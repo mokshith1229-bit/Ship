@@ -9,6 +9,8 @@ import leftArrowImg from '../assets/leftarrow.PNG';
 import rightArrowImg from '../assets/rightarrow.PNG';
 
 const REMARK_OPTIONS = [
+  'Rectified',
+  'Not Rectified',
   'Due to crack',
   'Due to rutting',
   'Due to pothole',
