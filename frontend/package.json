@@ -12,6 +12,7 @@
   "dependencies": {
     "@fontsource/plus-jakarta-sans": "^5.2.8",
     "autoprefixer": "^10.5.2",
+    "axios": "^1.18.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.42.2",
     "leaflet": "^1.9.4",

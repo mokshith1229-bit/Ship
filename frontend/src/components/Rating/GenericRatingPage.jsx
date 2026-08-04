@@ -191,6 +191,7 @@ const GenericRatingPage = ({ rowData = {}, config }) => {
                   activeIndex={activeImageIndex} 
                   onIndexChange={handleImageIndexChange} 
                   isEditMode={isEditMode}
+                  baseChainage={displayChainage}
                   onEscape={() => navigate(-1)} 
                 />
               </div>

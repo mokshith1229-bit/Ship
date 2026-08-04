@@ -19,8 +19,13 @@ import AllProjectsMap from '../components/dashboard/AllProjectsMap';
 
 import ExecutiveCards from '../components/dashboard/ExecutiveCards';
 import ExecutiveCharts from '../components/dashboard/ExecutiveCharts';
+import UserDashboard from '../components/dashboard/UserDashboard';
+import { useAuth } from '../context/AuthContext';
 
 const DashboardPage = () => {
+  const { user } = useAuth();
+  const isAdmin = user && (user.role === 'Admin' || user.role === 'Administrator' || user.role === 'HO' || user.role === 'SPV');
+  
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedProject = searchParams.get('project');
   const coordinates = selectedProject ? projectCoordinates[selectedProject] : null;
@@ -52,7 +57,9 @@ const DashboardPage = () => {
             animate={{ opacity: 1, y: 0 }}
             className="flex flex-col gap-4"
           >
-            {!selectedProject ? (
+            {!isAdmin ? (
+              <UserDashboard />
+            ) : !selectedProject ? (
               // GLOBAL VIEW - EXECUTIVE SUMMARY
               <div className="bg-white p-4 shadow-sm border border-gray-300 rounded mb-10">
                 {/* Header */}
@@ -110,32 +117,30 @@ const DashboardPage = () => {
               <>
                 <div className="flex items-center justify-between mb-2">
                   <h2 className="text-gray-800 font-bold text-xl tracking-wide flex items-center gap-2">
-                    Project Overview: <span className="text-primary bg-blue-50 px-3 py-1 rounded-md">{selectedProject}</span>
+                    Project Overview: <span className="text-[#5cb85c] bg-green-50 border border-green-200 px-3 py-1 rounded-md">{selectedProject}</span>
                   </h2>
                 </div>
 
-                <KPICards />
+                <KPICards selectedProject={selectedProject} />
 
                 {/* Map Section */}
-                {coordinates && (
-                  <div className="p-5 bg-white border border-borderColor rounded-xl shadow-sm mb-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-gray-700 font-bold text-base tracking-wide uppercase">
-                        Interactive Map: <span className="text-primary">{selectedProject}</span>
-                      </h2>
-                    </div>
-                    <ProjectMap project={selectedProject} coordinates={coordinates} />
+                <div className="p-5 bg-white border border-borderColor rounded-xl shadow-sm mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-gray-700 font-bold text-base tracking-wide uppercase">
+                      Interactive Map: <span className="text-[#5cb85c]">{selectedProject}</span>
+                    </h2>
                   </div>
-                )}
+                  <ProjectMap project={selectedProject} />
+                </div>
 
-                <AnalyticsCharts />
+                <AnalyticsCharts selectedProject={selectedProject} />
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
                   <div className="lg:col-span-2">
-                    <RecentActivityTimeline />
+                    <RecentActivityTimeline selectedProject={selectedProject} />
                   </div>
                   <div className="lg:col-span-1">
-                    <InspectorLeaderboard />
+                    <InspectorLeaderboard selectedProject={selectedProject} />
                   </div>
                 </div>
               </>

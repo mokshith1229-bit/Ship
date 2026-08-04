@@ -26,7 +26,7 @@ const CloneRatingPage = ({ rowData = {}, config }) => {
   const images = currentPage.images;
 
   const storedIndex = pageActiveImages[currentPageIndex];
-  const activeImageIndex = Math.max(0, Math.min(storedIndex ?? 0, images.length - 1));
+  const activeImageIndex = Math.max(0, Math.min(storedIndex ?? 1, images.length - 1));
 
   const handleImageIndexChange = (newIndex) => {
     setPageActiveImages(prev => ({

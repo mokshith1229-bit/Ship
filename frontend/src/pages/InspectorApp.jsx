@@ -1,0 +1,464 @@
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { MdUndo, MdEdit, MdHome, MdClose } from 'react-icons/md';
+import { motion, AnimatePresence } from 'framer-motion';
+import ImageCarousel from '../components/Rating/ImageCarousel';
+import CustomDropdown from '../components/common/CustomDropdown';
+import { ratingService } from '../services/rating.service';
+import leftArrowImg from '../assets/leftarrow.PNG';
+import rightArrowImg from '../assets/rightarrow.PNG';
+
+const REMARK_OPTIONS = [
+  'Due to crack',
+  'Due to rutting',
+  'Due to pothole',
+  'Minor Damage',
+  'Major Damage',
+  'Needs Cleaning',
+  'Missing',
+  'Requires Replacement',
+  'Good Condition'
+];
+
+const buildInitialRatings = (task) => {
+  if (task.ratings && task.ratings.length > 0) {
+    const map = {};
+    task.ratings.forEach(r => {
+      map[r.masterListId] = { score: String(r.score ?? 10), remark: r.remark || '' };
+    });
+    return map;
+  }
+  const map = {};
+  (task.parameters || []).forEach(p => {
+    map[p._id] = { score: '10', remark: '' };
+  });
+  return map;
+};
+
+const InspectorApp = () => {
+  const { batchId } = useParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const startIndex = parseInt(searchParams.get('startIndex'), 10) || 0;
+  
+  const [tasks, setTasks] = useState([]);
+  const [currentIndex, setCurrentIndex] = useState(startIndex);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [allRatings, setAllRatings] = useState({});
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [expandedCard, setExpandedCard] = useState(null);
+  const [headerRemarks, setHeaderRemarks] = useState({});
+  const [activeImageIndex, setActiveImageIndex] = useState(1);
+  const [customRemarkMode, setCustomRemarkMode] = useState({});
+
+  useEffect(() => {
+    fetchTasks();
+    // In case startIndex changes while mounted
+    setCurrentIndex(startIndex);
+  }, [batchId, startIndex]);
+
+  const fetchTasks = async () => {
+    try {
+      setLoading(true);
+      const res = await ratingService.getBatchTasks(batchId);
+      const fetchedTasks = res.data || [];
+      setTasks(fetchedTasks);
+      const initialAllRatings = {};
+      fetchedTasks.forEach(t => {
+        initialAllRatings[t._id] = buildInitialRatings(t);
+      });
+      setAllRatings(initialAllRatings);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to load inspection tasks.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const currentTask = tasks[currentIndex] || null;
+  const taskRatings = currentTask ? (allRatings[currentTask._id] || {}) : {};
+
+  const getRating = (masterListId) => taskRatings[masterListId] || { score: '10', remark: '' };
+
+  const setRating = (masterListId, field, value) => {
+    setAllRatings(prev => ({
+      ...prev,
+      [currentTask._id]: {
+        ...prev[currentTask._id],
+        [masterListId]: {
+          ...(prev[currentTask._id]?.[masterListId] || { score: '10', remark: '' }),
+          [field]: value
+        }
+      }
+    }));
+  };
+
+  const handleUndo = (masterListId) => {
+    setAllRatings(prev => ({
+      ...prev,
+      [currentTask._id]: {
+        ...prev[currentTask._id],
+        [masterListId]: { score: '10', remark: '' }
+      }
+    }));
+  };
+
+  const firstParam = currentTask?.parameters?.[0] || {};
+  
+  const displayAssetType = () => {
+    const aType = currentTask?.assetType || firstParam.assetType || '-';
+    const subType = currentTask?.assetSubType || firstParam.assetSubType;
+    return subType ? `${aType} (${subType})` : aType;
+  };
+
+  const metaHeaders = currentTask ? [
+    { key: 'category',  label: 'Category',   value: firstParam.category  || '-' },
+    { key: 'assetType', label: 'Asset type', value: displayAssetType() },
+    { key: 'direction', label: 'Direction',  value: firstParam.direction || '-' },
+    { key: 'roadType',  label: 'Road Type',  value: firstParam.roadType  || '-' },
+    { key: 'placement', label: 'Placement',  value: firstParam.placement || '-' },
+    { key: 'chainage',  label: 'Chainage',   value: currentTask.chainage || '-' }
+  ] : [];
+
+  const saveCurrentTask = async () => {
+    if (!currentTask) return true;
+    try {
+      setSaving(true);
+      const ratingsPayload = (currentTask.parameters || []).map(p => ({
+        masterListId: p._id,
+        score: Number(taskRatings[p._id]?.score ?? 10),
+        remark: taskRatings[p._id]?.remark || ''
+      }));
+      
+      const selectedImageUrl = images[activeImageIndex]?.url;
+      
+      await ratingService.saveTaskRatings(currentTask._id, ratingsPayload, selectedImageUrl);
+      setTasks(prev => {
+        const updated = [...prev];
+        const taskToUpdate = { ...updated[currentIndex], status: 'COMPLETED', ratings: ratingsPayload };
+        if (selectedImageUrl) {
+          taskToUpdate.image = { ...taskToUpdate.image, cloudinaryUrl: selectedImageUrl };
+        }
+        updated[currentIndex] = taskToUpdate;
+        return updated;
+      });
+      return true;
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save ratings. Please try again.');
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleNext = async () => {
+    const ok = await saveCurrentTask();
+    if (!ok) return;
+    if (currentIndex < tasks.length - 1) {
+      setCurrentIndex(prev => prev + 1);
+      setActiveImageIndex(1);
+      setExpandedCard(null);
+    } else {
+      alert('All tasks completed! Great job.');
+      navigate('/rating');
+    }
+  };
+
+  const handlePrevious = async () => {
+    await saveCurrentTask();
+    if (currentIndex > 0) {
+      setCurrentIndex(prev => prev - 1);
+      setActiveImageIndex(1);
+      setExpandedCard(null);
+    }
+  };
+
+  const toggleEditMode = () => {
+    setIsEditMode(e => !e);
+    setExpandedCard(null);
+  };
+
+  const handleCardClick = (cardKey) => {
+    if (!isEditMode) return;
+    setExpandedCard(prev => (prev === cardKey ? null : cardKey));
+  };
+
+  const images = [];
+  if (currentTask?.image?.cloudinaryUrl) {
+    const c = parseFloat(currentTask.chainage);
+    const currentImg = { url: currentTask.image.cloudinaryUrl, chainage: currentTask.chainage };
+    const prevImg = currentTask.image.previousUrl ? { url: currentTask.image.previousUrl, chainage: (c - 0.010).toFixed(3) } : currentImg;
+    const nextImg = currentTask.image.nextUrl ? { url: currentTask.image.nextUrl, chainage: (c + 0.010).toFixed(3) } : currentImg;
+    images.push(prevImg, currentImg, nextImg);
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col h-screen items-center justify-center bg-[#F8FAFC] gap-4">
+        <div className="w-10 h-10 border-4 border-[#5cb85c] border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-gray-500 font-medium">Loading inspection data...</p>
+      </div>
+    );
+  }
+
+  if (tasks.length === 0) {
+    return (
+      <div className="flex flex-col h-screen items-center justify-center bg-[#F8FAFC] gap-4">
+        <p className="text-gray-500 text-lg">No approved images found for this batch.</p>
+        <button
+          onClick={() => navigate('/rating')}
+          className="px-5 py-2 bg-[#5cb85c] text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+        >
+          Return to Rating Dashboard
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-screen overflow-hidden bg-[#F8FAFC]">
+
+      {/* Top Header */}
+      <div className="bg-white border-b border-[#5cb85c]/30 shadow-sm px-6 py-2.5 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/rating')}
+            className="p-2 text-gray-500 hover:text-[#5cb85c] hover:bg-green-50 rounded-full transition-colors"
+            title="Back to Rating Dashboard"
+          >
+            <MdHome className="text-xl" />
+          </button>
+          <div>
+            <h1 className="text-base font-semibold text-gray-900">Rating Interface</h1>
+            <p className="text-xs text-gray-500">Task {currentIndex + 1} of {tasks.length}</p>
+          </div>
+        </div>
+        <div className="text-sm font-medium text-gray-500">
+          Chainage: <span className="text-[#5cb85c] font-bold ml-1">{currentTask.chainage}</span>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        <div className="bg-white rounded shadow-sm border border-borderColor p-6 pb-24 flex flex-col min-h-full mx-0">
+
+          {/* Metadata Header Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-2">
+            {metaHeaders.map(header => {
+              const isExpanded = expandedCard === header.key;
+              const hasRemark = headerRemarks[header.key] && headerRemarks[header.key].trim() !== '';
+              return (
+                <div
+                  key={header.key}
+                  className={`border ${hasRemark ? 'border-red-500' : 'border-[#5cb85c]'} p-3 rounded bg-gray-50/30 flex flex-col relative transition-all duration-300 ${isEditMode ? 'cursor-pointer hover:shadow-md' : 'cursor-default'}`}
+                  onClick={() => handleCardClick(header.key)}
+                >
+                  <div className={`absolute inset-0 rounded pointer-events-none transition-all duration-300 ${isEditMode ? `ring-2 ring-inset ${hasRemark ? 'ring-red-500' : 'ring-[#D4AF37]'}` : ''} ${isExpanded && isEditMode ? (hasRemark ? 'bg-red-500/5 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : 'bg-[#D4AF37]/5 shadow-[0_0_10px_rgba(212,175,55,0.2)]') : ''}`}></div>
+                  <div className="relative z-10">
+                    <div className="text-xs text-gray-500 mb-1">{header.label}</div>
+                    <div className="font-medium text-gray-800">{header.value}</div>
+                  </div>
+                  <AnimatePresence>
+                    {isEditMode && isExpanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0, marginTop: 0 }}
+                        animate={{ height: 'auto', opacity: 1, marginTop: 12 }}
+                        exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="overflow-hidden relative z-10 w-full"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <textarea
+                          autoFocus
+                          className={`w-full p-2 border ${hasRemark ? 'border-red-500 focus:ring-red-500/50' : 'border-[#5cb85c] focus:ring-[#5cb85c]/50'} rounded focus:ring-2 focus:outline-none resize-y min-h-[80px] text-sm text-gray-800 bg-white`}
+                          placeholder="Enter remark..."
+                          value={headerRemarks[header.key] || ''}
+                          onChange={(e) => setHeaderRemarks(prev => ({ ...prev, [header.key]: e.target.value }))}
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Image Carousel with Arrow Navigation */}
+          <div className="relative flex items-center justify-between w-full my-4 group">
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              className="z-40 w-14 h-20 sm:w-20 sm:h-32 md:w-24 md:h-40 bg-transparent border-none focus:outline-none flex items-center justify-center shrink-0 -ml-2 sm:-ml-3"
+              onClick={handlePrevious}
+              disabled={currentIndex === 0 || saving}
+              title="Previous Task"
+            >
+              <img
+                src={leftArrowImg}
+                className={`w-full h-full object-contain mix-blend-multiply drop-shadow-md transition-opacity ${currentIndex === 0 ? 'opacity-30' : 'opacity-100'}`}
+                alt="Previous Task"
+                draggable={false}
+              />
+            </motion.button>
+
+            <div className="flex-1 px-2 md:px-4 min-w-0">
+              <ImageCarousel
+                images={images}
+                activeIndex={activeImageIndex}
+                onIndexChange={setActiveImageIndex}
+                isEditMode={isEditMode}
+                baseChainage={currentTask.chainage}
+                onEscape={() => navigate('/rating')}
+              />
+            </div>
+
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              className="z-40 w-14 h-20 sm:w-20 sm:h-32 md:w-24 md:h-40 bg-transparent border-none focus:outline-none flex items-center justify-center shrink-0 -mr-2 sm:-mr-3"
+              onClick={handleNext}
+              disabled={saving}
+              title={currentIndex === tasks.length - 1 ? 'Finish' : 'Next Task'}
+            >
+              <img
+                src={rightArrowImg}
+                className="w-full h-full object-contain mix-blend-multiply drop-shadow-md"
+                alt="Next Task"
+                draggable={false}
+              />
+            </motion.button>
+
+            {/* Edit Mode Toggle */}
+            <div className="absolute top-0 right-0 sm:right-2 md:right-4 lg:right-6 z-50 flex flex-col items-center justify-center pointer-events-none">
+              <button
+                onClick={toggleEditMode}
+                className={`w-12 h-12 md:w-14 md:h-14 rounded-full border-2 border-dashed transition-all duration-300 shadow-sm flex items-center justify-center pointer-events-auto ${isEditMode ? 'border-[#D4AF37] text-white bg-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.4)]' : 'border-[#5cb85c] text-[#5cb85c] hover:bg-[#5cb85c] hover:text-white bg-white/80 backdrop-blur-sm'}`}
+                aria-label={isEditMode ? 'Exit Edit Mode' : 'Enter Edit Mode'}
+                title={isEditMode ? 'Exit Edit Mode' : 'Enter Edit Mode'}
+              >
+                <MdEdit className="text-xl md:text-2xl" />
+              </button>
+            </div>
+          </div>
+
+          {/* Rating Parameters */}
+          <h2 className="text-lg font-medium text-center mb-2 mt-0 border-b pb-1 text-gray-800">
+            Rating Parameters
+          </h2>
+
+          <div className="flex flex-col xl:flex-row gap-6 w-full mb-0">
+            {(currentTask.parameters || []).map(param => {
+              const rating = getRating(param._id);
+              return (
+                <div
+                  key={param._id}
+                  className="flex flex-col border border-borderColor p-4 rounded bg-gray-50/30 shadow-sm flex-1"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-medium text-lg text-gray-800">{param.parameter}</h3>
+                    <button
+                      onClick={() => handleUndo(param._id)}
+                      className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                      title="Undo changes"
+                    >
+                      <MdUndo className="text-lg" />
+                    </button>
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-auto">
+                    <div className="flex gap-4 shrink-0">
+                      {['0', '1', '5', '10'].map(val => {
+                        const isRed = val === '0' || val === '1';
+                        const colorClass = isRed
+                          ? 'text-red-500 focus:ring-red-500 accent-red-500'
+                          : 'text-[#5cb85c] focus:ring-[#5cb85c] accent-[#5cb85c]';
+                        return (
+                          <label key={val} className="flex items-center gap-1.5 sm:gap-2 cursor-pointer group">
+                            <input
+                              type="radio"
+                              name={`rating-${param._id}`}
+                              value={val}
+                              checked={rating.score === val}
+                              onChange={(e) => setRating(param._id, 'score', e.target.value)}
+                              onKeyDown={(e) => e.preventDefault()}
+                              onClick={(e) => e.target.blur()}
+                              className={`w-4 h-4 border-gray-300 ${colorClass}`}
+                            />
+                            <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">{val}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <div className="flex-1 w-full">
+                      {customRemarkMode[param._id] || (rating.remark && !REMARK_OPTIONS.includes(rating.remark)) ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            autoFocus
+                            value={rating.remark === 'Other' ? '' : rating.remark}
+                            onChange={(e) => setRating(param._id, 'remark', e.target.value)}
+                            placeholder="Enter custom remark..."
+                            className="w-full px-3 py-1.5 md:min-h-[38px] bg-white border border-[#5cb85c] rounded-md text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#5cb85c]/20 shadow-sm"
+                          />
+                          <button
+                            onClick={() => {
+                              setRating(param._id, 'remark', '');
+                              setCustomRemarkMode(prev => ({ ...prev, [param._id]: false }));
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                            title="Cancel custom remark"
+                          >
+                            <MdClose className="text-xl" />
+                          </button>
+                        </div>
+                      ) : (
+                        <CustomDropdown
+                          options={[...REMARK_OPTIONS, 'Other']}
+                          value={rating.remark}
+                          onChange={(val) => {
+                            if (val === 'Other') {
+                              setCustomRemarkMode(prev => ({ ...prev, [param._id]: true }));
+                              setRating(param._id, 'remark', '');
+                            } else {
+                              setRating(param._id, 'remark', val);
+                            }
+                          }}
+                          placeholder="Remark"
+                          direction="up"
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {(!currentTask.parameters || currentTask.parameters.length === 0) && (
+              <div className="flex-1 flex items-center justify-center py-12 text-gray-400 border border-dashed border-gray-300 rounded-lg">
+                No rating parameters found for this task.
+              </div>
+            )}
+          </div>
+
+          {/* Save / Navigation Footer */}
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-3 flex items-center justify-start z-30 shadow-lg">
+            <div className="text-sm text-gray-500">
+              Task <span className="font-semibold text-gray-800">{currentIndex + 1}</span> of <span className="font-semibold text-gray-800">{tasks.length}</span>
+              {saving ? (
+                <span className="ml-3 px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium">Saving...</span>
+              ) : currentTask.status === 'COMPLETED' ? (
+                <span className="ml-3 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium">Saved</span>
+              ) : null}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default InspectorApp;

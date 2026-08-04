@@ -94,8 +94,31 @@ const RoadIcon = ({ className }) => (
 const DashboardChart = () => {
   const [activeIndex, setActiveIndex] = useState(null);
   const [isEngineStarted, setIsEngineStarted] = useState(false);
-  const total = useMemo(() => chartData.reduce((acc, curr) => acc + curr.value, 0), []);
-  const activeData = activeIndex !== null ? chartData[activeIndex] : null;
+  const [data, setData] = useState([]);
+
+  React.useEffect(() => {
+    import('../services/dashboard.service').then(({ dashboardService }) => {
+      dashboardService.getRoadsStatus().then(res => {
+        // Map backend data to chart format with colors
+        const colors = {
+          'COMPLETED': '#368c3f', // Green
+          'ONGOING': '#1b5e20', // Dark Green
+          'PENDING': '#1a1a1a'  // Dark Gray
+        };
+        const responseData = Array.isArray(res) ? res : (res.data || []);
+        const mappedData = responseData.map(item => ({
+          id: item._id,
+          name: item._id,
+          value: item.count,
+          color: colors[item._id] || '#8884d8'
+        }));
+        setData(mappedData.length ? mappedData : [{ name: 'No Data', value: 1, color: '#ccc' }]);
+      }).catch(console.error);
+    });
+  }, []);
+
+  const total = useMemo(() => data.reduce((acc, curr) => acc + curr.value, 0), [data]);
+  const activeData = activeIndex !== null ? data[activeIndex] : null;
 
   const onPieEnter = (_, index) => {
     setActiveIndex(index);
@@ -174,7 +197,7 @@ const DashboardChart = () => {
             <ResponsiveContainer width="100%" height="100%" className="focus:outline-none">
               <PieChart className="focus:outline-none !outline-none" style={{ outline: 'none' }}>
                 <Pie
-                  data={chartData}
+                  data={data}
                   cx="50%"
                   cy="50%"
                   innerRadius="65%"
@@ -193,7 +216,7 @@ const DashboardChart = () => {
                   animationDuration={1200}
                   animationEasing="ease-out"
                 >
-                  {chartData.map((entry, index) => (
+                  {data.map((entry, index) => (
                     <Cell 
                       key={`cell-${index}`} 
                       fill={entry.color} 
