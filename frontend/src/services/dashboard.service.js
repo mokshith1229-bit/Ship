@@ -49,5 +49,10 @@ export const dashboardService = {
   getChartsData: async (projectId = '') => {
     const response = await api.get(`/dashboard/charts?projectId=${projectId}`);
     return response.data?.data || response.data;
+  },
+
+  getSkipAnalytics: async (projectId = '') => {
+    const response = await api.get(`/dashboard/skip-analytics?projectId=${projectId}`);
+    return response.data?.data || response.data;
   }
 };

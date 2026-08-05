@@ -12,6 +12,7 @@ const fileSchema = new mongoose.Schema({
 const SurveyAssetSchema = new mongoose.Schema({
   project: { type: String, required: true, index: true },
   assetName: { type: String, required: true, index: true }, // e.g., 'SIPL_001'
+  roadDirection: { type: String, enum: ['LHS', 'RHS'] },
   roadType: { type: String, default: 'All Types', index: true },
   status: { 
     type: String, 

@@ -182,6 +182,11 @@ const getChartsData = asyncHandler(async (req, res) => {
   return successResponse(res, data, 'Charts data retrieved');
 });
 
+const getSkipAnalytics = asyncHandler(async (req, res) => {
+  const data = await dashboardService.getSkipAnalytics(req.query.projectId);
+  return successResponse(res, data, 'Skip analytics retrieved');
+});
+
 module.exports = {
   getExecutiveKPIs,
   getUserKPIs,
@@ -192,5 +197,6 @@ module.exports = {
   getInspectorLeaderboard,
   getRecentActivity,
   getAllProjectsMapData,
-  getChartsData
+  getChartsData,
+  getSkipAnalytics
 };

@@ -14,6 +14,7 @@ import KPICards from '../components/dashboard/KPICards';
 import AnalyticsCharts from '../components/dashboard/AnalyticsCharts';
 import InspectorLeaderboard from '../components/dashboard/InspectorLeaderboard';
 import RecentActivityTimeline from '../components/dashboard/RecentActivityTimeline';
+import SkipAnalytics from '../components/dashboard/SkipAnalytics';
 import LogoCarousel from '../components/dashboard/LogoCarousel';
 import AllProjectsMap from '../components/dashboard/AllProjectsMap';
 
@@ -142,6 +143,10 @@ const DashboardPage = () => {
                   <div className="lg:col-span-1">
                     <InspectorLeaderboard selectedProject={selectedProject} />
                   </div>
+                </div>
+
+                <div className="mb-10">
+                  <SkipAnalytics selectedProject={selectedProject} />
                 </div>
               </>
             )}

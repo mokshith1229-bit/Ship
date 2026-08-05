@@ -33,6 +33,7 @@ const SurveyLibraryPage = () => {
   const [modalMode, setModalMode] = useState('CREATE'); // 'CREATE' or 'EDIT'
   const [editingAssetId, setEditingAssetId] = useState(null);
   const [assetName, setAssetName] = useState('');
+  const [roadDirection, setRoadDirection] = useState('LHS');
   const [roadType, setRoadType] = useState('All Types');
   const [videoFile, setVideoFile] = useState(null);
   const [vttFile, setVttFile] = useState(null);
@@ -89,6 +90,7 @@ const SurveyLibraryPage = () => {
     setModalMode('CREATE');
     setEditingAssetId(null);
     setAssetName('');
+    setRoadDirection('LHS');
     setRoadType('All Types');
     setVideoFile(null);
     setVttFile(null);
@@ -100,6 +102,7 @@ const SurveyLibraryPage = () => {
     setModalMode('EDIT');
     setEditingAssetId(asset._id);
     setAssetName(asset.assetName);
+    setRoadDirection(asset.roadDirection || 'LHS');
     setRoadType(asset.roadType || 'All Types');
     setVideoFile(null); // Clear file selection on edit, meaning keep existing if not changed
     setVttFile(null);
@@ -128,10 +131,10 @@ const SurveyLibraryPage = () => {
     setSavingAsset(true);
     try {
       if (modalMode === 'CREATE') {
-        const res = await surveyLibraryService.createAsset(selectedProject, assetName, roadType, videoFile, vttFile);
+        const res = await surveyLibraryService.createAsset(selectedProject, assetName, roadDirection, roadType, videoFile, vttFile);
         setAssets(res.data);
       } else {
-        const res = await surveyLibraryService.updateAsset(selectedProject, editingAssetId, assetName, roadType, videoFile, vttFile);
+        const res = await surveyLibraryService.updateAsset(selectedProject, editingAssetId, assetName, roadDirection, roadType, videoFile, vttFile);
         setAssets(res.data);
       }
       closeModal();
@@ -260,6 +263,7 @@ const SurveyLibraryPage = () => {
                       <thead>
                         <tr className="border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider bg-gray-50/50">
                           <th className="py-3 px-4 font-semibold">Asset Name</th>
+                          <th className="py-3 px-4 font-semibold">Direction</th>
                           <th className="py-3 px-4 font-semibold">Road Type</th>
                           <th className="py-3 px-4 font-semibold text-center">Video</th>
                           <th className="py-3 px-4 font-semibold text-center">VTT</th>
@@ -280,6 +284,9 @@ const SurveyLibraryPage = () => {
                             <tr key={asset._id} className="hover:bg-gray-50/50 transition-colors">
                               <td className="py-3 px-4">
                                 <span className="font-bold text-sm text-gray-800">{asset.assetName}</span>
+                              </td>
+                              <td className="py-3 px-4">
+                                <span className="text-xs text-gray-600 px-2 py-1 bg-gray-100 rounded-md font-medium border border-gray-200">{asset.roadDirection || 'LHS'}</span>
                               </td>
                               <td className="py-3 px-4">
                                 <span className="text-xs text-gray-600 px-2 py-1 bg-gray-100 rounded-md font-medium border border-gray-200">{asset.roadType || 'All Types'}</span>
@@ -412,6 +419,21 @@ const SurveyLibraryPage = () => {
                   placeholder="e.g. SIPL_Part_01"
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-textColor focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Road Direction *</label>
+                <div className="relative">
+                  <select
+                    value={roadDirection}
+                    onChange={(e) => setRoadDirection(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-textColor focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 appearance-none bg-white"
+                  >
+                    <option value="LHS">LHS (Left Hand Side)</option>
+                    <option value="RHS">RHS (Right Hand Side)</option>
+                  </select>
+                  <MdKeyboardArrowDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
               </div>
 
               <div>

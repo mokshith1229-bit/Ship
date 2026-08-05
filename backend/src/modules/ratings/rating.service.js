@@ -356,4 +356,80 @@ const exportRatingsCSV = async (projectId) => {
   return rows.join('\n');
 };
 
-module.exports = { getProjectRatings, computeOverallRating, getRatingSummary, getVersionHistory, getReadyBatches, getBatchTasks, saveTaskRatings, exportRatingsCSV };
+/**
+ * Skips a task (chainage) with a reason
+ */
+const skipTask = async (taskId, skipData, user) => {
+  const task = await InspectionTask.findById(taskId);
+  if (!task) throw Object.assign(new Error('Task not found'), { statusCode: 404 });
+
+  // RBAC: If user is 'User', verify they are assigned this task
+  if (user && user.role === 'User') {
+    const assignment = await WorkAssignment.findOne({
+      batchId: task.batchId,
+      assignedTo: user._id,
+      status: { $in: ['Assigned', 'In Progress'] }
+    });
+
+    if (!assignment) {
+      throw Object.assign(new Error('Forbidden: No active assignment for this batch'), { statusCode: 403 });
+    }
+
+    if (assignment.questionIds && assignment.questionIds.length > 0) {
+      const isAssigned = assignment.questionIds.some(qId => qId.toString() === taskId.toString());
+      if (!isAssigned) {
+        throw Object.assign(new Error('Forbidden: You are not assigned to rate this specific task'), { statusCode: 403 });
+      }
+    }
+  }
+
+  if (!skipData.reason) {
+    throw Object.assign(new Error('Skip reason is required'), { statusCode: 400 });
+  }
+
+  if (skipData.reason === 'Other' && !skipData.remarks) {
+    throw Object.assign(new Error('Remarks are required when skip reason is "Other"'), { statusCode: 400 });
+  }
+
+  task.status = 'SKIPPED';
+  task.skipMetadata = {
+    reason: skipData.reason,
+    remarks: skipData.remarks || '',
+    skippedBy: user._id,
+    skippedAt: new Date()
+  };
+  await task.save();
+
+  // Check if batch is completed
+  const remainingTasks = await InspectionTask.countDocuments({ 
+    batchId: task.batchId, 
+    status: { $nin: ['COMPLETED', 'SKIPPED'] } 
+  });
+
+  if (remainingTasks === 0) {
+    const batch = await InspectionBatch.findById(task.batchId);
+    if (batch) {
+      batch.status = 'COMPLETED';
+      await batch.save();
+    }
+    
+    // Also mark assignment as completed if user is a 'User'
+    if (user && user.role === 'User') {
+       await WorkAssignment.updateMany(
+         { batchId: task.batchId, status: { $in: ['Assigned', 'In Progress'] } },
+         { $set: { status: 'Completed', completedTime: new Date() } }
+       );
+    }
+  } else {
+    // If it was READY_FOR_RATING, move to IN_PROGRESS
+    const batch = await InspectionBatch.findById(task.batchId);
+    if (batch && batch.status === 'READY_FOR_RATING') {
+      batch.status = 'IN_PROGRESS';
+      await batch.save();
+    }
+  }
+
+  return task;
+};
+
+module.exports = { getProjectRatings, computeOverallRating, getRatingSummary, getVersionHistory, getReadyBatches, getBatchTasks, saveTaskRatings, skipTask, exportRatingsCSV };

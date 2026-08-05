@@ -12,6 +12,7 @@ router.get('/version-history', getVersionHistory);
 router.get('/batches', ratingController.getReadyBatches);
 router.get('/batches/:batchId/tasks', ratingController.getBatchTasks);
 router.post('/tasks/:taskId/rate', ratingController.saveTaskRatings);
+router.post('/tasks/:taskId/skip', ratingController.skipTask);
 router.get('/project/:projectId/export', ratingController.exportRatingsCSV);
 router.get('/:id/summary', getRatingSummary);
 router.get('/:id/overall', getOverallRating);

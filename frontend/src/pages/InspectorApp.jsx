@@ -22,6 +22,22 @@ const REMARK_OPTIONS = [
   'Good Condition'
 ];
 
+const SKIP_REASONS = [
+  'Image does not match Chainage',
+  'Wrong Survey Image',
+  'Blurred / Low Quality Image',
+  'Image Not Available',
+  'Asset Not Visible',
+  'Asset Covered / Obstructed',
+  'Incorrect Asset Category',
+  'Duplicate Image',
+  'Chainage Mismatch',
+  'GPS / Metadata Error',
+  'Technical Extraction Error',
+  'Safety Concern',
+  'Other'
+];
+
 const buildInitialRatings = (task) => {
   if (task.ratings && task.ratings.length > 0) {
     const map = {};
@@ -53,6 +69,10 @@ const InspectorApp = () => {
   const [headerRemarks, setHeaderRemarks] = useState({});
   const [activeImageIndex, setActiveImageIndex] = useState(1);
   const [customRemarkMode, setCustomRemarkMode] = useState({});
+  const [skipModalOpen, setSkipModalOpen] = useState(false);
+  const [skipReason, setSkipReason] = useState('');
+  const [skipRemarks, setSkipRemarks] = useState('');
+  const [skipping, setSkipping] = useState(false);
 
   useEffect(() => {
     fetchTasks();
@@ -175,6 +195,45 @@ const InspectorApp = () => {
       setCurrentIndex(prev => prev - 1);
       setActiveImageIndex(1);
       setExpandedCard(null);
+    }
+  };
+
+  const handleSkip = async () => {
+    if (!skipReason) {
+      alert('Please select a skip reason.');
+      return;
+    }
+    if (skipReason === 'Other' && !skipRemarks.trim()) {
+      alert('Please provide remarks for skipping.');
+      return;
+    }
+
+    try {
+      setSkipping(true);
+      await ratingService.skipTask(currentTask._id, skipReason, skipRemarks);
+      setTasks(prev => {
+        const updated = [...prev];
+        updated[currentIndex] = { ...updated[currentIndex], status: 'SKIPPED' };
+        return updated;
+      });
+      
+      setSkipModalOpen(false);
+      setSkipReason('');
+      setSkipRemarks('');
+      
+      if (currentIndex < tasks.length - 1) {
+        setCurrentIndex(prev => prev + 1);
+        setActiveImageIndex(1);
+        setExpandedCard(null);
+      } else {
+        alert('All tasks completed! Great job.');
+        navigate('/rating');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to skip task. Please try again.');
+    } finally {
+      setSkipping(false);
     }
   };
 
@@ -426,6 +485,11 @@ const InspectorApp = () => {
                               setRating(param._id, 'remark', '');
                             } else {
                               setRating(param._id, 'remark', val);
+                              if (val && val.toLowerCase() === 'rectified') {
+                                setRating(param._id, 'score', '10');
+                              } else if (val && val.toLowerCase() === 'not rectified') {
+                                setRating(param._id, 'score', '5');
+                              }
                             }
                           }}
                           placeholder="Remark"
@@ -449,13 +513,123 @@ const InspectorApp = () => {
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-3 flex items-center justify-start z-30 shadow-lg">
             <div className="text-sm text-gray-500">
               Task <span className="font-semibold text-gray-800">{currentIndex + 1}</span> of <span className="font-semibold text-gray-800">{tasks.length}</span>
-              {saving ? (
-                <span className="ml-3 px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium">Saving...</span>
+              {saving || skipping ? (
+                <span className="ml-3 px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium">Processing...</span>
               ) : currentTask.status === 'COMPLETED' ? (
                 <span className="ml-3 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium">Saved</span>
+              ) : currentTask.status === 'SKIPPED' ? (
+                <span className="ml-3 px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full font-medium">Skipped</span>
               ) : null}
             </div>
+            <div className="ml-auto flex items-center gap-3">
+              <button
+                onClick={() => setSkipModalOpen(true)}
+                disabled={saving || skipping}
+                className="px-4 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none transition-colors border border-gray-200"
+              >
+                Skip Question
+              </button>
+            </div>
           </div>
+
+          {/* Skip Confirmation Modal */}
+          <AnimatePresence>
+            {skipModalOpen && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm"
+              >
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                  className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden"
+                >
+                  <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                    <h3 className="text-lg font-semibold text-gray-900">Skip Question</h3>
+                    <button
+                      onClick={() => {
+                        setSkipModalOpen(false);
+                        setSkipReason('');
+                        setSkipRemarks('');
+                      }}
+                      className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
+                    >
+                      <MdClose className="text-xl" />
+                    </button>
+                  </div>
+                  <div className="p-6">
+                    <p className="text-sm text-gray-600 mb-4">
+                      Please select a reason for skipping this inspection task.
+                    </p>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5 uppercase tracking-wide">
+                          Skip Reason <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={skipReason}
+                          onChange={(e) => setSkipReason(e.target.value)}
+                          className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#5cb85c]/20 focus:border-[#5cb85c] shadow-sm transition-shadow appearance-none cursor-pointer"
+                        >
+                          <option value="">Select a reason...</option>
+                          {SKIP_REASONS.map(reason => (
+                            <option key={reason} value={reason}>{reason}</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      {skipReason === 'Other' && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                        >
+                          <label className="block text-xs font-medium text-gray-700 mb-1.5 uppercase tracking-wide">
+                            Remarks <span className="text-red-500">*</span>
+                          </label>
+                          <textarea
+                            value={skipRemarks}
+                            onChange={(e) => setSkipRemarks(e.target.value)}
+                            placeholder="Please provide details..."
+                            rows={3}
+                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#5cb85c]/20 focus:border-[#5cb85c] shadow-sm transition-shadow resize-none"
+                          />
+                        </motion.div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
+                    <button
+                      onClick={() => {
+                        setSkipModalOpen(false);
+                        setSkipReason('');
+                        setSkipRemarks('');
+                      }}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSkip}
+                      disabled={skipping || !skipReason || (skipReason === 'Other' && !skipRemarks.trim())}
+                      className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {skipping ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          Skipping...
+                        </>
+                      ) : (
+                        'Confirm Skip'
+                      )}
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
         </div>
       </div>

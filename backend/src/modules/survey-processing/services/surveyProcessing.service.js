@@ -45,7 +45,7 @@ class SurveyProcessingService {
     const tasks = await InspectionTask.find({ 
       batchId: { $in: batchIds }, 
       status: { $in: ['PENDING_IMAGE', 'EXTRACTION_FAILED'] } 
-    });
+    }).populate('parameters');
 
     if (!tasks.length) {
       for (const b of pendingBatches) {
@@ -81,10 +81,37 @@ class SurveyProcessingService {
           if (a.roadType !== task.roadType) return false;
         }
 
+        // Match roadDirection
+        const taskDirection = task.parameters && task.parameters.length > 0 ? task.parameters[0].direction : 'N/A';
+        if (taskDirection === 'LHS' || taskDirection === 'RHS') {
+          if (a.roadDirection && a.roadDirection !== taskDirection) {
+            return false;
+          }
+        }
+
         return true;
       });
 
       if (!foundAsset) {
+        const taskDirection = task.parameters && task.parameters.length > 0 ? task.parameters[0].direction : 'N/A';
+        if (taskDirection === 'LHS' || taskDirection === 'RHS') {
+          // Check if it's purely a direction mismatch
+          const hasAssetWithoutDir = assets.find(a => {
+            if (!a.coverage) return false;
+            const matchesChainage = c >= Math.min(a.coverage.startChainage, a.coverage.endChainage) && 
+                                   c <= Math.max(a.coverage.startChainage, a.coverage.endChainage);
+            if (!matchesChainage) return false;
+            if (a.roadType && a.roadType !== 'All Types' && a.roadType !== task.roadType) return false;
+            return true; // Match found regardless of direction
+          });
+
+          if (hasAssetWithoutDir) {
+            task.extractionDiagnostics = { failureReason: 'No matching Survey Asset found for this Road Direction.' };
+            task.status = 'EXTRACTION_FAILED';
+            unmappedTasks.push(task);
+            continue;
+          }
+        }
         unmappedTasks.push(task);
       } else {
         if (!taskGroups.has(foundAsset._id.toString())) {
@@ -101,7 +128,10 @@ class SurveyProcessingService {
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
-    await InspectionBatch.updateMany({ _id: { $in: batchIds } }, { $set: { status: 'PROCESSING' } });
+    await InspectionBatch.updateMany(
+      { _id: { $in: batchIds }, status: { $in: ['WAITING_FOR_IMAGES', 'FAILED', 'READY_FOR_REVIEW'] } },
+      { $set: { status: 'PROCESSING' } }
+    );
 
     let successCount = 0;
     let failCount = 0;
@@ -225,8 +255,10 @@ class SurveyProcessingService {
 
       // Mark unmapped tasks
       for (const task of unmappedTasks) {
-        task.extractionDiagnostics = { failureReason: 'No survey asset covers this chainage for the specified road type' };
-        task.status = 'EXTRACTION_FAILED';
+        if (!task.extractionDiagnostics || !task.extractionDiagnostics.failureReason) {
+          task.extractionDiagnostics = { failureReason: 'No survey asset covers this chainage for the specified road type' };
+          task.status = 'EXTRACTION_FAILED';
+        }
         await task.save();
         failCount++;
       }

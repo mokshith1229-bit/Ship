@@ -7,7 +7,7 @@ const {
   getExecutiveKPIs, getProjectKPIs, getRoadsStatus,
   getCategoryDistribution, getDailyRatings,
   getInspectorLeaderboard, getRecentActivity, getAllProjectsMapData,
-  getChartsData, getUserKPIs
+  getChartsData, getUserKPIs, getSkipAnalytics
 } = require('./dashboard.controller');
 const { authenticate } = require('../../middleware/auth.middleware');
 
@@ -22,6 +22,7 @@ router.get('/inspector-leaderboard', getInspectorLeaderboard);
 router.get('/recent-activity', getRecentActivity);
 router.get('/map', getAllProjectsMapData);
 router.get('/charts', getChartsData);
+router.get('/skip-analytics', getSkipAnalytics);
 router.get('/project/:id', getProjectKPIs);
 
 module.exports = router;

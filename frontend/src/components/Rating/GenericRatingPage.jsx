@@ -80,7 +80,7 @@ const GenericRatingPage = ({ rowData = {}, config }) => {
   const remarks = currentData.remarks;
   const headerRemarks = currentData.headerRemarks;
 
-  const remarkOptions = ['Due to crack', 'Due to rutting', 'Due to pothole'];
+  const remarkOptions = ['Due to crack', 'Due to rutting', 'Due to pothole', 'Rectified', 'Not Rectified'];
 
   const toggleEditMode = () => {
     setIsEditMode(!isEditMode);
@@ -264,7 +264,14 @@ const GenericRatingPage = ({ rowData = {}, config }) => {
                         <CustomDropdown 
                           options={remarkOptions}
                           value={remarks[key]}
-                          onChange={(val) => setRemarks(prev => ({ ...prev, [key]: val }))}
+                          onChange={(val) => {
+                            setRemarks(prev => ({ ...prev, [key]: val }));
+                            if (val && val.toLowerCase() === 'rectified') {
+                              setRatings(prev => ({ ...prev, [key]: '10' }));
+                            } else if (val && val.toLowerCase() === 'not rectified') {
+                              setRatings(prev => ({ ...prev, [key]: '5' }));
+                            }
+                          }}
                           placeholder="Remark"
                           direction="up"
                         />

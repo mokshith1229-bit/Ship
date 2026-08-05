@@ -53,7 +53,7 @@ const inspectionTaskSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['PENDING_IMAGE', 'READY_FOR_REVIEW', 'READY_FOR_RATING', 'IN_PROGRESS', 'COMPLETED', 'EXTRACTION_FAILED', 'FAILED', 'REJECTED'],
+      enum: ['PENDING_IMAGE', 'READY_FOR_REVIEW', 'READY_FOR_RATING', 'IN_PROGRESS', 'COMPLETED', 'EXTRACTION_FAILED', 'FAILED', 'REJECTED', 'SKIPPED'],
       default: 'PENDING_IMAGE',
       index: true
     },
@@ -96,6 +96,12 @@ const inspectionTaskSchema = new mongoose.Schema(
       calculatedTimestamp: String,
       videoDuration: String,
       failureReason: String
+    },
+    skipMetadata: {
+      reason: String,
+      remarks: String,
+      skippedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      skippedAt: Date
     }
   },
   {

@@ -33,5 +33,13 @@ export const ratingService = {
       responseType: 'blob',
     });
     return response.data;
+  },
+
+  /**
+   * Skip a task
+   */
+  async skipTask(taskId, reason, remarks = '') {
+    const response = await api.post(`/ratings/tasks/${taskId}/skip`, { reason, remarks });
+    return response.data;
   }
 };

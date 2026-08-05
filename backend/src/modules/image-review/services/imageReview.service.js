@@ -38,7 +38,7 @@ class ImageReviewService {
     const batch = await InspectionBatch.findById(batchId);
     if (!batch) throw new Error('Batch not found');
 
-    if (batch.status !== 'READY_FOR_REVIEW') {
+    if (!['READY_FOR_REVIEW', 'READY_FOR_RATING', 'IN_PROGRESS', 'COMPLETED'].includes(batch.status)) {
       throw new Error(`Batch cannot be approved in status: ${batch.status}`);
     }
 
@@ -46,16 +46,18 @@ class ImageReviewService {
     // Only consider tasks that have an actual image
     const tasksWithImages = tasks.filter(t => t.image && t.image.cloudinaryUrl && t.image.cloudinaryUrl.trim() !== '');
     
-    // Move batch to READY_FOR_RATING
-    batch.status = 'READY_FOR_RATING';
+    // Move batch to READY_FOR_RATING, unless it's already IN_PROGRESS or COMPLETED
+    if (batch.status === 'READY_FOR_REVIEW') {
+      batch.status = 'READY_FOR_RATING';
+    }
     batch.approvedBy = userId;
     batch.approvedAt = new Date();
     batch.reviewCompleted = true;
     await batch.save();
 
-    // Ensure all tasks with images are approved and correctly marked
+    // Ensure all newly extracted tasks with images are approved and correctly marked
     await InspectionTask.updateMany(
-      { batchId, 'image.cloudinaryUrl': { $exists: true, $ne: '' } },
+      { batchId, status: 'READY_FOR_REVIEW', 'image.cloudinaryUrl': { $exists: true, $ne: '' } },
       { $set: { 
           status: 'READY_FOR_RATING',
           imageApproved: true,

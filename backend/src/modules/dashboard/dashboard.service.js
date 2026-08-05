@@ -114,8 +114,9 @@ const getUserKPIs = async (userId) => {
 /**
  * Project-specific KPIs
  */
-const getProjectKPIs = async (projectId) => {
+const getProjectKPIs = async (projectId, batchId = null) => {
   const filter = { project: projectId };
+  if (batchId) filter.batchId = mongoose.Types.ObjectId(batchId);
 
   const [total, completed, paramStats, criticalCount, avgRatingResult, lastUpdated] = await Promise.all([
     InspectionTask.countDocuments({ ...filter, status: { $in: ['READY_FOR_RATING', 'IN_PROGRESS', 'COMPLETED'] } }),
@@ -181,9 +182,10 @@ const getRoadsStatus = async () => {
 /**
  * Category distribution for charts
  */
-const getCategoryDistribution = async (projectId) => {
+const getCategoryDistribution = async (projectId, batchId = null) => {
   const filter = { status: 'COMPLETED' };
   if (projectId) filter.project = projectId;
+  if (batchId) filter.batchId = mongoose.Types.ObjectId(batchId);
 
   return InspectionTask.aggregate([
     { $match: filter },
@@ -204,9 +206,10 @@ const getCategoryDistribution = async (projectId) => {
 /**
  * Daily rating trend — last N days
  */
-const getDailyRatings = async (projectId, days = 30) => {
+const getDailyRatings = async (projectId, days = 30, batchId = null) => {
   const filter = { status: 'COMPLETED' };
   if (projectId) filter.project = projectId;
+  if (batchId) filter.batchId = mongoose.Types.ObjectId(batchId);
 
   const since = new Date();
   since.setDate(since.getDate() - parseInt(days));
@@ -228,9 +231,10 @@ const getDailyRatings = async (projectId, days = 30) => {
 /**
  * Inspector Leaderboard
  */
-const getInspectorLeaderboard = async (projectId, limit = 10) => {
+const getInspectorLeaderboard = async (projectId, limit = 10, batchId = null) => {
   const filter = { status: 'COMPLETED' };
   if (projectId) filter.project = projectId;
+  if (batchId) filter.batchId = mongoose.Types.ObjectId(batchId);
 
   // Assuming approvedBy holds the user ID of the inspector who completed it
   return InspectionTask.aggregate([
@@ -372,9 +376,10 @@ const getAllProjectsMapData = async (projectId) => {
 /**
  * Additional Chart Endpoints for AnalyticsCharts
  */
-const getChartsData = async (projectId) => {
+const getChartsData = async (projectId, batchId = null) => {
   const filter = { status: 'COMPLETED' };
   if (projectId) filter.project = projectId;
+  if (batchId) filter.batchId = mongoose.Types.ObjectId(batchId);
 
   // Rating Distribution (Donut)
   const donutData = await InspectionTask.aggregate([
@@ -399,7 +404,7 @@ const getChartsData = async (projectId) => {
 
   // Ratings by Project (Bar)
   const barData = await InspectionTask.aggregate([
-    { $match: { status: 'COMPLETED' } }, // Global
+    { $match: filter },
     { $unwind: '$ratings' },
     { $group: { _id: '$project', ratings: { $sum: 1 } } },
     { $sort: { ratings: -1 } }
@@ -465,7 +470,7 @@ const getChartsData = async (projectId) => {
 
   // Top Critical Roads (Bar)
   const criticalRoadsData = await InspectionTask.aggregate([
-    { $match: { status: 'COMPLETED' } }, // Global
+    { $match: filter },
     { $unwind: '$ratings' },
     { $match: { 'ratings.score': { $lte: 5 } } },
     { $group: { _id: '$project', issues: { $sum: 1 } } },
@@ -542,6 +547,75 @@ const getChartsData = async (projectId) => {
   };
 };
 
+/**
+ * Skip Analytics
+ */
+const getSkipAnalytics = async (projectId, batchId = null) => {
+  const matchFilter = { status: 'SKIPPED' };
+  const totalTasksFilter = { status: { $in: ['READY_FOR_RATING', 'IN_PROGRESS', 'COMPLETED', 'SKIPPED'] } };
+
+  if (projectId) {
+    matchFilter.project = projectId;
+    totalTasksFilter.project = projectId;
+  }
+  if (batchId) {
+    matchFilter.batchId = mongoose.Types.ObjectId(batchId);
+    totalTasksFilter.batchId = mongoose.Types.ObjectId(batchId);
+  }
+
+  const [
+    totalSkipped,
+    totalTasks,
+    reasonDistribution,
+    inspectorCounts,
+    projectCounts
+  ] = await Promise.all([
+    InspectionTask.countDocuments(matchFilter),
+    InspectionTask.countDocuments(totalTasksFilter),
+    InspectionTask.aggregate([
+      { $match: matchFilter },
+      { $group: { _id: '$skipMetadata.reason', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]),
+    InspectionTask.aggregate([
+      { $match: matchFilter },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'skipMetadata.skippedBy',
+          foreignField: '_id',
+          as: 'inspector'
+        }
+      },
+      { $unwind: { path: '$inspector', preserveNullAndEmptyArrays: true } },
+      { 
+        $group: { 
+          _id: { $concat: ['$inspector.firstName', ' ', '$inspector.lastName'] }, 
+          count: { $sum: 1 } 
+        } 
+      },
+      { $sort: { count: -1 } },
+      { $limit: 10 }
+    ]),
+    InspectionTask.aggregate([
+      { $match: matchFilter },
+      { $group: { _id: '$project', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 10 }
+    ])
+  ]);
+
+  const skipRate = totalTasks > 0 ? ((totalSkipped / totalTasks) * 100).toFixed(2) : 0;
+
+  return {
+    totalSkipped,
+    skipRate,
+    reasonDistribution: reasonDistribution.map(r => ({ reason: r._id || 'Unknown', count: r.count })),
+    inspectorCounts: inspectorCounts.map(i => ({ inspector: i._id || 'System / Unknown', count: i.count })),
+    projectCounts: projectCounts.map(p => ({ project: p._id || 'Unknown', count: p.count }))
+  };
+};
+
 module.exports = {
   getExecutiveKPIs,
   getUserKPIs,
@@ -552,5 +626,6 @@ module.exports = {
   getInspectorLeaderboard,
   getRecentActivity,
   getAllProjectsMapData,
-  getChartsData
+  getChartsData,
+  getSkipAnalytics
 };

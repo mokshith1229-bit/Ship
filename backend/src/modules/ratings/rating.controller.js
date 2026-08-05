@@ -115,4 +115,9 @@ const exportRatingsCSV = asyncHandler(async (req, res) => {
   res.send(csvData);
 });
 
-module.exports = { getProjectRatings, getRatingSummary, getVersionHistory, getOverallRating, getReadyBatches, getBatchTasks, saveTaskRatings, exportRatingsCSV };
+const skipTask = asyncHandler(async (req, res) => {
+  const data = await ratingService.skipTask(req.params.taskId, req.body, req.user);
+  return successResponse(res, data, 'Task skipped successfully');
+});
+
+module.exports = { getProjectRatings, getRatingSummary, getVersionHistory, getOverallRating, getReadyBatches, getBatchTasks, saveTaskRatings, skipTask, exportRatingsCSV };
