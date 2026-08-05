@@ -317,7 +317,7 @@ const exportRatingsCSV = async (projectId) => {
     .populate('parameters')
     .sort({ chainage: 1 });
 
-  const headers = ['ASSET ID', 'PROJECT', 'CATEGORY', 'ASSET TYPE', 'CHAINAGE', 'PARAMETER', 'SCORE', 'REMARK', 'IMAGE URL', 'RATED AT'];
+  const headers = ['ASSET ID', 'PROJECT', 'CATEGORY', 'ASSET TYPE', 'CHAINAGE', 'DIRECTION', 'PARAMETER', 'SCORE', 'REMARK', 'IMAGE URL', 'RATED AT'];
   const rows = [];
   rows.push(headers.join(','));
 
@@ -335,6 +335,7 @@ const exportRatingsCSV = async (projectId) => {
         const param = task.parameters.find(p => p._id.toString() === rating.masterListId.toString());
         const category = param ? param.category : '-';
         const paramText = param ? param.parameter : '-';
+        const direction = param && param.direction ? param.direction : '-';
         
         const row = [
           `"${assetId}"`,
@@ -342,6 +343,7 @@ const exportRatingsCSV = async (projectId) => {
           `"${category}"`,
           `"${aType}"`,
           `"${chainage}"`,
+          `"${direction}"`,
           `"${paramText.replace(/"/g, '""')}"`,
           `"${rating.score}"`,
           `"${(rating.remark || '').replace(/"/g, '""')}"`,

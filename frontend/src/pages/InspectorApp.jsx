@@ -419,15 +419,45 @@ const InspectorApp = () => {
                   key={param._id}
                   className="flex flex-col border border-borderColor p-4 rounded bg-gray-50/30 shadow-sm flex-1"
                 >
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center justify-between mb-3 border-b border-gray-100 pb-2">
                     <h3 className="font-medium text-lg text-gray-800">{param.parameter}</h3>
-                    <button
-                      onClick={() => handleUndo(param._id)}
-                      className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                      title="Undo changes"
-                    >
-                      <MdUndo className="text-lg" />
-                    </button>
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-1.5 cursor-pointer group">
+                        <input
+                          type="radio"
+                          name={`rectified-${param._id}`}
+                          value="Rectified"
+                          checked={rating.remark === 'Rectified'}
+                          onChange={() => {
+                            setRating(param._id, 'remark', 'Rectified');
+                            setRating(param._id, 'score', '10');
+                          }}
+                          className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">Rectified</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer group">
+                        <input
+                          type="radio"
+                          name={`rectified-${param._id}`}
+                          value="Not Rectified"
+                          checked={rating.remark === 'Not Rectified'}
+                          onChange={() => {
+                            setRating(param._id, 'remark', 'Not Rectified');
+                            setRating(param._id, 'score', '5');
+                          }}
+                          className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">Not Rectified</span>
+                      </label>
+                      <button
+                        onClick={() => handleUndo(param._id)}
+                        className="text-gray-400 hover:text-red-500 transition-colors p-1 ml-1 border-l border-gray-200 pl-3"
+                        title="Undo changes"
+                      >
+                        <MdUndo className="text-lg" />
+                      </button>
+                    </div>
                   </div>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-auto">
                     <div className="flex gap-4 shrink-0">

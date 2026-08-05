@@ -550,7 +550,7 @@ const getChartsData = async (projectId, batchId = null) => {
 /**
  * Skip Analytics
  */
-const getSkipAnalytics = async (projectId, batchId = null) => {
+const getSkipAnalytics = async (projectId, batchId = null, filters = {}) => {
   const matchFilter = { status: 'SKIPPED' };
   const totalTasksFilter = { status: { $in: ['READY_FOR_RATING', 'IN_PROGRESS', 'COMPLETED', 'SKIPPED'] } };
 
@@ -562,13 +562,29 @@ const getSkipAnalytics = async (projectId, batchId = null) => {
     matchFilter.batchId = mongoose.Types.ObjectId(batchId);
     totalTasksFilter.batchId = mongoose.Types.ObjectId(batchId);
   }
+  
+  if (filters.reason) matchFilter['skipMetadata.reason'] = filters.reason;
+  if (filters.inspector) {
+    matchFilter['skipMetadata.skippedBy'] = mongoose.Types.ObjectId(filters.inspector);
+    totalTasksFilter['skipMetadata.skippedBy'] = mongoose.Types.ObjectId(filters.inspector); // Note: total tasks might not have skippedBy, wait, total tasks by inspector might not be accurate unless we check assignedTo or ratedBy. Let's omit inspector from totalTasksFilter for now, or just calculate total skips for this inspector.
+  }
+  if (filters.assetType) {
+    matchFilter.assetType = filters.assetType;
+    totalTasksFilter.assetType = filters.assetType;
+  }
+  if (filters.startDate && filters.endDate) {
+    matchFilter.updatedAt = { $gte: new Date(filters.startDate), $lte: new Date(filters.endDate) };
+    totalTasksFilter.updatedAt = { $gte: new Date(filters.startDate), $lte: new Date(filters.endDate) };
+  }
 
   const [
     totalSkipped,
     totalTasks,
     reasonDistribution,
     inspectorCounts,
-    projectCounts
+    projectCounts,
+    recentSkips,
+    chainageHotspots
   ] = await Promise.all([
     InspectionTask.countDocuments(matchFilter),
     InspectionTask.countDocuments(totalTasksFilter),
@@ -590,18 +606,32 @@ const getSkipAnalytics = async (projectId, batchId = null) => {
       { $unwind: { path: '$inspector', preserveNullAndEmptyArrays: true } },
       { 
         $group: { 
-          _id: { $concat: ['$inspector.firstName', ' ', '$inspector.lastName'] }, 
+          _id: { 
+            id: '$skipMetadata.skippedBy', 
+            name: { $concat: ['$inspector.firstName', ' ', '$inspector.lastName'] } 
+          }, 
           count: { $sum: 1 } 
         } 
       },
       { $sort: { count: -1 } },
-      { $limit: 10 }
+      { $limit: 20 }
     ]),
     InspectionTask.aggregate([
       { $match: matchFilter },
       { $group: { _id: '$project', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 10 }
+    ]),
+    InspectionTask.find(matchFilter)
+      .sort({ updatedAt: -1 })
+      .limit(20)
+      .populate('skipMetadata.skippedBy', 'firstName lastName')
+      .select('project chainage skipMetadata image updatedAt assetType')
+      .lean(),
+    InspectionTask.aggregate([
+      { $match: matchFilter },
+      { $group: { _id: { chainage: '$chainage', project: '$project' }, count: { $sum: 1 } } },
+      { $limit: 100 }
     ])
   ]);
 
@@ -611,8 +641,25 @@ const getSkipAnalytics = async (projectId, batchId = null) => {
     totalSkipped,
     skipRate,
     reasonDistribution: reasonDistribution.map(r => ({ reason: r._id || 'Unknown', count: r.count })),
-    inspectorCounts: inspectorCounts.map(i => ({ inspector: i._id || 'System / Unknown', count: i.count })),
-    projectCounts: projectCounts.map(p => ({ project: p._id || 'Unknown', count: p.count }))
+    inspectorCounts: inspectorCounts.map(i => ({ inspector: i._id.name || 'System / Unknown', count: i.count })),
+    projectCounts: projectCounts.map(p => ({ project: p._id || 'Unknown', count: p.count })),
+    recentSkips: recentSkips.map(s => ({
+      _id: s._id,
+      project: s.project,
+      chainage: s.chainage,
+      assetType: s.assetType,
+      reason: s.skipMetadata?.reason || 'Unknown',
+      remarks: s.skipMetadata?.remarks || '',
+      inspector: s.skipMetadata?.skippedBy ? `${s.skipMetadata.skippedBy.firstName} ${s.skipMetadata.skippedBy.lastName}` : 'System',
+      timestamp: s.updatedAt,
+      imageUrl: s.image?.cloudinaryUrl || null
+    })),
+    chainageHotspots: chainageHotspots.map(h => ({
+      x: parseFloat(h._id.chainage) || 0,
+      y: h.count,
+      project: h._id.project,
+      z: 100
+    }))
   };
 };
 

@@ -51,8 +51,15 @@ export const dashboardService = {
     return response.data?.data || response.data;
   },
 
-  getSkipAnalytics: async (projectId = '') => {
-    const response = await api.get(`/dashboard/skip-analytics?projectId=${projectId}`);
+  getSkipAnalytics: async (projectId = '', filters = {}) => {
+    let url = `/dashboard/skip-analytics?projectId=${projectId}`;
+    if (filters.reason) url += `&reason=${encodeURIComponent(filters.reason)}`;
+    if (filters.inspector) url += `&inspector=${encodeURIComponent(filters.inspector)}`;
+    if (filters.assetType) url += `&assetType=${encodeURIComponent(filters.assetType)}`;
+    if (filters.startDate) url += `&startDate=${encodeURIComponent(filters.startDate)}`;
+    if (filters.endDate) url += `&endDate=${encodeURIComponent(filters.endDate)}`;
+    
+    const response = await api.get(url);
     return response.data?.data || response.data;
   }
 };

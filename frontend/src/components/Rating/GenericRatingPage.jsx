@@ -229,11 +229,41 @@ const GenericRatingPage = ({ rowData = {}, config }) => {
                 const title = param.title;
                 return (
                   <div key={key} className="flex flex-col border border-borderColor p-4 rounded bg-gray-50/30 shadow-sm flex-1">
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center justify-between mb-3 border-b border-gray-100 pb-2">
                       <h3 className="font-medium text-lg text-gray-800">{title}</h3>
-                      <button onClick={() => handleUndo(key)} className="text-gray-400 hover:text-red-500 transition-colors p-1" aria-label={`Undo ${title} changes`} title="Undo changes">
-                        <MdUndo className="text-lg" />
-                      </button>
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-1.5 cursor-pointer group">
+                          <input
+                            type="radio"
+                            name={`rectified-${key}`}
+                            value="Rectified"
+                            checked={remarks[key] === 'Rectified'}
+                            onChange={() => {
+                              setRemarks(prev => ({ ...prev, [key]: 'Rectified' }));
+                              setRatings(prev => ({ ...prev, [key]: '10' }));
+                            }}
+                            className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm font-medium text-gray-700">Rectified</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer group">
+                          <input
+                            type="radio"
+                            name={`rectified-${key}`}
+                            value="Not Rectified"
+                            checked={remarks[key] === 'Not Rectified'}
+                            onChange={() => {
+                              setRemarks(prev => ({ ...prev, [key]: 'Not Rectified' }));
+                              setRatings(prev => ({ ...prev, [key]: '5' }));
+                            }}
+                            className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm font-medium text-gray-700">Not Rectified</span>
+                        </label>
+                        <button onClick={() => handleUndo(key)} className="text-gray-400 hover:text-red-500 transition-colors p-1 ml-1 border-l border-gray-200 pl-3" aria-label={`Undo ${title} changes`} title="Undo changes">
+                          <MdUndo className="text-lg" />
+                        </button>
+                      </div>
                     </div>
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-auto">
                       <div className="flex gap-4 shrink-0">

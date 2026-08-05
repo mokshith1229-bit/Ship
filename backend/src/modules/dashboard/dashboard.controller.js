@@ -183,7 +183,7 @@ const getChartsData = asyncHandler(async (req, res) => {
 });
 
 const getSkipAnalytics = asyncHandler(async (req, res) => {
-  const data = await dashboardService.getSkipAnalytics(req.query.projectId);
+  const data = await dashboardService.getSkipAnalytics(req.query.projectId, null, req.query);
   return successResponse(res, data, 'Skip analytics retrieved');
 });
 
