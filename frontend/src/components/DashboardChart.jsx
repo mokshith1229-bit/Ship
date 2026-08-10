@@ -101,14 +101,16 @@ const DashboardChart = () => {
       dashboardService.getRoadsStatus().then(res => {
         // Map backend data to chart format with colors
         const colors = {
-          'COMPLETED': '#368c3f', // Green
-          'ONGOING': '#1b5e20', // Dark Green
-          'PENDING': '#1a1a1a'  // Dark Gray
+          'HO-RATED': '#368c3f', // Green
+          'SPV-RATED': '#368c3f', // Green
+          'ON-GOING': '#1b5e20', // Dark Green
+          'HO-PROCESS': '#1a1a1a', // Dark Gray
+          'NOT-RATED': '#1a1a1a'  // Dark Gray
         };
         const responseData = Array.isArray(res) ? res : (res.data || []);
         const mappedData = responseData.map(item => ({
           id: item._id,
-          name: item._id,
+          name: item._id ? item._id.replace('-', ' ') : 'UNKNOWN',
           value: item.count,
           color: colors[item._id] || '#8884d8'
         }));

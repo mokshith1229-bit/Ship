@@ -8,6 +8,7 @@ import MasterListEmptyState from './MasterList/components/MasterListEmptyState';
 import MasterListImportModal from './MasterList/components/MasterListImportModal';
 import MasterListProjectFolders from './MasterList/components/MasterListProjectFolders';
 import { MdUploadFile, MdFolder, MdList, MdArrowBack } from 'react-icons/md';
+import Premium3DButton from '../components/common/Premium3DButton';
 
 const MasterListPage = () => {
   const [data, setData] = useState([]);
@@ -88,27 +89,27 @@ const MasterListPage = () => {
             <div className="flex bg-gray-100 p-1 rounded-lg">
               <button 
                 onClick={() => { setViewMode('folders'); setSelectedProject(''); }}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'folders' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'folders' ? 'bg-white text-green-500 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 <MdFolder className="text-lg" />
                 Folders
               </button>
               <button 
                 onClick={() => setViewMode('table')}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'table' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'table' ? 'bg-white text-green-500 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 <MdList className="text-lg" />
                 List
               </button>
             </div>
             
-            <button 
+            <Premium3DButton 
               onClick={() => setShowImportModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+              className="!w-auto"
             >
               <MdUploadFile className="text-lg" />
               Import Master List
-            </button>
+            </Premium3DButton>
           </div>
         </div>
 

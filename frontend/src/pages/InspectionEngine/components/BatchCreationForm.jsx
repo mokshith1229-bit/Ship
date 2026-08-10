@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { masterListService } from '../../../services/masterList.service';
+import CustomDropdown from '../../../components/common/CustomDropdown';
+import Premium3DButton from '../../../components/common/Premium3DButton';
 
 const BatchCreationForm = ({ onBatchCreated }) => {
   const [projects, setProjects] = useState([]);
@@ -66,6 +68,16 @@ const BatchCreationForm = ({ onBatchCreated }) => {
     }
   };
 
+  const projectOptions = projects.map(p => ({ label: p, value: p }));
+  const categoryOptions = categories.map(c => ({ label: c, value: c }));
+  const strategyOptions = [
+    { label: '5%', value: 5 },
+    { label: '10%', value: 10 },
+    { label: '15%', value: 15 },
+    { label: '20%', value: 20 },
+    { label: 'Custom Filters', value: 'custom' }
+  ];
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
       <h2 className="text-lg font-bold text-gray-800 mb-4">Generate Inspection Batch</h2>
@@ -77,71 +89,57 @@ const BatchCreationForm = ({ onBatchCreated }) => {
       )}
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <div className="flex flex-col md:flex-row gap-4 items-end">
+        <div className="flex flex-col md:flex-row gap-4 items-end relative z-[60]">
           {/* Project Selection */}
-          <div className="flex-1">
+          <div className="flex-1 w-full">
             <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
-            <select
+            <CustomDropdown
+              options={projectOptions}
               value={selectedProject}
-              onChange={(e) => setSelectedProject(e.target.value)}
-              required
-              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-            >
-              <option value="">Select Project</option>
-              {projects.map(p => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
+              onChange={(val) => setSelectedProject(val)}
+              placeholder="Select Project"
+            />
           </div>
 
           {/* Sampling Percentage Selection */}
-          <div className="flex-1">
+          <div className="flex-1 w-full">
             <label className="block text-sm font-medium text-gray-700 mb-1">Sampling Strategy (Random)</label>
-            <select
+            <CustomDropdown
+              options={strategyOptions}
               value={samplingPercentage}
-              onChange={(e) => {
-                setSamplingPercentage(e.target.value);
-                if (e.target.value !== 'custom') {
+              onChange={(val) => {
+                setSamplingPercentage(val);
+                if (val !== 'custom') {
                   setSelectedCategory('');
                 }
               }}
-              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-            >
-              <option value={5}>5%</option>
-              <option value={10}>10%</option>
-              <option value={15}>15%</option>
-              <option value={20}>20%</option>
-              <option value="custom">Custom Filters</option>
-            </select>
+              placeholder="Select Strategy"
+            />
           </div>
 
-          <button
+          <Premium3DButton 
+            loading={loading}
+            disabled={!selectedProject}
             type="submit"
-            disabled={loading || !selectedProject}
-            className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors h-[42px]"
           >
             {loading ? 'Generating...' : 'Generate Batch'}
-          </button>
+          </Premium3DButton>
         </div>
 
         {/* Custom Strategy Filters Row */}
         {samplingPercentage === 'custom' && (
-          <div className="flex flex-col md:flex-row gap-4 items-end p-4 bg-gray-50/50 border border-gray-100 rounded-lg mt-2">
-            <div className="flex-1">
+          <div className="flex flex-col md:flex-row gap-4 items-end p-4 bg-gray-50/50 border border-gray-100 rounded-lg mt-2 relative z-[50]">
+            <div className="flex-1 w-full">
               <label className="block text-sm font-medium text-gray-700 mb-1">Category Filter</label>
-              <select
+              <CustomDropdown
+                options={categoryOptions}
                 value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              >
-                <option value="">All Categories</option>
-                {categories.map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+                onChange={(val) => setSelectedCategory(val)}
+                placeholder="All Categories"
+              />
             </div>
 
-            <div className="flex-1">
+            <div className="flex-1 w-full">
               <label className="block text-sm font-medium text-gray-700 mb-1">Custom %</label>
               <input
                 type="number"
@@ -150,7 +148,7 @@ const BatchCreationForm = ({ onBatchCreated }) => {
                 value={customPercentage}
                 onChange={(e) => setCustomPercentage(e.target.value)}
                 required
-                className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                className="w-full px-4 py-[7px] bg-white border border-[#5cb85c] rounded-md focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                 placeholder="e.g. 25"
               />
             </div>

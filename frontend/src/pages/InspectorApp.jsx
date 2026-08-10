@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ImageCarousel from '../components/Rating/ImageCarousel';
 import CustomDropdown from '../components/common/CustomDropdown';
 import { ratingService } from '../services/rating.service';
+import { projectService } from '../services/project.service';
 import leftArrowImg from '../assets/leftarrow.PNG';
 import rightArrowImg from '../assets/rightarrow.PNG';
 
@@ -184,6 +185,13 @@ const InspectorApp = () => {
       setActiveImageIndex(1);
       setExpandedCard(null);
     } else {
+      try {
+        if (currentTask && currentTask.project) {
+          await projectService.completeProject(currentTask.project);
+        }
+      } catch (err) {
+        console.error("Failed to mark project as completed:", err);
+      }
       alert('All tasks completed! Great job.');
       navigate('/rating');
     }
@@ -226,6 +234,13 @@ const InspectorApp = () => {
         setActiveImageIndex(1);
         setExpandedCard(null);
       } else {
+        try {
+          if (currentTask && currentTask.project) {
+            await projectService.completeProject(currentTask.project);
+          }
+        } catch (err) {
+          console.error("Failed to mark project as completed:", err);
+        }
         alert('All tasks completed! Great job.');
         navigate('/rating');
       }

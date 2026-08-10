@@ -12,6 +12,113 @@ const allProjects = [
   'WMPTL', 'WUPTL', 'WVEL'
 ];
 
+const SidebarHoverButton = ({ isActive, onClick, children }) => {
+  const buttonRef = useRef(null);
+
+  useEffect(() => {
+    const btn = buttonRef.current;
+    if (!btn) return;
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
+
+    let rafId = null;
+    let targetX = 0.5;
+    let targetY = 0.5;
+    let currentX = 0.5;
+    let currentY = 0.5;
+    let isHovered = false;
+
+    const lerp = (start, end, factor) => start + (end - start) * factor;
+
+    const render = () => {
+      currentX = lerp(currentX, targetX, 0.15);
+      currentY = lerp(currentY, targetY, 0.15);
+
+      if (isHovered) {
+        btn.style.setProperty('--light-x', `${currentX * 100}%`);
+        btn.style.setProperty('--light-y', `${currentY * 100}%`);
+      } else {
+        targetX = 0.5;
+        targetY = 0.5;
+      }
+
+      rafId = requestAnimationFrame(render);
+    };
+
+    rafId = requestAnimationFrame(render);
+
+    const handleMouseMove = (e) => {
+      const rect = btn.getBoundingClientRect();
+      targetX = (e.clientX - rect.left) / rect.width;
+      targetY = (e.clientY - rect.top) / rect.height;
+    };
+
+    const handleMouseEnter = () => {
+      isHovered = true;
+    };
+
+    const handleMouseLeave = () => {
+      isHovered = false;
+    };
+
+    btn.addEventListener('mousemove', handleMouseMove);
+    btn.addEventListener('mouseenter', handleMouseEnter);
+    btn.addEventListener('mouseleave', handleMouseLeave);
+
+    return () => {
+      btn.removeEventListener('mousemove', handleMouseMove);
+      btn.removeEventListener('mouseenter', handleMouseEnter);
+      btn.removeEventListener('mouseleave', handleMouseLeave);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, []);
+
+  return (
+    <button
+      ref={buttonRef}
+      onClick={onClick}
+      className={cn(
+        "sidebar-3d-btn relative w-full rounded-[12px] text-sm font-medium transition-all duration-300 border overflow-hidden group outline-none",
+        isActive 
+          ? "bg-gradient-to-r from-green-500 to-green-400 border-transparent text-white shadow-md shadow-green-500/25 active-btn" 
+          : "bg-white border-gray-200 text-gray-500 hover:border-green-400 hover:text-green-700 inactive-btn"
+      )}
+      style={{
+        '--light-x': '50%',
+        '--light-y': '50%',
+      }}
+    >
+      <style>
+        {`
+          .sidebar-3d-btn.inactive-btn .glow-layer {
+            background: radial-gradient(
+              circle 70px at var(--light-x) var(--light-y), 
+              rgba(21, 128, 61, 0.15) 0%, 
+              rgba(220, 252, 231, 1) 100% 
+            );
+          }
+
+          .sidebar-3d-btn.active-btn .glow-layer {
+            background: radial-gradient(
+              circle 70px at var(--light-x) var(--light-y), 
+              rgba(20, 83, 45, 0.3) 0%, 
+              transparent 100%
+            );
+          }
+        `}
+      </style>
+      {/* Background layer for the hover glow */}
+      <div className="glow-layer absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-0"></div>
+      
+      {/* Content wrapper to stay above the glow */}
+      <div className="relative z-10 flex w-full items-center gap-3.5 px-3 py-3">
+        {children}
+      </div>
+    </button>
+  );
+};
+
 const Sidebar = () => {
   const { user } = useAuth();
   const location = useLocation();
@@ -172,14 +279,9 @@ const Sidebar = () => {
                 key={item.path} 
                 className="relative"
               >
-                <button
+                <SidebarHoverButton
                   onClick={() => handleSidebarClick(item)}
-                  className={cn(
-                    "flex w-full items-center gap-3.5 px-3 py-3 rounded-[12px] text-sm font-medium transition-all duration-300 border",
-                    isActive 
-                      ? "bg-gradient-to-r from-green-500 to-green-400 border-transparent text-white shadow-md shadow-green-500/25" 
-                      : "bg-white border-gray-200 text-gray-500 hover:bg-green-50 hover:border-green-400 hover:text-green-600 group"
-                  )}
+                  isActive={isActive}
                 >
                   <Icon className={cn(
                     "text-[22px] shrink-0 transition-colors duration-300",
@@ -194,7 +296,7 @@ const Sidebar = () => {
                   >
                     {item.name}
                   </span>
-                </button>
+                </SidebarHoverButton>
 
                 {/* Double-Click Sub-Menu for Dashboard */}
                 <AnimatePresence>

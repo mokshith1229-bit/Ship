@@ -10,6 +10,10 @@ const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode
   // Fullscreen specific states
   const [rotation, setRotation] = useState(0);
 
+  // Zoom Magnifier states
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [backgroundPos, setBackgroundPos] = useState('50% 50%');
+
   const nextImage = useCallback(() => {
     if (onIndexChange) {
       onIndexChange(Math.min(currentIndex + 1, images.length - 1));
@@ -152,18 +156,44 @@ const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode
                   </div>
 
                   <div 
-                    className="w-full h-full overflow-hidden rounded-[24px] cursor-pointer relative"
-                    onClick={() => {
+                    className={`w-full h-full overflow-hidden rounded-[24px] relative ${distance === 0 ? 'cursor-crosshair' : 'cursor-pointer'}`}
+                    onClick={(e) => {
+                      if (distance !== 0) return;
+                      // Only allow full screen if clicking the button? No, allow full screen on click too.
+                      // Wait, previous code allowed click to fullscreen.
                       setFullScreenIndex(index);
                       setRotation(0);
+                    }}
+                    onMouseEnter={() => { if (distance === 0) setIsZoomed(true); }}
+                    onMouseLeave={() => { if (distance === 0) setIsZoomed(false); }}
+                    onMouseMove={(e) => {
+                      if (distance === 0) {
+                        const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
+                        const x = ((e.clientX - left) / width) * 100;
+                        const y = ((e.clientY - top) / height) * 100;
+                        setBackgroundPos(`${x}% ${y}%`);
+                      }
                     }}
                   >
                     <motion.img 
                       src={img.url || img} 
                       alt={`Road view ${index + 1}`} 
-                      className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+                      className={`w-full h-full object-cover transition-opacity duration-300 ease-out group-hover:scale-[1.03] ${distance === 0 && isZoomed ? 'opacity-0' : 'opacity-100'}`}
                       draggable={false}
                     />
+
+                    {/* Zoomed Magnifier Overlay */}
+                    {distance === 0 && (
+                      <div 
+                        className={`absolute inset-0 z-20 pointer-events-none transition-opacity duration-300 ${isZoomed ? 'opacity-100' : 'opacity-0'}`}
+                        style={{
+                          backgroundImage: `url(${img.url || img})`,
+                          backgroundPosition: backgroundPos,
+                          backgroundSize: '250%',
+                          backgroundRepeat: 'no-repeat'
+                        }}
+                      />
+                    )}
                     
                     {/* Fullscreen Button */}
                     <button

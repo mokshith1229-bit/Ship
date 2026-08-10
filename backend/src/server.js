@@ -7,7 +7,7 @@ const createApp = require('./app');
 const connectDB = require('./config/db');
 const logger = require('./config/logger');
 
-const PORT = process.env.PORT || 5000;
+const PORT = 5555; // Explicitly use 5555 to avoid conflicts
 
 const startServer = async () => {
   try {

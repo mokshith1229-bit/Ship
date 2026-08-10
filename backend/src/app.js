@@ -32,6 +32,7 @@ const surveyLibraryRoutes = require('./modules/survey-library/routes/surveyLibra
 const imageReviewRoutes = require('./modules/image-review/routes/imageReview.routes');
 const workAssignmentRoutes = require('./modules/work-assignment/workAssignment.routes');
 const shipRoutes = require('./modules/ship/ship.routes');
+const reportsRoutes = require('./modules/reports/reports.routes');
 
 // ─── Due-date reminder cron (runs every hour) ─────────────────────────────────
 const { sendDueDateReminders, markOverdueAssignments } = require('./modules/work-assignment/workAssignment.service');
@@ -63,6 +64,8 @@ const createApp = () => {
     cors({
       origin: [
         'http://localhost:5173',
+        'http://localhost:5174',
+        'http://localhost:5175',
         'http://localhost:3000',
         process.env.FRONTEND_URL
       ].filter(Boolean),
@@ -136,6 +139,7 @@ const createApp = () => {
   app.use('/api/v1/image-review', apiLimiter, imageReviewRoutes);
   app.use('/api/v1/work-assignments', apiLimiter, workAssignmentRoutes);
   app.use('/api/v1/ship', apiLimiter, shipRoutes);
+  app.use('/api/v1/reports', apiLimiter, reportsRoutes);
 
   // ─── 404 Handler ─────────────────────────────────────────────────────────────
   app.use(notFoundHandler);

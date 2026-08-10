@@ -3,7 +3,7 @@
 require('dotenv').config();
 
 const mongoose = require('mongoose');
-const MasterData = require('../models/MasterData.model');
+const MasterList = require('../models/MasterList.model');
 
 /**
  * Sample Master Data seed — representative parameters for each category.
@@ -87,9 +87,9 @@ const seedMasterData = async () => {
       placement: record.placement
     };
 
-    const existing = await MasterData.findOne(filter);
+    const existing = await MasterList.findOne(filter);
     if (!existing) {
-      await MasterData.create(record);
+      await MasterList.create(record);
       inserted++;
     } else {
       skipped++;
