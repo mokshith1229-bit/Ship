@@ -22,6 +22,8 @@ import ExecutiveCards from '../components/dashboard/ExecutiveCards';
 import ExecutiveCharts from '../components/dashboard/ExecutiveCharts';
 import UserDashboard from '../components/dashboard/UserDashboard';
 import { useAuth } from '../context/AuthContext';
+import RollingLogo from '../components/common/RollingLogo';
+import LiveActivityFeed from '../components/dashboard/LiveActivityFeed';
 
 const DashboardPage = () => {
   const { user } = useAuth();
@@ -76,7 +78,7 @@ const DashboardPage = () => {
                     {/* Logo Box container to match diagonal green width */}
                     <div className="w-[170px] flex justify-center shrink-0">
                       <div className="bg-white px-3 py-1.5 rounded shadow-sm flex items-center justify-center">
-                         <img src={logoText} alt="HiRATE" className="h-[22px] object-contain" />
+                         <RollingLogo />
                       </div>
                     </div>
 
@@ -99,18 +101,24 @@ const DashboardPage = () => {
                 
                 <ExecutiveCharts />
 
-                <div className="mt-4">
-                   <AllProjectsMap />
-                </div>
-                
-                <div className="w-full bg-white border border-gray-300 rounded shadow-sm flex flex-col p-6 mt-6">
-                  <h2 className="text-gray-500 font-bold text-sm tracking-wide mb-8 uppercase">Roads Status</h2>
-                  <div className="flex-1 flex flex-col items-center justify-center -mt-8">
-                    <DashboardChart />
-                    <div className="text-center mt-2">
-                      <span className="font-bold text-gray-700 text-lg">Total Roads : 27</span>
-                    </div>
-                  </div>
+                <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
+                   <div className="lg:col-span-2">
+                     <AllProjectsMap />
+                     
+                     <div className="w-full bg-white border border-gray-300 rounded shadow-sm flex flex-col p-6 mt-6">
+                       <h2 className="text-gray-500 font-bold text-sm tracking-wide mb-8 uppercase">Roads Status</h2>
+                       <div className="flex-1 flex flex-col items-center justify-center -mt-8">
+                         <DashboardChart />
+                         <div className="text-center mt-2">
+                           <span className="font-bold text-gray-700 text-lg">Total Roads : 27</span>
+                         </div>
+                       </div>
+                     </div>
+                   </div>
+
+                   <div className="lg:col-span-1 flex flex-col h-full">
+                     <LiveActivityFeed />
+                   </div>
                 </div>
               </div>
             ) : (

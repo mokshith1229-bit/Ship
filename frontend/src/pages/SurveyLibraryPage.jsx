@@ -197,10 +197,10 @@ const SurveyLibraryPage = () => {
   const canExtract = assets.some(a => a.status === 'READY' || a.status === 'COMPLETED');
 
   return (
-    <div className="flex h-screen bg-gray-50 font-sans">
-      <Sidebar />
-      <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
-        <Navbar />
+    <div className="flex flex-col h-screen bg-gray-50 font-sans">
+      <Navbar />
+      <div className="flex flex-1 overflow-hidden relative">
+        <Sidebar />
         <main className="flex-1 overflow-y-auto p-6 scrollbar-hide">
           <div className="max-w-6xl mx-auto space-y-6">
             

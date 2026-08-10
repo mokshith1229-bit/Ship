@@ -3,6 +3,7 @@
 const ratingService = require('./rating.service');
 const { successResponse } = require('../../utils/response.util');
 const asyncHandler = require('../../utils/asyncHandler.util');
+const { getIO } = require('../../config/socket');
 
 /**
  * @swagger
@@ -105,6 +106,24 @@ const getBatchTasks = asyncHandler(async (req, res) => {
 
 const saveTaskRatings = asyncHandler(async (req, res) => {
   const data = await ratingService.saveTaskRatings(req.params.taskId, req.body.ratings, req.body.selectedImageUrl, req.user);
+  
+  try {
+    const io = getIO();
+    io.emit('NEW_ACTIVITY', {
+      id: Date.now().toString(),
+      user: req.user?.name || 'User',
+      project: data.project || 'Unknown Project',
+      chainage: data.chainage || 'Unknown Chainage',
+      action: 'Rated Image',
+      timestamp: new Date().toISOString()
+    });
+    // Fire a metric update request event for the clients to refetch or we can push data
+    io.emit('DASHBOARD_METRICS_UPDATED', {});
+  } catch (err) {
+    // Socket error should not fail the request
+    console.error('Socket emit error:', err);
+  }
+
   return successResponse(res, data, 'Task ratings saved');
 });
 
@@ -117,6 +136,22 @@ const exportRatingsCSV = asyncHandler(async (req, res) => {
 
 const skipTask = asyncHandler(async (req, res) => {
   const data = await ratingService.skipTask(req.params.taskId, req.body, req.user);
+
+  try {
+    const io = getIO();
+    io.emit('NEW_ACTIVITY', {
+      id: Date.now().toString(),
+      user: req.user?.name || 'User',
+      project: data.project || 'Unknown Project',
+      chainage: data.chainage || 'Unknown Chainage',
+      action: `Skipped Image (${req.body.skipReason || 'No reason'})`,
+      timestamp: new Date().toISOString()
+    });
+    io.emit('DASHBOARD_METRICS_UPDATED', {});
+  } catch (err) {
+    console.error('Socket emit error:', err);
+  }
+
   return successResponse(res, data, 'Task skipped successfully');
 });
 

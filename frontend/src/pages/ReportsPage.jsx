@@ -70,10 +70,10 @@ const ReportsPage = () => {
 
   return (
     <LayoutGroup>
-      <div className="flex h-screen bg-[#F8FAFC] font-sans">
-        <Sidebar />
-        <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
-          <Navbar />
+      <div className="flex flex-col h-screen bg-[#F8FAFC] font-sans">
+        <Navbar />
+        <div className="flex flex-1 overflow-hidden relative">
+          <Sidebar />
           <main className="flex-1 overflow-hidden p-[10px] flex gap-[10px]">
             {loading ? (
               <div className="w-full h-full flex items-center justify-center">

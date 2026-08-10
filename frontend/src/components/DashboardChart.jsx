@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Sector, Tooltip } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSocket } from '../context/SocketContext';
 
 const chartData = [
   { id: 1, name: "HO Rated", value: 6, color: "#368c3f" }, // Logo Green
@@ -95,8 +96,9 @@ const DashboardChart = () => {
   const [activeIndex, setActiveIndex] = useState(null);
   const [isEngineStarted, setIsEngineStarted] = useState(false);
   const [data, setData] = useState([]);
+  const socket = useSocket();
 
-  React.useEffect(() => {
+  const fetchChartData = () => {
     import('../services/dashboard.service').then(({ dashboardService }) => {
       dashboardService.getRoadsStatus().then(res => {
         // Map backend data to chart format with colors
@@ -117,7 +119,24 @@ const DashboardChart = () => {
         setData(mappedData.length ? mappedData : [{ name: 'No Data', value: 1, color: '#ccc' }]);
       }).catch(console.error);
     });
+  };
+
+  useEffect(() => {
+    fetchChartData();
   }, []);
+
+  useEffect(() => {
+    if (!socket) return;
+    
+    const handleUpdate = () => {
+      fetchChartData();
+    };
+
+    socket.on('DASHBOARD_METRICS_UPDATED', handleUpdate);
+    return () => {
+      socket.off('DASHBOARD_METRICS_UPDATED', handleUpdate);
+    };
+  }, [socket]);
 
   const total = useMemo(() => data.reduce((acc, curr) => acc + curr.value, 0), [data]);
   const activeData = activeIndex !== null ? data[activeIndex] : null;

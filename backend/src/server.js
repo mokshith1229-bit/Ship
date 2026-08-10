@@ -20,6 +20,10 @@ const startServer = async () => {
     // Create HTTP server
     const server = http.createServer(app);
 
+    // Initialize Socket.io
+    const { initializeSocket } = require('./config/socket');
+    initializeSocket(server);
+
     // Start listening
     server.listen(PORT, () => {
       logger.info(`========================================`);

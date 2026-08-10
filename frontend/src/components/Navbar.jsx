@@ -6,6 +6,7 @@ import logoText from '../assets/HIRATE text.PNG';
 import { useAuth } from '../hooks/useAuth';
 
 import CustomDropdown from './common/CustomDropdown';
+import RollingLogo from './common/RollingLogo';
 import api from '../services/api';
 
 const Navbar = () => {
@@ -128,7 +129,7 @@ const Navbar = () => {
         </button>
         <div className="flex items-center gap-2">
           <img src={logo} alt="HiRATE Logo" className="w-8 h-8 object-contain" />
-          <img src={logoText} alt="HiRATE" className="h-5 object-contain" />
+          <RollingLogo />
         </div>
         <div className="ml-4 w-[200px]">
           <CustomDropdown
