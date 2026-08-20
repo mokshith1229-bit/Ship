@@ -104,8 +104,15 @@ const getBatchTasks = asyncHandler(async (req, res) => {
 });
 
 const saveTaskRatings = asyncHandler(async (req, res) => {
-  const data = await ratingService.saveTaskRatings(req.params.taskId, req.body.ratings, req.body.selectedImageUrl, req.user);
-  return successResponse(res, data, 'Task ratings saved');
+  console.log(`[RATING] Request received. User: ${req.user?._id}, Task ID: ${req.params.taskId}`);
+  try {
+    const data = await ratingService.saveTaskRatings(req.params.taskId, req.body.ratings, req.body.selectedImageUrl, req.user);
+    console.log(`[RATING] Success. Task ID: ${req.params.taskId}`);
+    return successResponse(res, data, 'Task ratings saved');
+  } catch (error) {
+    console.error(`[RATING] Failed. Task ID: ${req.params.taskId}. Reason: ${error.message}`);
+    throw error;
+  }
 });
 
 const exportRatingsCSV = asyncHandler(async (req, res) => {

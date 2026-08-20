@@ -251,7 +251,7 @@ const saveTaskRatings = async (taskId, ratingsData, selectedImageUrl, user) => {
     const assignment = await WorkAssignment.findOne({
       batchId: task.batchId,
       assignedTo: user._id,
-      status: { $in: ['Assigned', 'In Progress'] }
+      status: { $in: ['Assigned', 'In Progress', 'Completed'] }
     });
 
     if (!assignment) {
@@ -437,7 +437,7 @@ const skipTask = async (taskId, skipData, user) => {
     const assignment = await WorkAssignment.findOne({
       batchId: task.batchId,
       assignedTo: user._id,
-      status: { $in: ['Assigned', 'In Progress'] }
+      status: { $in: ['Assigned', 'In Progress', 'Completed'] }
     });
 
     if (!assignment) {

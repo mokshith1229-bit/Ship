@@ -82,7 +82,12 @@ const createApp = () => {
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
         
-        if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
+        // Allow dynamic Vercel preview deployments
+        if (
+          allowedOrigins.indexOf(origin) !== -1 || 
+          allowedOrigins.includes('*') ||
+          origin.endsWith('.vercel.app')
+        ) {
           callback(null, true);
         } else {
           // Do not throw an Error, this causes a 500 crash in Vercel

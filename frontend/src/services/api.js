@@ -1,10 +1,12 @@
 import axios from 'axios';
 
+// Safely determine base URL: if running on localhost, use local backend, otherwise use Vercel backend
+const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const PROD_URL = 'https://hirate-backend.vercel.app/api/v1';
+const DEV_URL = 'http://localhost:5000/api/v1';
+
 const api = axios.create({
-  // Force Vercel production API URL during production build, preventing localhost fallback
-  baseURL: import.meta.env.PROD 
-    ? 'https://hirate-backend.vercel.app/api/v1' 
-    : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1'),
+  baseURL: import.meta.env.VITE_API_URL || (isLocal ? DEV_URL : PROD_URL),
   headers: {
     'Content-Type': 'application/json'
   }
@@ -39,10 +41,5 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-
-// Warn if using localhost in production
-if (import.meta.env.PROD && (!import.meta.env.VITE_API_URL || import.meta.env.VITE_API_URL.includes('localhost'))) {
-  console.warn('⚠️ WARNING: Using localhost API URL in production build. Ensure VITE_API_URL is correctly set.');
-}
 
 export default api;
