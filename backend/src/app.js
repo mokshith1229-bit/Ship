@@ -36,15 +36,19 @@ const reportRoutes = require('./modules/reports/report.routes');
 
 // ─── Due-date reminder cron (runs every hour) ─────────────────────────────────
 const { sendDueDateReminders, markOverdueAssignments } = require('./modules/work-assignment/workAssignment.service');
-setInterval(async () => {
-  try {
-    await sendDueDateReminders();
-    await markOverdueAssignments();
-  } catch (e) {
-    // Non-fatal — log only
-    console.error('[Cron] Work assignment reminder error:', e.message);
-  }
-}, 60 * 60 * 1000); // every 1 hour
+
+// Do not run setInterval in Vercel Serverless environments, it will cause 500 Function Timeout errors
+if (!process.env.VERCEL) {
+  setInterval(async () => {
+    try {
+      await sendDueDateReminders();
+      await markOverdueAssignments();
+    } catch (e) {
+      // Non-fatal — log only
+      console.error('[Cron] Work assignment reminder error:', e.message);
+    }
+  }, 60 * 60 * 1000); // every 1 hour
+}
 
 const createApp = () => {
   const app = express();
