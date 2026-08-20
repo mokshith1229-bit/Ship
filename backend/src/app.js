@@ -67,16 +67,27 @@ const createApp = () => {
   app.set('trust proxy', 1);
 
   // ─── CORS ─────────────────────────────────────────────────────────────────────
-  const allowedOrigins = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : ['http://localhost:5173'];
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'https://ship-phi-ruddy.vercel.app',
+    'https://hirate-backend.vercel.app'
+  ];
+  if (process.env.FRONTEND_URL) {
+    allowedOrigins.push(...process.env.FRONTEND_URL.split(','));
+  }
+
   app.use(
     cors({
       origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
+        
         if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
           callback(null, true);
         } else {
-          callback(new Error('The CORS policy for this site does not allow access from the specified Origin.'));
+          // Do not throw an Error, this causes a 500 crash in Vercel
+          // Instead, return false to indicate CORS rejection gracefully
+          callback(null, false);
         }
       },
       credentials: true,

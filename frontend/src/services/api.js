@@ -1,8 +1,10 @@
 import axios from 'axios';
 
 const api = axios.create({
-  // Use VITE_API_URL or default based on environment
-  baseURL: import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://hirate-backend.vercel.app/api/v1' : 'http://localhost:5000/api/v1'),
+  // Force Vercel production API URL during production build, preventing localhost fallback
+  baseURL: import.meta.env.PROD 
+    ? 'https://hirate-backend.vercel.app/api/v1' 
+    : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1'),
   headers: {
     'Content-Type': 'application/json'
   }
