@@ -15,7 +15,7 @@ const generateToken = (user) => {
       role: user.role,
       name: user.name
     },
-    process.env.JWT_SECRET,
+    process.env.JWT_SECRET || 'fallback_secret_key_for_development_only',
     { expiresIn: process.env.JWT_EXPIRES || '7d' }
   );
 };

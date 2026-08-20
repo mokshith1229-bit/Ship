@@ -41,6 +41,10 @@ const connectDB = async () => {
     cached.promise = null;
     logger.error(`MongoDB connection error: ${err.message}`);
 
+    if (process.env.VERCEL) {
+      throw err; // In serverless, fail immediately so the API returns a 500 response instead of hanging
+    }
+
     if (retryCount < MAX_RETRIES) {
       retryCount++;
       logger.warn(`Retrying connection (${retryCount}/${MAX_RETRIES}) in ${RETRY_DELAY_MS / 1000}s...`);
