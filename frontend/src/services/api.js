@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 const api = axios.create({
-  // Update to network IP for external access or set VITE_API_URL in .env
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1',
+  // Use VITE_API_URL or default based on environment
+  baseURL: import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://hirate-backend.vercel.app/api/v1' : 'http://localhost:5000/api/v1'),
   headers: {
     'Content-Type': 'application/json'
   }
