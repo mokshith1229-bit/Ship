@@ -32,6 +32,19 @@ class InspectionEngineService {
 
     let masterListPopulation = await masterListRepository.getMasterList(filter);
 
+    // Add temporary logs for RSF check
+    if (categories && categories.includes('Road Signage and Furniture')) {
+      const MasterList = require('../../../models/MasterList.model');
+      console.log("When fetching RSF (createBatch):");
+      console.log("Total MasterList records:", await MasterList.countDocuments({ project }));
+      console.log("RSF records found:", await MasterList.countDocuments({ project, category: 'Road Signage and Furniture' }));
+      console.log("Project filtered records:", await MasterList.countDocuments({ project, status: 'Active' }));
+      console.log("Category filtered records:", await MasterList.countDocuments({ project, status: 'Active', category: 'Road Signage and Furniture' }));
+      console.log("Final RSF questions returned:", masterListPopulation.length);
+      // We limit to 5 just for logging size
+      console.log("Print the actual IDs and chainages (first 5):", masterListPopulation.slice(0, 5).map(q => ({ id: q._id, chainage: q.chainage })));
+    }
+
     if (!masterListPopulation || masterListPopulation.length === 0) {
       throw new Error(`No active master list questions found for project: ${project}${categories ? ` and selected categories/assets` : ''}`);
     }
@@ -295,18 +308,32 @@ class InspectionEngineService {
     }
 
     const MasterList = require('../../../models/MasterList.model');
-    // Fetch active RSF questions or any active questions configured for these chainages
-    // The prompt specifies RSF has its own questions from MasterList configuration.
-    // For safety, assuming Category == 'RSF' or 'Road Safety Features'. 
-    // We'll just fetch all active items and filter by chainage range. 
-    // Actually, Roadway is NOT in MasterList, so any MasterList item in this range is technically non-Roadway (e.g. RSF)
-    const activeQuestions = await MasterList.find({ project, status: 'Active' });
+    // We are explicitly fetching ONLY RSF active questions
+    // The user's category is 'Road Signage and Furniture'
+    const rsfCategory = 'Road Signage and Furniture';
     
-    const rsfQuestions = activeQuestions.filter(q => {
-      // Treat any active MasterList item in this range as RSF (or standard)
+    // Add temporary logs as requested
+    console.log("When fetching RSF:");
+    const totalMasterListRecords = await MasterList.countDocuments({ project });
+    console.log("Total MasterList records:", totalMasterListRecords);
+    
+    const rsfRecordsFound = await MasterList.countDocuments({ project, category: rsfCategory });
+    console.log("RSF records found:", rsfRecordsFound);
+    
+    const projectFilteredRecords = await MasterList.countDocuments({ project, status: 'Active' });
+    console.log("Project filtered records:", projectFilteredRecords);
+    
+    const categoryFilteredRecords = await MasterList.find({ project, status: 'Active', category: rsfCategory });
+    console.log("Category filtered records:", categoryFilteredRecords.length);
+
+    // Apply chainage filtering without limit/dedup
+    const rsfQuestions = categoryFilteredRecords.filter(q => {
       const c = parseFloat(q.chainage);
       return !isNaN(c) && c >= minC && c <= maxC;
     });
+
+    console.log("Final RSF questions returned:", rsfQuestions.length);
+    console.log("Print the actual IDs and chainages:", rsfQuestions.map(q => ({ id: q._id, chainage: q.chainage })));
 
     const rsfChainagesMap = new Map(); // chainage -> [questions]
     
@@ -420,7 +447,7 @@ class InspectionEngineService {
       
       const task = {
         project,
-        category: isRoadway ? 'Roadway' : 'RSF', // Use Roadway if Roadway exists, else RSF
+        category: isRoadway ? 'Roadway' : 'Road Signage and Furniture', // Use Roadway if Roadway exists, else RSF
         chainage: chainageStr,
         assetType: 'Multi-Asset', // Avoid storing "Roadway" as assetType
         assetSubType: '',

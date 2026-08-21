@@ -474,8 +474,8 @@ const InspectorApp = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden flex flex-col">
-        <div className="bg-white rounded-t shadow-sm border-t border-l border-r border-borderColor p-6 pb-2 flex flex-col shrink-0 z-20 mx-0">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 overflow-y-auto bg-white rounded shadow-sm border border-borderColor p-6 pb-24 mx-0 scroll-smooth">
 
           {/* Metadata Header Cards */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-2">
@@ -577,9 +577,7 @@ const InspectorApp = () => {
               </button>
             </div>
           </div>
-        </div>
 
-        <div className="flex-1 overflow-y-auto bg-white rounded-b shadow-sm border-b border-l border-r border-borderColor p-6 pt-4 pb-24 mx-0 scroll-smooth">
           {/* Rating Parameters */}
           <h2 className="text-lg font-medium text-center mb-2 mt-0 border-b pb-1 text-gray-800">
             Rating Parameters

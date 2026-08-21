@@ -1,7 +1,0 @@
-node_modules/
-.env
-dist/
-build/
-backend/logs/
-backend/uploads/
-.DS_Store

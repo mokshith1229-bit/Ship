@@ -56,14 +56,15 @@ const RoadSummaryPage = () => {
         const batchesRes = await ratingService.getReadyBatches();
         const batches = Array.isArray(batchesRes) ? batchesRes : (batchesRes?.data || []);
         
-        const projectBatches = batches.filter(b => b.project === roadId && (b.status === 'READY_FOR_RATING' || b.status === 'IN_PROGRESS'));
+        const projectBatches = batches.filter(b => b.project === roadId && (b.status === 'READY_FOR_RATING' || b.status === 'IN_PROGRESS' || b.status === 'COMPLETED'));
         if (projectBatches.length > 0) {
           projectBatches.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
           setProjectBatches(projectBatches);
           
           const latestBatch = projectBatches[0];
           setActiveBatchId(latestBatch._id);
-          setVersion(new Date(latestBatch.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }));
+          const dateStr = new Date(latestBatch.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+          setVersion(`${dateStr} - ${latestBatch.name || 'Unnamed'}`);
           
           const data = await ratingService.getBatchTasks(latestBatch._id);
           const fetchedTasks = Array.isArray(data) ? data : (data?.data || []);
@@ -82,7 +83,8 @@ const RoadSummaryPage = () => {
               status: task.status,
               createdAt: task.createdAt,
               direction: task.direction || firstParam.direction || '-',
-              roadType: task.roadType || firstParam.roadType || '-'
+              roadType: task.roadType || firstParam.roadType || '-',
+              parameterCategories: (task.parameters || []).map(p => p.category)
             };
           });
           setQuestions(tasksAsAssets);
@@ -102,9 +104,10 @@ const RoadSummaryPage = () => {
 
   useEffect(() => {
     if (version !== 'Choose' && projectBatches.length > 0) {
-      const selectedBatch = projectBatches.find(b => 
-        new Date(b.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) === version
-      ) || projectBatches[0];
+      const selectedBatch = projectBatches.find(b => {
+        const dateStr = new Date(b.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        return `${dateStr} - ${b.name || 'Unnamed'}` === version;
+      }) || projectBatches[0];
       
       if (selectedBatch && selectedBatch._id !== activeBatchId) {
         setActiveBatchId(selectedBatch._id);
@@ -126,7 +129,8 @@ const RoadSummaryPage = () => {
                 status: task.status,
                 createdAt: task.createdAt,
                 direction: task.direction || firstParam.direction || '-',
-                roadType: task.roadType || firstParam.roadType || '-'
+                roadType: task.roadType || firstParam.roadType || '-',
+                parameterCategories: (task.parameters || []).map(p => p.category)
               };
             });
             setQuestions(tasksAsAssets);
@@ -141,7 +145,11 @@ const RoadSummaryPage = () => {
   
   // Apply filters based on appliedFilters state
   if (appliedFilters.category && appliedFilters.category !== 'All') {
-    currentData = currentData.filter(q => q.category === appliedFilters.category);
+    currentData = currentData.filter(q => {
+      if (q.category === appliedFilters.category) return true;
+      if (q.parameterCategories && q.parameterCategories.includes(appliedFilters.category)) return true;
+      return false;
+    });
   }
   if (appliedFilters.direction && appliedFilters.direction !== 'Choose Direction' && appliedFilters.direction !== 'All') {
     currentData = currentData.filter(q => q.direction === appliedFilters.direction);
@@ -325,10 +333,13 @@ const RoadSummaryPage = () => {
             <label htmlFor="concerned" className="text-sm font-medium text-gray-700">Concerned Items</label>
           </div>
           
-          <div className="w-[120px]">
+          <div className="min-w-[150px] max-w-[300px]">
             <label className="block text-xs font-medium text-gray-700 mb-1 text-center">Version:</label>
             <CustomDropdown
-              options={projectBatches.length > 0 ? projectBatches.map(b => new Date(b.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })) : ['Choose']}
+              options={projectBatches.length > 0 ? projectBatches.map(b => {
+                const dateStr = new Date(b.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+                return `${dateStr} - ${b.name || 'Unnamed'}`;
+              }) : ['Choose']}
               value={version}
               onChange={setVersion}
               placeholder="Version"
@@ -382,7 +393,11 @@ const RoadSummaryPage = () => {
                 >
                   <td className="px-4 py-3 text-gray-900 font-medium">{q.assetId}</td>
                   <td className="px-4 py-3 text-gray-600">{q.project}</td>
-                  <td className="px-4 py-3 text-gray-600">{q.category}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {appliedFilters.category !== 'All' && q.parameterCategories?.includes(appliedFilters.category) 
+                      ? appliedFilters.category 
+                      : q.category}
+                  </td>
                   <td className="px-4 py-3 text-gray-600">{q.assetType}</td>
                   <td className="px-4 py-3 text-gray-600">{q.chainage}</td>
                   <td className="px-4 py-3 text-gray-600">{q.parameterCount} Params</td>
