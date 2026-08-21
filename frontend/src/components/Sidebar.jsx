@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { cn } from '../utils/cn';
-import { MdStarRate, MdPerson, MdChevronLeft, MdChevronRight, MdClose, MdDashboard, MdContentCopy, MdCheck, MdNotifications, MdGroup, MdList, MdOutlinePrecisionManufacturing, MdOutlineVideoCameraFront, MdImageSearch, MdVideoLibrary, MdInsights, MdAddRoad } from 'react-icons/md';
+import { MdStarRate, MdPerson, MdChevronLeft, MdChevronRight, MdClose, MdDashboard, MdContentCopy, MdCheck, MdNotifications, MdGroup, MdList, MdOutlinePrecisionManufacturing, MdOutlineVideoCameraFront, MdImageSearch, MdInsights, MdAddRoad, MdDomain, MdBusinessCenter, MdLibraryBooks, MdCameraOutdoor } from 'react-icons/md';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import { projectService } from '../services/project.service';
@@ -93,7 +93,10 @@ const Sidebar = () => {
     { name: 'Master List', icon: MdList, path: '/master-list', allowedRoles: ['Admin', 'Administrator'] },
     { name: 'Inspection Engine', icon: MdOutlinePrecisionManufacturing, path: '/inspection-engine', allowedRoles: ['Admin', 'Administrator'] },
     { name: 'Roadway Sampling', icon: MdAddRoad, path: '/roadway-sampling', allowedRoles: ['Admin', 'Administrator'] },
-    { name: 'Survey Library', icon: MdVideoLibrary, path: '/survey-library', allowedRoles: ['Admin', 'Administrator'] },
+    { name: 'Structures Sampling', icon: MdDomain, path: '/structure-sampling', allowedRoles: ['Admin', 'Administrator'] },
+    { name: 'Project Facilities', icon: MdBusinessCenter, path: '/project-facilities', allowedRoles: ['Admin', 'Administrator'] },
+    { name: 'ATMS', icon: MdCameraOutdoor, path: '/atms', allowedRoles: ['Admin', 'Administrator'] },
+    { name: 'Survey Library', icon: MdLibraryBooks, path: '/survey-library', allowedRoles: ['Admin', 'Administrator'] },
     { name: 'Survey Processing', icon: MdOutlineVideoCameraFront, path: '/survey-processing', allowedRoles: ['Admin', 'Administrator'] },
     { name: 'Image Review', icon: MdImageSearch, path: '/image-review', allowedRoles: ['Admin', 'Administrator', 'HO'] },
     { name: 'Rating', icon: MdStarRate, path: '/rating', allowedRoles: ['Admin', 'Administrator', 'HO', 'SPV', 'User'] },

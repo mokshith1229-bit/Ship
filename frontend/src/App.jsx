@@ -14,6 +14,9 @@ import UserManagementPage from './pages/UserManagementPage';
 import MasterListPage from './pages/MasterListPage';
 import InspectionEnginePage from './pages/InspectionEnginePage';
 import RoadwaySamplingPage from './pages/RoadwaySampling/RoadwaySamplingPage';
+import StructureSamplingPage from './pages/StructureSampling/StructureSamplingPage';
+import ProjectFacilitiesPage from './pages/ProjectFacilities/ProjectFacilitiesPage';
+import AtmsPage from './pages/Atms/AtmsPage';
 import SurveyLibraryPage from './pages/SurveyLibraryPage';
 import SurveyProcessingPage from './pages/SurveyProcessingPage';
 import ImageReviewPage from './pages/ImageReviewPage';
@@ -39,6 +42,9 @@ function App() {
       <Route path="/master-list" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><MasterListPage /></ProtectedRoute>} />
       <Route path="/inspection-engine" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><InspectionEnginePage /></ProtectedRoute>} />
       <Route path="/roadway-sampling" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><RoadwaySamplingPage /></ProtectedRoute>} />
+      <Route path="/structure-sampling" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><StructureSamplingPage /></ProtectedRoute>} />
+      <Route path="/project-facilities" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><ProjectFacilitiesPage /></ProtectedRoute>} />
+      <Route path="/atms" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><AtmsPage /></ProtectedRoute>} />
       <Route path="/survey-library" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><SurveyLibraryPage /></ProtectedRoute>} />
       <Route path="/survey-processing" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><SurveyProcessingPage /></ProtectedRoute>} />
       <Route path="/skip-gallery" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><SkipGalleryPage /></ProtectedRoute>} />

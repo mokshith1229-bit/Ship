@@ -66,7 +66,9 @@ class SurveyProcessingService {
     let unmappedTasks = [];
 
     for (const task of tasks) {
-      const c = parseFloat(task.chainage);
+      const isStructure = task.category === 'Structures';
+      const offset = 0; // -20m offset removed for Structures
+      const c = parseFloat(task.chainage) - offset;
       const taskDirection = task.parameters && task.parameters.length > 0 ? task.parameters[0].direction : 'N/A';
       const taskReq = task.imageRequirement || 'DAY';
       
@@ -145,7 +147,9 @@ class SurveyProcessingService {
         const { asset, tasks: groupTasks } = group;
         const chainageSet = new Set();
         groupTasks.forEach(t => {
-          const c = parseFloat(t.chainage);
+          const isStructure = t.category === 'Structures';
+          const offset = 0; // -20m offset removed for Structures
+          const c = parseFloat(t.chainage) - offset;
           chainageSet.add(c.toFixed(3));
           chainageSet.add((c - 0.010).toFixed(3));
           chainageSet.add((c + 0.010).toFixed(3));
@@ -168,9 +172,13 @@ class SurveyProcessingService {
           
           if (results.success) {
             for (const task of groupTasks) {
-              const centerC = parseFloat(task.chainage).toFixed(3);
-              const prevC = (parseFloat(task.chainage) - 0.010).toFixed(3);
-              const nextC = (parseFloat(task.chainage) + 0.010).toFixed(3);
+              const isStructure = task.category === 'Structures';
+              const offset = 0; // -20m offset removed for Structures
+              const extractionChainage = parseFloat(task.chainage) - offset;
+              
+              const centerC = extractionChainage.toFixed(3);
+              const prevC = (extractionChainage - 0.010).toFixed(3);
+              const nextC = (extractionChainage + 0.010).toFixed(3);
 
               const centerRecord = results.records.find(r => parseFloat(r.target_chainage || r.chainage).toFixed(3) === centerC);
               const prevRecord = results.records.find(r => parseFloat(r.target_chainage || r.chainage).toFixed(3) === prevC);

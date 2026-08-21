@@ -30,7 +30,7 @@ const buildInitialRatings = (task) => {
   if (task.ratings && task.ratings.length > 0) {
     const map = {};
     task.ratings.forEach(r => {
-      const key = task.category === 'Roadway' ? r.parameterKey : r.masterListId;
+      const key = (task.category === 'Roadway' || task.category === 'Structures' || task.category === 'Project Facilities' || task.category === 'ATMS') ? r.parameterKey : r.masterListId;
       map[key] = { score: String(r.score ?? 10), remark: r.remark || '' };
     });
     return map;
@@ -164,14 +164,23 @@ const InspectorApp = () => {
     return subType ? `${aType} (${subType})` : aType;
   };
 
-  const metaHeaders = currentTask ? [
-    { key: 'category',  label: 'Category',   value: currentTask.category || firstParam.category  || '-' },
-    { key: 'assetType', label: 'Asset type', value: displayAssetType() },
-    { key: 'direction', label: 'Direction',  value: currentTask.direction || firstParam.direction || '-' },
-    { key: 'roadType',  label: 'Road Type',  value: currentTask.roadType || firstParam.roadType  || '-' },
-    { key: 'placement', label: 'Placement',  value: currentTask.placement || firstParam.placement || '-' },
-    { key: 'chainage',  label: 'Chainage',   value: currentTask.chainage || '-' }
-  ] : [];
+  const metaHeaders = currentTask ? (
+    currentTask.category === 'Structures' ? [
+      { key: 'category',  label: 'Category',   value: currentTask.category || '-' },
+      { key: 'structureId', label: 'Structure ID', value: currentTask.assetMetadata?.structureId || '-' },
+      { key: 'type', label: 'Structure Type', value: currentTask.assetType || currentTask.assetMetadata?.typeOfStructure || '-' },
+      { key: 'direction', label: 'Direction',  value: currentTask.direction || '-' },
+      { key: 'range', label: 'Structure Range', value: currentTask.assetMetadata?.startChainage !== undefined ? (currentTask.assetMetadata?.endChainage ? `${currentTask.assetMetadata?.startChainage?.toFixed(3)} - ${currentTask.assetMetadata?.endChainage?.toFixed(3)}` : `${currentTask.assetMetadata?.startChainage?.toFixed(3)}`) : '-' },
+      { key: 'chainage',  label: 'Inspection Chainage',   value: currentTask.chainage || '-' }
+    ] : [
+      { key: 'category',  label: 'Category',   value: currentTask.category || firstParam.category  || '-' },
+      { key: 'assetType', label: 'Asset type', value: displayAssetType() },
+      { key: 'direction', label: 'Direction',  value: currentTask.direction || firstParam.direction || '-' },
+      { key: 'roadType',  label: 'Road Type',  value: currentTask.roadType || firstParam.roadType  || '-' },
+      { key: 'placement', label: 'Placement',  value: currentTask.placement || firstParam.placement || '-' },
+      { key: 'chainage',  label: 'Chainage',   value: currentTask.chainage || '-' }
+    ]
+  ) : [];
 
   const saveCurrentTask = async () => {
     if (!currentTask) return true;
@@ -202,6 +211,14 @@ const InspectorApp = () => {
           }));
           
         ratingsPayload = [...roadwayRatings, ...rsfRatings];
+      } else if (currentTask.category === 'Structures' || currentTask.category === 'Project Facilities' || currentTask.category === 'ATMS') {
+        ratingsPayload = (currentTask.ratings || []).map(p => ({
+          parameterKey: p.parameterKey,
+          parameterName: p.parameterName,
+          group: p.group,
+          score: Number(taskRatings[p.parameterKey]?.score ?? 10),
+          remark: taskRatings[p.parameterKey]?.remark || ''
+        }));
       } else {
         ratingsPayload = (currentTask.parameters || []).map(p => ({
           masterListId: p._id,
@@ -739,7 +756,7 @@ const InspectorApp = () => {
                           </button>
                         )}
                       </div>
-                      <div className="flex flex-col xl:flex-row gap-6 w-full flex-wrap">
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 w-full">
                          {groupParams.map(param => renderParamCard(param))}
                       </div>
                     </div>
@@ -773,7 +790,7 @@ const InspectorApp = () => {
                               </button>
                             )}
                           </div>
-                          <div className="flex flex-col xl:flex-row gap-6 w-full flex-wrap">
+                          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 w-full">
                              {params.map(param => renderParamCard(param))}
                           </div>
                         </div>
@@ -785,9 +802,10 @@ const InspectorApp = () => {
             ) : (
               <div className="flex flex-col w-full">
                 {Object.entries(
-                  (currentTask.parameters || []).reduce((acc, param) => {
-                    if (!acc[param.assetType]) acc[param.assetType] = [];
-                    acc[param.assetType].push(param);
+                  (currentTask.category === 'Structures' || currentTask.category === 'Project Facilities' || currentTask.category === 'ATMS' ? currentTask.ratings || [] : currentTask.parameters || []).reduce((acc, param) => {
+                    const groupName = (currentTask.category === 'Structures' || currentTask.category === 'Project Facilities' || currentTask.category === 'ATMS') ? (param.group || currentTask.category) : param.assetType;
+                    if (!acc[groupName]) acc[groupName] = [];
+                    acc[groupName].push(param);
                     return acc;
                   }, {})
                 ).map(([group, params]) => {
@@ -808,7 +826,7 @@ const InspectorApp = () => {
                           </button>
                         )}
                       </div>
-                      <div className="flex flex-col xl:flex-row gap-6 w-full flex-wrap">
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 w-full">
                          {params.map(param => renderParamCard(param))}
                       </div>
                     </div>
@@ -817,13 +835,13 @@ const InspectorApp = () => {
               </div>
             )}
 
-            {currentTask.category !== 'Roadway' && (!currentTask.parameters || currentTask.parameters.length === 0) && (
+            {currentTask.category !== 'Roadway' && currentTask.category !== 'Structures' && currentTask.category !== 'Project Facilities' && currentTask.category !== 'ATMS' && (!currentTask.parameters || currentTask.parameters.length === 0) && (
               <div className="flex-1 flex items-center justify-center py-12 text-gray-400 border border-dashed border-gray-300 rounded-lg">
                 No rating parameters found for this task.
               </div>
             )}
             
-            {currentTask.category === 'Roadway' && (!currentTask.ratings || currentTask.ratings.length === 0) && (
+            {(currentTask.category === 'Roadway' || currentTask.category === 'Structures' || currentTask.category === 'Project Facilities' || currentTask.category === 'ATMS') && (!currentTask.ratings || currentTask.ratings.length === 0) && (
               <div className="flex-1 flex items-center justify-center py-12 text-gray-400 border border-dashed border-gray-300 rounded-lg">
                 No rating parameters found for this task.
               </div>

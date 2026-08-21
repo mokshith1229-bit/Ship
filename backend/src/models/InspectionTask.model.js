@@ -116,6 +116,9 @@ const inspectionTaskSchema = new mongoose.Schema(
       speed: Number,
       extractedAt: String
     },
+    assetMetadata: {
+      type: mongoose.Schema.Types.Mixed
+    },
     extractionDiagnostics: {
       surveyAssetId: { type: mongoose.Schema.Types.ObjectId, ref: 'SurveyAsset' },
       videoFilename: String,
