@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { MdUndo, MdEdit, MdHome, MdClose } from 'react-icons/md';
+import { MdUndo, MdEdit, MdHome, MdClose, MdArrowBack } from 'react-icons/md';
 import { motion, AnimatePresence } from 'framer-motion';
 import ImageCarousel from '../components/Rating/ImageCarousel';
 import CustomDropdown from '../components/common/CustomDropdown';
@@ -64,6 +64,27 @@ const InspectorApp = () => {
   const [skipGroup, setSkipGroup] = useState(null); // Tracks which Asset Type is being skipped for Roadway
   const [skipping, setSkipping] = useState(false);
   const [remarkMasterConfig, setRemarkMasterConfig] = useState({});
+  const [userCustomRemarks, setUserCustomRemarks] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('userCustomRemarks')) || {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      try {
+        setUserCustomRemarks(JSON.parse(localStorage.getItem('userCustomRemarks')) || {});
+      } catch(e) {}
+    };
+    window.addEventListener('customRemarksUpdated', handleStorageChange);
+    window.addEventListener('storage', handleStorageChange); // To sync across tabs
+    return () => {
+      window.removeEventListener('customRemarksUpdated', handleStorageChange);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   useEffect(() => {
     fetch('/remarkMaster.json')
@@ -77,6 +98,11 @@ const InspectorApp = () => {
     // In case startIndex changes while mounted
     setCurrentIndex(startIndex);
   }, [batchId, startIndex]);
+
+  useEffect(() => {
+    // Reset custom remark inputs when navigating to a new task
+    setCustomRemarkMode({});
+  }, [currentIndex]);
 
   const fetchTasks = async () => {
     try {
@@ -179,6 +205,39 @@ const InspectorApp = () => {
         }));
       }
       
+      // Save custom remarks to localStorage
+      const currentCat = currentTask.category || 'N/A';
+      const existingOptions = remarkMasterConfig[currentCat] || [];
+      const newCustomRemarks = [];
+      
+      ratingsPayload.forEach(r => {
+        const remark = r.remark?.trim();
+        if (remark && remark !== 'Other' && !existingOptions.includes(remark)) {
+          newCustomRemarks.push(remark);
+        }
+      });
+      
+      if (newCustomRemarks.length > 0) {
+        try {
+          const stored = JSON.parse(localStorage.getItem('userCustomRemarks')) || {};
+          const catStored = stored[currentCat] || [];
+          let updated = false;
+          newCustomRemarks.forEach(r => {
+            if (!catStored.includes(r)) {
+              catStored.push(r);
+              updated = true;
+            }
+          });
+          if (updated) {
+            stored[currentCat] = catStored;
+            localStorage.setItem('userCustomRemarks', JSON.stringify(stored));
+            window.dispatchEvent(new Event('customRemarksUpdated'));
+          }
+        } catch(e) {
+          console.error("Error saving custom remarks", e);
+        }
+      }
+
       const selectedImageUrl = images[activeImageIndex]?.url;
       
       await ratingService.saveTaskRatings(currentTask._id, ratingsPayload, selectedImageUrl);
@@ -237,7 +296,7 @@ const InspectorApp = () => {
       setSkipping(true);
       const payload = {
         category: currentTask.category,
-        assetType: currentTask.category === 'Roadway' && skipGroup ? skipGroup : currentTask.assetType,
+        assetType: skipGroup ? skipGroup : currentTask.assetType,
         skipReason: skipReason,
         remarks: skipRemarks
       };
@@ -251,15 +310,13 @@ const InspectorApp = () => {
         return updated;
       });
       
+      const wasAssetSkip = !!skipGroup;
       setSkipModalOpen(false);
       setSkipReason('');
       setSkipRemarks('');
-      
-      // Store whether this was an asset skip or a full question skip
-      const wasAssetSkip = !!skipGroup;
       setSkipGroup(null);
       
-      // If task is fully skipped or completed and it wasn't just an asset skip, move to next
+      // If task is fully skipped or completed, move to next ONLY if it was a full task skip
       if (!wasAssetSkip && (returnedTask.status === 'SKIPPED' || returnedTask.status === 'COMPLETED')) {
         if (currentIndex < tasks.length - 1) {
           setCurrentIndex(prev => prev + 1);
@@ -291,7 +348,13 @@ const InspectorApp = () => {
   // Dynamic Remarks Calculation
   const currentCategory = currentTask?.category || firstParam.category || 'N/A';
   const categoryRemarks = remarkMasterConfig[currentCategory] || [];
-  const dynamicRemarkOptions = [...categoryRemarks, 'Other'];
+  const customRemarks = userCustomRemarks[currentCategory] || [];
+  
+  // Guarantee any currently saved remark for this task is in the dropdown options
+  const currentTaskRemarks = Object.values(taskRatings || {}).map(r => r.remark).filter(r => r && r !== 'Other');
+  
+  // Ensure unique values using Set
+  const dynamicRemarkOptions = [...new Set([...categoryRemarks, ...customRemarks, ...currentTaskRemarks]), 'Other'];
 
   const images = [];
   if (currentTask?.image?.cloudinaryUrl) {
@@ -407,6 +470,7 @@ const InspectorApp = () => {
                   if (val === 'Other') {
                     setCustomRemarkMode(prev => ({ ...prev, [pId]: true }));
                     setRating(pId, 'remark', '');
+                    setRating(pId, 'score', '5');
                   } else {
                     setRating(pId, 'remark', val);
                     if (val && val.toLowerCase() === 'rectified') {
@@ -423,6 +487,7 @@ const InspectorApp = () => {
                 }}
                 placeholder="Remark"
                 direction="up"
+                searchable={true}
               />
             )}
           </div>
@@ -460,6 +525,14 @@ const InspectorApp = () => {
       {/* Top Header */}
       <div className="bg-white border-b border-[#5cb85c]/30 shadow-sm px-6 py-2.5 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors border border-gray-200"
+            title="Go Back"
+          >
+            <MdArrowBack className="text-lg" />
+            Back
+          </button>
           <button
             onClick={() => navigate('/rating')}
             className="p-2 text-gray-500 hover:text-[#5cb85c] hover:bg-green-50 rounded-full transition-colors"
@@ -593,9 +666,8 @@ const InspectorApp = () => {
                   const groupParams = (currentTask.ratings || []).filter(p => p.group === group);
                   if (groupParams.length === 0) return null;
                   const isSkipped = (currentTask.skippedAssetTypes || []).some(s => s.assetType === group);
-                  if (isSkipped) return null;
                   return (
-                    <div key={group} className="flex flex-col w-full">
+                    <div key={group} className={`flex flex-col w-full ${isSkipped ? 'opacity-50 pointer-events-none' : ''}`}>
                       <div className="flex items-center justify-between mb-3 pb-1 border-b-2 border-gray-200">
                         <h3 className="text-md font-bold text-gray-700">{group} {isSkipped && '(SKIPPED)'}</h3>
                         {!isSkipped && (
@@ -628,9 +700,8 @@ const InspectorApp = () => {
                       }, {})
                     ).map(([rsfGroup, params]) => {
                       const isSkipped = (currentTask.skippedAssetTypes || []).some(s => s.assetType === rsfGroup);
-                      if (isSkipped) return null;
                       return (
-                        <div key={rsfGroup} className="flex flex-col w-full mb-4">
+                        <div key={rsfGroup} className={`flex flex-col w-full mb-4 ${isSkipped ? 'opacity-50 pointer-events-none' : ''}`}>
                           <div className="flex items-center justify-between mb-3 pb-1 border-b border-gray-100">
                             <h4 className="text-sm font-bold text-gray-600">{rsfGroup} {isSkipped && '(SKIPPED)'}</h4>
                             {!isSkipped && (
@@ -664,9 +735,8 @@ const InspectorApp = () => {
                   }, {})
                 ).map(([group, params]) => {
                   const isSkipped = (currentTask.skippedAssetTypes || []).some(s => s.assetType === group);
-                  if (isSkipped) return null;
                   return (
-                    <div key={group} className="flex flex-col w-full mb-4">
+                    <div key={group} className={`flex flex-col w-full mb-4 ${isSkipped ? 'opacity-50 pointer-events-none' : ''}`}>
                       <div className="flex items-center justify-between mb-3 pb-1 border-b-2 border-gray-200">
                         <h3 className="text-md font-bold text-gray-700">{group} {isSkipped && '(SKIPPED)'}</h3>
                         {!isSkipped && (

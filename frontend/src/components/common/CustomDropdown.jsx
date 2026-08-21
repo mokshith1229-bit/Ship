@@ -9,16 +9,22 @@ const CustomDropdown = ({
   placeholder = 'Select an option', 
   className = '',
   disabled = false,
-  direction = 'down'
+  direction = 'down',
+  searchable = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [searchTerm, setSearchTerm] = useState('');
   const dropdownRef = useRef(null);
   
   // Format options: accept array of strings or array of {label, value}
   const formattedOptions = options.map(opt => 
     typeof opt === 'string' ? { label: opt, value: opt } : opt
   );
+
+  const filteredOptions = (searchable && isOpen && searchTerm)
+    ? formattedOptions.filter(opt => opt.label.toLowerCase().startsWith(searchTerm.toLowerCase()))
+    : formattedOptions;
 
   const selectedOption = formattedOptions.find(opt => opt.value === value);
 
@@ -33,23 +39,33 @@ const CustomDropdown = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Update highlighted index when opening
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchTerm('');
+    }
+  }, [isOpen]);
+
+  // Update highlighted index when opening or filtering
   useEffect(() => {
     if (isOpen) {
-      const index = formattedOptions.findIndex(opt => opt.value === value);
-      setHighlightedIndex(index >= 0 ? index : 0);
+      if (searchTerm) {
+        setHighlightedIndex(filteredOptions.length > 0 ? 0 : -1);
+      } else {
+        const index = filteredOptions.findIndex(opt => opt.value === value);
+        setHighlightedIndex(index >= 0 ? index : 0);
+      }
     }
-  }, [isOpen, value, formattedOptions]);
+  }, [isOpen, value, searchTerm]);
 
   // Keyboard navigation
   const handleKeyDown = (e) => {
     if (disabled) return;
     
-    if (e.key === 'Enter' || e.key === ' ') {
+    if (e.key === 'Enter' || (e.key === ' ' && !searchable)) {
       if (!isOpen) {
         setIsOpen(true);
-      } else if (highlightedIndex >= 0 && highlightedIndex < formattedOptions.length) {
-        onChange(formattedOptions[highlightedIndex].value);
+      } else if (highlightedIndex >= 0 && highlightedIndex < filteredOptions.length) {
+        onChange(filteredOptions[highlightedIndex].value);
         setIsOpen(false);
       }
       e.preventDefault();
@@ -60,7 +76,7 @@ const CustomDropdown = ({
       if (!isOpen) {
         setIsOpen(true);
       } else {
-        setHighlightedIndex(prev => Math.min(prev + 1, formattedOptions.length - 1));
+        setHighlightedIndex(prev => Math.min(prev + 1, filteredOptions.length - 1));
       }
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
@@ -99,9 +115,24 @@ const CustomDropdown = ({
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
       >
-        <span className={`block truncate ${selectedOption ? 'text-gray-800' : 'text-gray-400'}`}>
-          {selectedOption ? selectedOption.label : placeholder}
-        </span>
+        {searchable ? (
+          <input
+            type="text"
+            className={`w-full outline-none bg-transparent truncate ${selectedOption && !isOpen && !searchTerm ? 'text-gray-800 font-medium' : 'text-gray-700'}`}
+            placeholder={selectedOption && !isOpen ? selectedOption.label : placeholder}
+            value={isOpen ? searchTerm : (selectedOption ? selectedOption.label : '')}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onClick={(e) => {
+              if (isOpen) e.stopPropagation();
+            }}
+            readOnly={!isOpen}
+            autoComplete="off"
+          />
+        ) : (
+          <span className={`block truncate ${selectedOption ? 'text-gray-800' : 'text-gray-400'}`}>
+            {selectedOption ? selectedOption.label : placeholder}
+          </span>
+        )}
         <motion.div
           animate={{ rotate: isOpen ? (isUp ? -180 : 180) : 0 }}
           transition={{ duration: 0.25, ease: "easeInOut" }}
@@ -124,10 +155,10 @@ const CustomDropdown = ({
               className="max-h-60 overflow-y-auto py-1 custom-dropdown-scrollbar focus:outline-none overscroll-contain"
               role="listbox"
             >
-              {formattedOptions.length === 0 ? (
-                <li className="px-4 py-3 text-sm text-gray-500 text-center">No options</li>
+              {filteredOptions.length === 0 ? (
+                <li className="px-4 py-3 text-sm text-gray-500 text-center">No remarks found</li>
               ) : (
-                formattedOptions.map((opt, index) => {
+                filteredOptions.map((opt, index) => {
                   const isSelected = value === opt.value;
                   const isHighlighted = highlightedIndex === index;
                   

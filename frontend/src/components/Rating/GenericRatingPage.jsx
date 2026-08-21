@@ -17,9 +17,30 @@ const GenericRatingPage = ({ rowData = {}, config }) => {
   const [pageActiveImages, setPageActiveImages] = useState({});
   const [expandedCard, setExpandedCard] = useState(null);
   const [remarkMasterConfig, setRemarkMasterConfig] = useState({});
+  const [userCustomRemarks, setUserCustomRemarks] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('userCustomRemarks')) || {};
+    } catch {
+      return {};
+    }
+  });
 
   // Store data per page and per image
   const [globalReviewData, setGlobalReviewData] = useState({});
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      try {
+        setUserCustomRemarks(JSON.parse(localStorage.getItem('userCustomRemarks')) || {});
+      } catch(e) {}
+    };
+    window.addEventListener('customRemarksUpdated', handleStorageChange);
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('customRemarksUpdated', handleStorageChange);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   useEffect(() => {
     fetch('/remarkMaster.json')
@@ -91,7 +112,8 @@ const GenericRatingPage = ({ rowData = {}, config }) => {
 
   const currentCategory = currentPage.overrides?.category || rowData.category || 'N/A';
   const categoryRemarks = remarkMasterConfig[currentCategory] || [];
-  const remarkOptions = [...categoryRemarks, 'Other'];
+  const customRemarks = userCustomRemarks[currentCategory] || [];
+  const remarkOptions = [...new Set([...categoryRemarks, ...customRemarks]), 'Other'];
 
   const toggleEditMode = () => {
     setIsEditMode(!isEditMode);
@@ -104,14 +126,57 @@ const GenericRatingPage = ({ rowData = {}, config }) => {
   };
 
   // Next/prev page navigation
-  const handlePrevPage = () => {
-    setCurrentPageIndex(prev => Math.max(0, prev - 1));
-    setExpandedCard(null); // Close expanded remark box
+  const handleSaveData = () => {
+    // Extract and save custom remarks before saving
+    const currentCat = currentPage.overrides?.category || rowData.category || 'N/A';
+    const existingOptions = remarkMasterConfig[currentCat] || [];
+    const newCustomRemarks = [];
+    
+    Object.values(remarks).forEach(val => {
+      const remark = val?.trim();
+      if (remark && remark !== 'Other' && !existingOptions.includes(remark)) {
+        newCustomRemarks.push(remark);
+      }
+    });
+
+    if (newCustomRemarks.length > 0) {
+      try {
+        const stored = JSON.parse(localStorage.getItem('userCustomRemarks')) || {};
+        const catStored = stored[currentCat] || [];
+        let updated = false;
+        newCustomRemarks.forEach(r => {
+          if (!catStored.includes(r)) {
+            catStored.push(r);
+            updated = true;
+          }
+        });
+        if (updated) {
+          stored[currentCat] = catStored;
+          localStorage.setItem('userCustomRemarks', JSON.stringify(stored));
+          window.dispatchEvent(new Event('customRemarksUpdated'));
+        }
+      } catch(e) {
+        console.error("Error saving custom remarks", e);
+      }
+    }
+
+    console.log('Saved data:', { globalReviewData });
   };
 
   const handleNextPage = () => {
-    setCurrentPageIndex(prev => Math.min(pagesData.length - 1, prev + 1));
-    setExpandedCard(null); // Close expanded remark box
+    handleSaveData();
+    if (currentPageIndex < pagesData.length - 1) {
+      setCurrentPageIndex(currentPageIndex + 1);
+      setExpandedCard(null); // Close expanded remark box
+    }
+  };
+
+  const handlePrevPage = () => {
+    handleSaveData();
+    if (currentPageIndex > 0) {
+      setCurrentPageIndex(currentPageIndex - 1);
+      setExpandedCard(null); // Close expanded remark box
+    }
   };
 
   // Simulate updating chainage based on page
@@ -305,6 +370,7 @@ const GenericRatingPage = ({ rowData = {}, config }) => {
                         <CustomDropdown 
                           options={remarkOptions}
                           value={remarks[key]}
+                          searchable={true}
                           onChange={(val) => {
                             setGlobalReviewData(prevGlobal => {
                               const current = prevGlobal[currentPageIndex] || getInitialState();
@@ -314,6 +380,8 @@ const GenericRatingPage = ({ rowData = {}, config }) => {
                               if (val && val.toLowerCase() === 'rectified') {
                                 newRatings[key] = '10';
                               } else if (val && val.toLowerCase() === 'not rectified') {
+                                newRatings[key] = '5';
+                              } else if (val === 'Other') {
                                 newRatings[key] = '5';
                               } else {
                                 const resolvedRating = resolveRemarkRating(currentCategory, val);
