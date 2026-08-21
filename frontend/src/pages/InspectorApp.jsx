@@ -254,10 +254,13 @@ const InspectorApp = () => {
       setSkipModalOpen(false);
       setSkipReason('');
       setSkipRemarks('');
+      
+      // Store whether this was an asset skip or a full question skip
+      const wasAssetSkip = !!skipGroup;
       setSkipGroup(null);
       
-      // If task is fully skipped or completed, move to next
-      if (returnedTask.status === 'SKIPPED' || returnedTask.status === 'COMPLETED') {
+      // If task is fully skipped or completed and it wasn't just an asset skip, move to next
+      if (!wasAssetSkip && (returnedTask.status === 'SKIPPED' || returnedTask.status === 'COMPLETED')) {
         if (currentIndex < tasks.length - 1) {
           setCurrentIndex(prev => prev + 1);
           setActiveImageIndex(1);
@@ -590,8 +593,9 @@ const InspectorApp = () => {
                   const groupParams = (currentTask.ratings || []).filter(p => p.group === group);
                   if (groupParams.length === 0) return null;
                   const isSkipped = (currentTask.skippedAssetTypes || []).some(s => s.assetType === group);
+                  if (isSkipped) return null;
                   return (
-                    <div key={group} className={`flex flex-col w-full ${isSkipped ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <div key={group} className="flex flex-col w-full">
                       <div className="flex items-center justify-between mb-3 pb-1 border-b-2 border-gray-200">
                         <h3 className="text-md font-bold text-gray-700">{group} {isSkipped && '(SKIPPED)'}</h3>
                         {!isSkipped && (
@@ -624,8 +628,9 @@ const InspectorApp = () => {
                       }, {})
                     ).map(([rsfGroup, params]) => {
                       const isSkipped = (currentTask.skippedAssetTypes || []).some(s => s.assetType === rsfGroup);
+                      if (isSkipped) return null;
                       return (
-                        <div key={rsfGroup} className={`flex flex-col w-full mb-4 ${isSkipped ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <div key={rsfGroup} className="flex flex-col w-full mb-4">
                           <div className="flex items-center justify-between mb-3 pb-1 border-b border-gray-100">
                             <h4 className="text-sm font-bold text-gray-600">{rsfGroup} {isSkipped && '(SKIPPED)'}</h4>
                             {!isSkipped && (
@@ -659,8 +664,9 @@ const InspectorApp = () => {
                   }, {})
                 ).map(([group, params]) => {
                   const isSkipped = (currentTask.skippedAssetTypes || []).some(s => s.assetType === group);
+                  if (isSkipped) return null;
                   return (
-                    <div key={group} className={`flex flex-col w-full mb-4 ${isSkipped ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <div key={group} className="flex flex-col w-full mb-4">
                       <div className="flex items-center justify-between mb-3 pb-1 border-b-2 border-gray-200">
                         <h3 className="text-md font-bold text-gray-700">{group} {isSkipped && '(SKIPPED)'}</h3>
                         {!isSkipped && (
