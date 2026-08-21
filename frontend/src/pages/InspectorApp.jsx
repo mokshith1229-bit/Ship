@@ -45,7 +45,7 @@ const buildInitialRatings = (task) => {
 const InspectorApp = () => {
   const { batchId } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const startIndex = parseInt(searchParams.get('startIndex'), 10) || 0;
   
   const [tasks, setTasks] = useState([]);
@@ -63,6 +63,7 @@ const InspectorApp = () => {
   const [skipRemarks, setSkipRemarks] = useState('');
   const [skipGroup, setSkipGroup] = useState(null); // Tracks which Asset Type is being skipped for Roadway
   const [skipping, setSkipping] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
   const [remarkMasterConfig, setRemarkMasterConfig] = useState({});
   const [userCustomRemarks, setUserCustomRemarks] = useState(() => {
     try {
@@ -95,14 +96,18 @@ const InspectorApp = () => {
 
   useEffect(() => {
     fetchTasks();
-    // In case startIndex changes while mounted
+    // Reset currentIndex when batchId changes
     setCurrentIndex(startIndex);
-  }, [batchId, startIndex]);
+  }, [batchId]);
 
   useEffect(() => {
     // Reset custom remark inputs when navigating to a new task
     setCustomRemarkMode({});
-  }, [currentIndex]);
+    setValidationErrors({});
+    
+    // Sync URL with currentIndex so refreshing preserves the state
+    setSearchParams({ startIndex: currentIndex }, { replace: true });
+  }, [currentIndex, setSearchParams]);
 
   const fetchTasks = async () => {
     try {
@@ -205,6 +210,43 @@ const InspectorApp = () => {
         }));
       }
       
+      const errors = {};
+      let firstErrorPId = null;
+      
+      for (const r of ratingsPayload) {
+        const score = Number(r.score);
+        const remark = (r.remark || '').trim();
+        if ([0, 1, 5].includes(score) && (!remark || remark === 'Other')) {
+          const pId = r.parameterKey || r.masterListId;
+          errors[pId] = "Please enter remark";
+          if (!firstErrorPId) firstErrorPId = pId;
+        }
+      }
+      
+      if (Object.keys(errors).length > 0) {
+        setValidationErrors(errors);
+        setCustomRemarkMode(prev => {
+          const next = { ...prev };
+          Object.keys(errors).forEach(pId => {
+             next[pId] = true; 
+          });
+          return next;
+        });
+        
+        setTimeout(() => {
+          const errorEl = document.getElementById(`remark-input-${firstErrorPId}`);
+          if (errorEl) {
+            errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            errorEl.focus();
+          }
+        }, 100);
+        
+        setSaving(false);
+        return false;
+      }
+      
+      setValidationErrors({});
+      
       // Save custom remarks to localStorage
       const currentCat = currentTask.category || 'N/A';
       const existingOptions = remarkMasterConfig[currentCat] || [];
@@ -274,7 +316,8 @@ const InspectorApp = () => {
   };
 
   const handlePrevious = async () => {
-    await saveCurrentTask();
+    const ok = await saveCurrentTask();
+    if (!ok) return;
     if (currentIndex > 0) {
       setCurrentIndex(prev => prev - 1);
       setActiveImageIndex(1);
@@ -445,11 +488,17 @@ const InspectorApp = () => {
               <div className="flex items-center gap-2">
                 <input
                   type="text"
+                  id={`remark-input-${pId}`}
                   autoFocus
                   value={rating.remark === 'Other' ? '' : rating.remark}
-                  onChange={(e) => setRating(pId, 'remark', e.target.value)}
+                  onChange={(e) => {
+                    setRating(pId, 'remark', e.target.value);
+                    if (e.target.value.trim() && validationErrors[pId]) {
+                      setValidationErrors(prev => ({ ...prev, [pId]: null }));
+                    }
+                  }}
                   placeholder="Enter custom remark..."
-                  className="w-full px-3 py-1.5 md:min-h-[38px] bg-white border border-[#5cb85c] rounded-md text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#5cb85c]/20 shadow-sm"
+                  className={`w-full px-3 py-1.5 md:min-h-[38px] bg-white border rounded-md text-sm text-gray-800 focus:outline-none focus:ring-2 shadow-sm ${validationErrors[pId] ? 'border-red-500 ring-1 ring-red-500 focus:ring-red-500/20' : 'border-[#5cb85c] focus:ring-[#5cb85c]/20'}`}
                 />
                 <button
                   onClick={() => {
@@ -464,9 +513,14 @@ const InspectorApp = () => {
               </div>
             ) : (
               <CustomDropdown
+                className={`remark-${pId}`}
                 options={dynamicRemarkOptions}
                 value={rating.remark}
+                error={!!validationErrors[pId]}
                 onChange={(val) => {
+                  if (validationErrors[pId]) {
+                    setValidationErrors(prev => ({ ...prev, [pId]: null }));
+                  }
                   if (val === 'Other') {
                     setCustomRemarkMode(prev => ({ ...prev, [pId]: true }));
                     setRating(pId, 'remark', '');
@@ -489,6 +543,9 @@ const InspectorApp = () => {
                 direction="up"
                 searchable={true}
               />
+            )}
+            {validationErrors[pId] && (
+              <div className="text-red-500 text-[11px] mt-1.5 font-medium">{validationErrors[pId]}</div>
             )}
           </div>
         </div>
@@ -663,7 +720,7 @@ const InspectorApp = () => {
             {currentTask.category === 'Roadway' ? (
               <>
                 {['Pavement', 'Shoulder', 'Kerb', 'Pavement Markings', 'ROW', 'Median Plantation'].map(group => {
-                  const groupParams = (currentTask.ratings || []).filter(p => p.group === group);
+                  const groupParams = (currentTask.ratings || []).filter(p => p.group === group && p.parameterKey !== 'rutting');
                   if (groupParams.length === 0) return null;
                   const isSkipped = (currentTask.skippedAssetTypes || []).some(s => s.assetType === group);
                   return (

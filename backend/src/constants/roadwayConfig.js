@@ -1,6 +1,5 @@
 const ROADWAY_PARAMETER_CONFIG = [
   { group: 'Pavement', parameterKey: 'cracks', parameterName: 'Cracks' },
-  { group: 'Pavement', parameterKey: 'rutting', parameterName: 'Rutting' },
   { group: 'Pavement', parameterKey: 'pothole', parameterName: 'Pothole' },
   { group: 'Shoulder', parameterKey: 'edgeDrop', parameterName: 'Edge Drop' },
   { group: 'Shoulder', parameterKey: 'unevenness', parameterName: 'Unevenness' },

@@ -10,7 +10,8 @@ const CustomDropdown = ({
   className = '',
   disabled = false,
   direction = 'down',
-  searchable = false
+  searchable = false,
+  error = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -108,9 +109,11 @@ const CustomDropdown = ({
     >
       <button
         type="button"
-        className={`w-full flex items-center justify-between px-3 py-1.5 min-h-[34px] md:min-h-[38px] bg-white border border-[#5cb85c] rounded-md text-sm font-medium transition-all duration-200 outline-none
-          ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-[0_2px_8px_rgba(92,184,92,0.15)] focus:ring-2 focus:ring-[#5cb85c]/20'}
-          ${isOpen ? 'ring-2 ring-[#5cb85c]/20 shadow-[0_2px_8px_rgba(92,184,92,0.15)]' : ''}
+        id={className.includes('remark-') ? className.split(' ').find(c => c.startsWith('remark-')) : undefined}
+        className={`w-full flex items-center justify-between px-3 py-1.5 min-h-[34px] md:min-h-[38px] bg-white border rounded-md text-sm font-medium transition-all duration-200 outline-none
+          ${error ? 'border-red-500 ring-1 ring-red-500' : 'border-[#5cb85c]'}
+          ${disabled ? 'opacity-50 cursor-not-allowed' : `cursor-pointer ${error ? 'hover:shadow-[0_2px_8px_rgba(239,68,68,0.15)] focus:ring-red-500/20' : 'hover:shadow-[0_2px_8px_rgba(92,184,92,0.15)] focus:ring-[#5cb85c]/20'}`}
+          ${isOpen ? `ring-2 ${error ? 'ring-red-500/20 shadow-[0_2px_8px_rgba(239,68,68,0.15)]' : 'ring-[#5cb85c]/20 shadow-[0_2px_8px_rgba(92,184,92,0.15)]'}` : ''}
         `}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
