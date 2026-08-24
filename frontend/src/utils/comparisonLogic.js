@@ -12,16 +12,19 @@ export const processComparisonData = (tasksA, tasksB) => {
     const tA = mapA.get(key);
     
     if (tA) {
-      const ratingA = Number(tA.rating);
-      const ratingB = Number(tB.rating);
+      const ratingA = (tA.rating === null || tA.rating === '' || tA.rating === undefined) ? null : Number(tA.rating);
+      const ratingB = (tB.rating === null || tB.rating === '' || tB.rating === undefined) ? null : Number(tB.rating);
       
       let status = 'unchanged';
-      let difference = 0;
+      let difference = null;
       
-      if (!isNaN(ratingA) && !isNaN(ratingB)) {
+      if (ratingA !== null && ratingB !== null && ratingA !== 0 && ratingB !== 0 && !isNaN(ratingA) && !isNaN(ratingB)) {
         difference = ratingB - ratingA;
         if (ratingB > ratingA) status = 'improved';
         else if (ratingB < ratingA) status = 'deteriorated';
+        else if (ratingA === 1 || ratingA === 5) status = 'unresolved';
+      } else if (ratingA === null || ratingB === null || ratingA === 0 || ratingB === 0) {
+        status = 'not rated';
       }
       
       matched.push({
@@ -58,9 +61,11 @@ export const processComparisonData = (tasksA, tasksB) => {
     if (m.status === 'improved') improvedIssues++;
     if (m.status === 'deteriorated') deterioratedIssues++;
     if (m.status === 'unchanged') unchangedIssues++;
+    // Unresolved issues are also counted as unchanged in the aggregate stats if we want? Let's leave them out of unchanged?
+    // Wait, let's keep track if needed.
     
-    const rA = Number(m.taskA.rating);
-    const rB = Number(m.taskB.rating);
+    const rA = (m.taskA.rating === null || m.taskA.rating === '' || m.taskA.rating === undefined) ? null : Number(m.taskA.rating);
+    const rB = (m.taskB.rating === null || m.taskB.rating === '' || m.taskB.rating === undefined) ? null : Number(m.taskB.rating);
     
     // Check if it's a critical issue
     if ([1, 5].includes(rA) || [1, 5].includes(rB)) {
@@ -90,11 +95,18 @@ export const processComparisonData = (tasksA, tasksB) => {
     chainages.push({
       chainage: m.chainage,
       category: m.category,
+      asset: m.assetType,
       parameter: m.parameter,
       ratingA: rA,
       ratingB: rB,
+      remarkA: m.taskA.remark,
+      remarkB: m.taskB.remark,
       diff: m.difference,
-      status: m.status === 'improved' ? 'Improved' : m.status === 'deteriorated' ? 'Deteriorated' : 'No Change'
+      status: m.status === 'improved' ? 'Improved' : m.status === 'deteriorated' ? 'Deteriorated' : m.status === 'unresolved' ? 'Unresolved' : (m.status === 'not rated' ? 'Not Rated' : 'No Change'),
+      imageA: m.taskA.image,
+      imageB: m.taskB.image,
+      dateA: m.taskA.date,
+      dateB: m.taskB.date
     });
     
     // Populate mapPoints
@@ -137,8 +149,9 @@ export const processComparisonData = (tasksA, tasksB) => {
 
     const averageRating = count > 0 ? (totalScore / count) : 0;
     const overallRating = count > 0 ? ((totalScore / (count * 10)) * 100) : 0;
+    const total = tasks.length;
 
-    return { overallRating, averageRating, criticalCount, perfect10, skipped, completed, count, imagesCompared };
+    return { overallRating, averageRating, criticalCount, perfect10, skipped, completed, count, imagesCompared, total };
   };
 
   const statsA = calcStats(tasksA);
@@ -147,11 +160,13 @@ export const processComparisonData = (tasksA, tasksB) => {
   // Top improvements / deteriorations (based on individual parameter differences, grouped by parameter name)
   const paramDiffs = {};
   matched.forEach(m => {
-    if (!paramDiffs[m.parameter]) {
-      paramDiffs[m.parameter] = { name: m.parameter, diff: 0, count: 0 };
+    if (m.difference !== null) {
+      if (!paramDiffs[m.parameter]) {
+        paramDiffs[m.parameter] = { name: m.parameter, diff: 0, count: 0 };
+      }
+      paramDiffs[m.parameter].diff += m.difference;
+      paramDiffs[m.parameter].count++;
     }
-    paramDiffs[m.parameter].diff += m.difference;
-    paramDiffs[m.parameter].count++;
   });
   
   const allParams = Object.values(paramDiffs).map(p => ({
@@ -187,6 +202,12 @@ export const processComparisonData = (tasksA, tasksB) => {
     skippedDiff: statsB.skipped - statsA.skipped,
     skippedA: statsA.skipped,
     skippedB: statsB.skipped,
+    imagesA: statsA.imagesCompared,
+    imagesB: statsB.imagesCompared,
+    countA: statsA.count,
+    countB: statsB.count,
+    totalA: statsA.total,
+    totalB: statsB.total,
   };
 
   // Category Performance (Phase 4)

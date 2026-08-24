@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import ComparisonKPIs from './ComparisonKPIs';
-import CriticalIssueComparison from './CriticalIssueComparison';
 import CategoryAssetComparison from './CategoryAssetComparison';
 import ChainageIntelligence from './ChainageIntelligence';
-import ComparisonMap from './ComparisonMap';
-import ManagementSummary from './ManagementSummary';
 import { ratingService } from '../../../services/rating.service';
 import { processComparisonData } from '../../../utils/comparisonLogic';
+import { exportInspectionCommitteeReport } from '../../../utils/excelExport';
 
 const InspectionComparison = ({ selectedProject }) => {
   const [batches, setBatches] = useState([]);
@@ -14,6 +11,7 @@ const InspectionComparison = ({ selectedProject }) => {
   const [versionB, setVersionB] = useState('');
   const [loading, setLoading] = useState(false);
   const [comparisonData, setComparisonData] = useState(null);
+  const [flatData, setFlatData] = useState({ flatA: [], flatB: [] });
 
   // Fetch available batches for the selected project
   useEffect(() => {
@@ -95,8 +93,16 @@ const InspectionComparison = ({ selectedProject }) => {
         
         const flatA = flattenTasks(tasksA, dateA);
         const flatB = flattenTasks(tasksB, dateB);
+        setFlatData({ flatA, flatB });
         
         const data = processComparisonData(flatA, flatB);
+        
+        // Append raw task counts as requested
+        if (data && data.analytics) {
+          data.analytics.rawTaskCountA = tasksA.length;
+          data.analytics.rawTaskCountB = tasksB.length;
+        }
+
         setComparisonData(data);
       })
       .catch(console.error)
@@ -146,7 +152,7 @@ const InspectionComparison = ({ selectedProject }) => {
         </div>
 
         <div className="flex-1 min-w-[200px]">
-          <label className="block text-sm font-bold text-gray-700 uppercase tracking-wider mb-2">Version A (Previous)</label>
+          <label className="block text-sm font-bold text-gray-700 uppercase tracking-wider mb-2">Previous Month</label>
           <select 
             className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm"
             value={versionA}
@@ -160,7 +166,7 @@ const InspectionComparison = ({ selectedProject }) => {
         </div>
 
         <div className="flex-1 min-w-[200px]">
-          <label className="block text-sm font-bold text-gray-700 uppercase tracking-wider mb-2">Version B (Current)</label>
+          <label className="block text-sm font-bold text-gray-700 uppercase tracking-wider mb-2">Current Month</label>
           <select 
             className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm"
             value={versionB}
@@ -171,6 +177,32 @@ const InspectionComparison = ({ selectedProject }) => {
               <option key={b._id} value={b._id}>{b.name || new Date(b.createdAt).toLocaleDateString()}</option>
             ))}
           </select>
+        </div>
+
+        <div className="flex items-end min-w-[200px]">
+          <button 
+            className="w-full px-4 py-2 bg-[#00A651] text-white font-bold rounded-lg hover:bg-green-700 shadow-sm transition-colors flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!comparisonData || loading}
+            onClick={() => {
+              if (!comparisonData) {
+                alert("Please load a comparison before downloading the report.");
+                return;
+              }
+              const batchAObj = batches.find(b => b._id === versionA);
+              const batchBObj = batches.find(b => b._id === versionB);
+              
+              exportInspectionCommitteeReport(comparisonData, flatData.flatA, flatData.flatB, {
+                projectName: selectedProject,
+                monthA: batchAObj?.name || 'Previous Month',
+                monthB: batchBObj?.name || 'Current Month'
+              });
+            }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+            Download Excel Report
+          </button>
         </div>
       </div>
 
@@ -183,28 +215,9 @@ const InspectionComparison = ({ selectedProject }) => {
 
       {!loading && comparisonData && versionA !== versionB && (
         <div className="flex flex-col gap-8 animate-fade-in">
-          <ComparisonKPIs data={comparisonData.kpis} />
           
-          <CategoryAssetComparison 
-            categories={comparisonData.categories}
-            topImprovements={comparisonData.topImprovements}
-            topDeteriorations={comparisonData.topDeteriorations}
-          />
+          <ChainageIntelligence chainages={comparisonData.chainages} analytics={comparisonData.analytics} />
 
-          <CriticalIssueComparison issues={comparisonData.criticalIssues} />
-          
-          <ChainageIntelligence chainages={comparisonData.chainages} />
-          
-          <div className="p-5 bg-white border border-gray-200 rounded-xl shadow-sm">
-             <div className="flex items-center justify-between mb-4">
-               <h2 className="text-gray-800 font-bold text-base tracking-wide uppercase">
-                 Interactive Comparison Map
-               </h2>
-             </div>
-             <ComparisonMap mapPoints={comparisonData.mapPoints} />
-          </div>
-          
-          <ManagementSummary insights={comparisonData.insights} />
         </div>
       )}
       

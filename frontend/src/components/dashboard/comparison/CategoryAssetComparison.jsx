@@ -72,9 +72,9 @@ const CategoryAssetComparison = ({ categories, topImprovements, topDeterioration
 
   return (
     <div className="space-y-6">
-      {/* SECTION 2 */}
+      {/* CATEGORY COMPARISON */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-bold text-gray-800 mb-6 uppercase tracking-wider border-b border-gray-100 pb-3">Section 2: Category Comparison</h2>
+        <h2 className="text-lg font-bold text-gray-800 mb-6 uppercase tracking-wider border-b border-gray-100 pb-3">Category Comparison</h2>
         
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="flex-1 h-[300px]">
@@ -96,20 +96,20 @@ const CategoryAssetComparison = ({ categories, topImprovements, topDeterioration
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* SECTION 4 */}
+        {/* TOP IMPROVEMENTS */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-bold text-gray-800 mb-6 uppercase tracking-wider border-b border-gray-100 pb-3 text-green-700 flex items-center gap-2">
-            <MdArrowUpward /> Section 4: Top Improvements
+            <MdArrowUpward /> Top Improvements
           </h2>
           <div className="space-y-3">
             {topImprovements.map((item, idx) => <ListRow key={idx} item={item} isImprovement={true} />)}
           </div>
         </div>
 
-        {/* SECTION 5 */}
+        {/* TOP DETERIORATION */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-bold text-gray-800 mb-6 uppercase tracking-wider border-b border-gray-100 pb-3 text-red-700 flex items-center gap-2">
-            <MdArrowDownward /> Section 5: Top Deterioration
+            <MdArrowDownward /> Top Deterioration
           </h2>
           <div className="space-y-3">
             {topDeteriorations.map((item, idx) => <ListRow key={idx} item={item} isImprovement={false} />)}

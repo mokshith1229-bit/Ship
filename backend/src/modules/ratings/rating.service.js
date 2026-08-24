@@ -149,12 +149,7 @@ const WorkAssignment = require('../../models/WorkAssignment.model');
 const getBatchTasks = async (batchId, user) => {
   let queryFilter = {
     batchId,
-    status: { $nin: ['EXTRACTION_FAILED', 'PENDING_IMAGE'] },
-    $and: [
-      { 'image.cloudinaryUrl': { $exists: true } },
-      { 'image.cloudinaryUrl': { $ne: null } },
-      { 'image.cloudinaryUrl': { $ne: '' } }
-    ]
+    status: { $nin: ['EXTRACTION_FAILED', 'PENDING_IMAGE'] }
   };
 
   // If user is a 'User', restrict to their assignment
