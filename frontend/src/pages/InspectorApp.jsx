@@ -408,13 +408,12 @@ const InspectorApp = () => {
   // Dynamic Remarks Calculation
   const currentCategory = currentTask?.category || firstParam.category || 'N/A';
   const categoryRemarks = remarkMasterConfig[currentCategory] || [];
-  const customRemarks = userCustomRemarks[currentCategory] || [];
+  
+  // Flatten all custom remarks across all categories so manually typed remarks are forwarded everywhere
+  const allCustomRemarks = Object.values(userCustomRemarks).flat();
   
   // Guarantee any currently saved remark for this task is in the dropdown options
   const currentTaskRemarks = Object.values(taskRatings || {}).map(r => r.remark).filter(r => r && r !== 'Other');
-  
-  // Ensure unique values using Set
-  const dynamicRemarkOptions = [...new Set([...categoryRemarks, ...customRemarks, ...currentTaskRemarks]), 'Other'];
 
   const images = [];
   if (currentTask?.image?.cloudinaryUrl) {
@@ -428,6 +427,18 @@ const InspectorApp = () => {
   const renderParamCard = (param) => {
     const pId = param.parameterKey || param._id;
     const rating = getRating(pId);
+    
+    // Determine category for this parameter (useful for RSF embedded in Roadway)
+    // For RSF parameters, param.assetType might be 'Road Signage and Furniture' or 'Landscaping'
+    const paramCategory = param.category || param.assetType || currentCategory;
+    const paramMasterRemarks = remarkMasterConfig[paramCategory] || [];
+    
+    // Combine master remarks for the main task category AND the specific parameter category
+    const combinedMasterRemarks = [...new Set([...categoryRemarks, ...paramMasterRemarks])];
+    
+    // Ensure unique values using Set
+    const dynamicRemarkOptions = [...new Set([...combinedMasterRemarks, ...allCustomRemarks, ...currentTaskRemarks]), 'Other'];
+    
     return (
       <div
         key={pId}
@@ -548,6 +559,8 @@ const InspectorApp = () => {
                       setRating(pId, 'score', '10');
                     } else if (val && val.toLowerCase() === 'not rectified') {
                       setRating(pId, 'score', '5');
+                    } else if (val && (val.toLowerCase() === 'not applicable' || val.toLowerCase() === 'na' || val.toLowerCase() === 'n/a')) {
+                      setRating(pId, 'score', '0');
                     } else {
                       const resolvedScore = resolveRemarkRating('', val);
                       if (resolvedScore !== null) {

@@ -5,35 +5,106 @@ import CategoryAssetComparison from './CategoryAssetComparison';
 import ChainageIntelligence from './ChainageIntelligence';
 import ComparisonMap from './ComparisonMap';
 import ManagementSummary from './ManagementSummary';
-import { mockComparisonData } from '../../../data/mockComparisonData';
+import { ratingService } from '../../../services/rating.service';
+import { processComparisonData } from '../../../utils/comparisonLogic';
 
 const InspectionComparison = ({ selectedProject }) => {
   const [batches, setBatches] = useState([]);
   const [versionA, setVersionA] = useState('');
   const [versionB, setVersionB] = useState('');
   const [loading, setLoading] = useState(false);
+  const [comparisonData, setComparisonData] = useState(null);
 
+  // Fetch available batches for the selected project
   useEffect(() => {
-    if (selectedProject === 'SIPL') {
-      setBatches([
-        { _id: 'Batch-SIPL-2026-08-04-786', name: 'Batch-SIPL-2026-08-04-786' },
-        { _id: 'Batch-SIPL-2026-09-05-812', name: 'Batch-SIPL-2026-09-05-812' }
-      ]);
+    if (selectedProject) {
+      ratingService.getReadyBatches()
+        .then(res => {
+          const allBatches = Array.isArray(res) ? res : (res?.data || []);
+          const projectBatches = allBatches
+            .filter(b => b.project === selectedProject)
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          
+          setBatches(projectBatches);
+          setVersionA('');
+          setVersionB('');
+          setComparisonData(null);
+        })
+        .catch(console.error);
     } else {
       setBatches([]);
       setVersionA('');
       setVersionB('');
+      setComparisonData(null);
     }
   }, [selectedProject]);
 
-  // Simulate loading delay for better UX
+  const flattenTasks = (tasks, batchDate) => {
+    const flattened = [];
+    tasks.forEach(t => {
+      const isSkipped = t.status === 'SKIPPED';
+      const ratingList = t.ratings || [];
+      
+      ratingList.forEach(r => {
+        let paramName = r.parameterName || r.parameterKey;
+        if (!paramName && r.masterListId && t.parameters) {
+          const matchedParam = t.parameters.find(p => p._id === r.masterListId || (p._id && p._id.toString() === r.masterListId.toString()));
+          if (matchedParam) {
+            paramName = matchedParam.parameter || matchedParam.parameterName;
+          }
+        }
+
+        flattened.push({
+          project: t.project,
+          category: t.category || '-',
+          assetType: t.assetType || '-',
+          parameter: paramName || '-',
+          chainage: t.chainage,
+          direction: t.direction || '-',
+          roadType: t.roadType || '-',
+          rating: r.score,
+          remark: r.remark,
+          skipStatus: isSkipped ? 'Skipped' : 'Completed',
+          image: t.image?.cloudinaryUrl || null,
+          metadata: t.metadata || null,
+          date: batchDate
+        });
+      });
+    });
+    return flattened;
+  };
+
+  // Fetch tasks and run comparison logic when versions are selected
   useEffect(() => {
     if (versionA && versionB && versionA !== versionB) {
       setLoading(true);
-      const timer = setTimeout(() => {
+      
+      Promise.all([
+        ratingService.getBatchTasks(versionA),
+        ratingService.getBatchTasks(versionB)
+      ])
+      .then(([resA, resB]) => {
+        const tasksA = Array.isArray(resA) ? resA : (resA?.data || []);
+        const tasksB = Array.isArray(resB) ? resB : (resB?.data || []);
+        
+        const batchAObj = batches.find(b => b._id === versionA);
+        const batchBObj = batches.find(b => b._id === versionB);
+        
+        const dateA = batchAObj ? (batchAObj.createdAt || Date.now()) : Date.now();
+        const dateB = batchBObj ? (batchBObj.createdAt || Date.now()) : Date.now();
+        
+        const flatA = flattenTasks(tasksA, dateA);
+        const flatB = flattenTasks(tasksB, dateB);
+        
+        const data = processComparisonData(flatA, flatB);
+        setComparisonData(data);
+      })
+      .catch(console.error)
+      .finally(() => {
         setLoading(false);
-      }, 800);
-      return () => clearTimeout(timer);
+      });
+    } else {
+      setComparisonData(null);
     }
   }, [versionA, versionB]);
 
@@ -56,8 +127,22 @@ const InspectionComparison = ({ selectedProject }) => {
           </div>
         </div>
         
-        <div className="flex items-center justify-center pb-2 px-2 text-gray-400 font-bold uppercase tracking-widest text-sm">
+        <div className="flex items-center justify-center pb-2 px-2 text-gray-400 font-bold uppercase tracking-widest text-sm relative">
           Compare
+          {versionA && versionB && versionA !== versionB && (
+            <button 
+              onClick={() => {
+                const a = versionA; const b = versionB;
+                setVersionA(''); setVersionB('');
+                setTimeout(() => { setVersionA(a); setVersionB(b); }, 50);
+              }}
+              disabled={loading}
+              className="absolute -top-6 text-xs text-blue-500 hover:text-blue-700 whitespace-nowrap bg-blue-50 px-2 py-1 rounded"
+              title="Click to fetch the latest ratings from the database"
+            >
+              Refresh Data
+            </button>
+          )}
         </div>
 
         <div className="flex-1 min-w-[200px]">
@@ -69,7 +154,7 @@ const InspectionComparison = ({ selectedProject }) => {
           >
             <option value="">Select Batch</option>
             {batches.map(b => (
-              <option key={b._id} value={b._id}>{b.name}</option>
+              <option key={b._id} value={b._id}>{b.name || new Date(b.createdAt).toLocaleDateString()}</option>
             ))}
           </select>
         </div>
@@ -83,7 +168,7 @@ const InspectionComparison = ({ selectedProject }) => {
           >
             <option value="">Select Batch</option>
             {batches.map(b => (
-              <option key={b._id} value={b._id}>{b.name}</option>
+              <option key={b._id} value={b._id}>{b.name || new Date(b.createdAt).toLocaleDateString()}</option>
             ))}
           </select>
         </div>
@@ -92,23 +177,23 @@ const InspectionComparison = ({ selectedProject }) => {
       {loading && (
         <div className="flex items-center justify-center p-12 bg-white rounded-xl shadow-sm border border-gray-100">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
-          <span className="ml-3 text-gray-600 font-medium">Analyzing comparison data...</span>
+          <span className="ml-3 text-gray-600 font-medium">Fetching and analyzing comparison data...</span>
         </div>
       )}
 
-      {!loading && versionA && versionB && versionA !== versionB && selectedProject === 'SIPL' && (
+      {!loading && comparisonData && versionA !== versionB && (
         <div className="flex flex-col gap-8 animate-fade-in">
-          <ComparisonKPIs data={mockComparisonData.kpis} />
+          <ComparisonKPIs data={comparisonData.kpis} />
           
           <CategoryAssetComparison 
-            categories={mockComparisonData.categories}
-            topImprovements={mockComparisonData.topImprovements}
-            topDeteriorations={mockComparisonData.topDeteriorations}
+            categories={comparisonData.categories}
+            topImprovements={comparisonData.topImprovements}
+            topDeteriorations={comparisonData.topDeteriorations}
           />
 
-          <CriticalIssueComparison issues={mockComparisonData.criticalIssues} />
+          <CriticalIssueComparison issues={comparisonData.criticalIssues} />
           
-          <ChainageIntelligence chainages={mockComparisonData.chainages} />
+          <ChainageIntelligence chainages={comparisonData.chainages} />
           
           <div className="p-5 bg-white border border-gray-200 rounded-xl shadow-sm">
              <div className="flex items-center justify-between mb-4">
@@ -116,22 +201,16 @@ const InspectionComparison = ({ selectedProject }) => {
                  Interactive Comparison Map
                </h2>
              </div>
-             <ComparisonMap mapPoints={mockComparisonData.mapPoints} />
+             <ComparisonMap mapPoints={comparisonData.mapPoints} />
           </div>
           
-          <ManagementSummary insights={mockComparisonData.insights} />
+          <ManagementSummary insights={comparisonData.insights} />
         </div>
       )}
       
       {!loading && (!versionA || !versionB || versionA === versionB) && (
         <div className="flex items-center justify-center p-12 bg-gray-50 rounded-xl border border-dashed border-gray-300">
           <p className="text-gray-500 font-medium">Select two different versions above to generate the comparison.</p>
-        </div>
-      )}
-      
-      {!loading && selectedProject !== 'SIPL' && versionA && versionB && (
-        <div className="flex items-center justify-center p-12 bg-red-50 rounded-xl border border-dashed border-red-300">
-          <p className="text-red-500 font-medium">Mock data is only available for the SIPL project.</p>
         </div>
       )}
     </div>

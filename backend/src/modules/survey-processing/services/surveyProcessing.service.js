@@ -27,6 +27,12 @@ class SurveyProcessingService {
   }
 
   async validateExtraction(project) {
+    // Prevent concurrent extraction processes
+    const isExtracting = await SurveyAsset.exists({ project, status: 'PROCESSING' });
+    if (isExtracting) {
+      throw new Error('An extraction process is already running for this project.');
+    }
+
     const assets = await SurveyAsset.find({ project, status: 'READY' }).sort({ createdAt: -1 });
     if (!assets.length) {
       throw new Error('No ready assets found for this project.');

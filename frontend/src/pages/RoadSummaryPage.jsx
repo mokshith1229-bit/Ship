@@ -13,7 +13,7 @@ const RoadSummaryPage = () => {
   const { roadId } = useParams();
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedCategory, setSelectedCategory] = useState('Roadway');
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [direction, setDirection] = useState('Choose Direction');
   const [roadType, setRoadType] = useState('Choose Road Type');
   const [paramType, setParamType] = useState('Choose');
@@ -23,7 +23,7 @@ const RoadSummaryPage = () => {
   const [goToPageInput, setGoToPageInput] = useState('');
   
   const [appliedFilters, setAppliedFilters] = useState({
-    category: 'Roadway',
+    category: 'All',
     minChainage: '',
     maxChainage: '',
     direction: 'Choose Direction',

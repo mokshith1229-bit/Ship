@@ -9,6 +9,9 @@ const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode
   
   // Fullscreen specific states
   const [rotation, setRotation] = useState(0);
+  
+  // Magnifier specific states
+  const [zoomState, setZoomState] = useState({ show: false, x: 0, y: 0, imgUrl: '' });
 
   const nextImage = useCallback(() => {
     if (onIndexChange) {
@@ -157,11 +160,47 @@ const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode
                       setFullScreenIndex(index);
                       setRotation(0);
                     }}
+                    onMouseEnter={(e) => {
+                      if (distance === 0 && window.innerWidth >= 768) {
+                        setZoomState(prev => ({ ...prev, show: true, imgUrl: img.url || img }));
+                      }
+                    }}
+                    onMouseLeave={() => {
+                      if (distance === 0) {
+                        setZoomState(prev => ({ ...prev, show: false }));
+                      }
+                    }}
+                    onMouseMove={(e) => {
+                      if (distance === 0 && window.innerWidth >= 768) {
+                        const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
+                        const x = (e.clientX - left) / width;
+                        const y = (e.clientY - top) / height;
+                        setZoomState({ 
+                          show: true, 
+                          x: Math.max(0, Math.min(1, x)), 
+                          y: Math.max(0, Math.min(1, y)), 
+                          imgUrl: img.url || img 
+                        });
+                      }
+                    }}
                   >
                     <motion.img 
                       src={img.url || img} 
                       alt={`Road view ${index + 1}`} 
-                      className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+                      className="w-full h-full object-cover"
+                      style={
+                        distance === 0 && zoomState.show
+                          ? {
+                              transform: 'scale(3.5)',
+                              transformOrigin: `${zoomState.x * 100}% ${zoomState.y * 100}%`,
+                              transition: 'transform 0.2s ease-out'
+                            }
+                          : {
+                              transform: 'scale(1)',
+                              transformOrigin: 'center center',
+                              transition: 'transform 0.4s ease-out'
+                            }
+                      }
                       draggable={false}
                     />
                     
@@ -182,6 +221,7 @@ const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode
             })}
           </div>
         </div>
+        
       </div>
 
       {/* Fullscreen Modal */}

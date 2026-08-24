@@ -3,23 +3,42 @@ const MasterList = require('../../models/MasterList.model');
 const xlsx = require('xlsx');
 
 class MasterListService {
-  async importMasterList(fileBuffer, projectName, importMode) {
+  async importMasterList(fileBuffer, projectName, importMode, user, originalFileName) {
     if (!fileBuffer) throw new Error('No file uploaded');
     if (!projectName) throw new Error('Project name is required');
     if (!['append', 'replace'].includes(importMode)) {
       throw new Error('Invalid import mode. Must be "append" or "replace"');
     }
 
+    const ImportBatch = require('../../models/ImportBatch.model');
+
+    // Create the batch record
+    const importBatch = new ImportBatch({
+      originalFileName: originalFileName || 'Uploaded File',
+      project: projectName,
+      uploadedBy: user ? user._id : null,
+      status: 'Processing'
+    });
+    await importBatch.save();
+
     // 1. Parse Excel/CSV
     const workbook = xlsx.read(fileBuffer, { type: 'buffer' });
-    const firstSheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[firstSheetName];
-    // raw: false ensures strings are formatted
-    const rows = xlsx.utils.sheet_to_json(sheet, { defval: '' });
+    let rows = [];
+    
+    // Process all sheets, not just the first one
+    for (const sheetName of workbook.SheetNames) {
+      const sheet = workbook.Sheets[sheetName];
+      const sheetRows = xlsx.utils.sheet_to_json(sheet, { defval: '' });
+      rows = rows.concat(sheetRows);
+    }
 
     if (!rows || rows.length === 0) {
+      importBatch.status = 'Failed';
+      await importBatch.save();
       throw new Error('File is empty or could not be parsed.');
     }
+
+    importBatch.totalRows = rows.length;
 
     // 2. Fetch existing for deduplication (if append)
     let existingSet = new Set();
@@ -31,7 +50,6 @@ class MasterListService {
         .lean();
       
       existingRecords.forEach(r => {
-        // Dedup key: Chainage_Parameter
         existingSet.add(`${r.chainage}_${r.parameter}`.toLowerCase().trim());
       });
     }
@@ -41,49 +59,54 @@ class MasterListService {
     let invalid = 0;
     const validDocsToInsert = [];
     
-    // Maintain a local set to deduplicate within the file itself
     const localFileSet = new Set();
 
     // 3. Process rows
     for (const row of rows) {
-      // Find columns case-insensitively/flexibly
       const getVal = (keyNames) => {
         const key = Object.keys(row).find(k => keyNames.some(n => k.toLowerCase().includes(n.toLowerCase())));
         return key ? String(row[key]).trim() : '';
       };
 
-      // We allow the uploaded file to specify project, OR we override it with the selected project
-      // The prompt says: "Duplicate means: Project + Chainage + Parameter"
-      // Since Project is selected in the UI, we force all rows to use `projectName`.
-      const category = getVal(['category']);
-      const assetType = getVal(['asset']);
-      const assetSubType = getVal(['sign board type', 'asset sub type', 'subtype', 'sub type']);
-      const chainage = getVal(['chainage', 'location']);
-      const parameter = getVal(['parameter', 'question']);
+      let category = getVal(['category']);
+      let assetType = getVal(['asset']);
+      let assetSubType = getVal(['sign board type', 'asset sub type', 'subtype', 'sub type']);
+      let chainage = getVal(['chainage', 'location']);
+      let parameter = getVal(['parameter', 'question']);
       
-      // Optional fields
-      const roadType = getVal(['road type', 'roadtype']) || 'N/A';
-      const direction = getVal(['direction']) || 'N/A';
-      const placement = getVal(['placement']) || '';
+      let roadType = getVal(['road type', 'roadtype']) || 'N/A';
+      let direction = getVal(['direction']) || 'N/A';
+      let placement = getVal(['placement']) || '';
 
-      // Validation
-      if (!category || !assetType || !chainage || !parameter) {
-        invalid++;
-        continue; // Skip invalid row
+      // Auto-correct shifted columns for missing SubType (e.g. Lightings in malformed excel)
+      if (!parameter && direction && direction !== 'N/A') {
+        const validDirections = ['lhs', 'rhs', 'both', 'n/a', 'median', 'l.h.s', 'r.h.s', 'm', 'l', 'r'];
+        if (!validDirections.includes(direction.toLowerCase().trim())) {
+          // The parameter value got shifted into the direction column!
+          parameter = direction;
+          direction = roadType;
+          roadType = assetSubType;
+          assetSubType = '';
+        }
       }
 
-      const dedupKey = `${chainage}_${parameter}`.toLowerCase();
+      // Final fallback if direction wasn't provided or shifted into placement
+      if (!parameter && placement && placement !== 'N/A') {
+          parameter = placement;
+          placement = direction;
+          direction = roadType;
+          roadType = assetSubType;
+          assetSubType = '';
+      }
 
-      // Check Duplicates
-      if (existingSet.has(dedupKey) || localFileSet.has(dedupKey)) {
-        duplicates++;
+      if (!category || !assetType || !chainage || !parameter) {
+        invalid++;
         continue;
       }
 
-      // It's valid and unique
+      const dedupKey = `${chainage}_${parameter}`.toLowerCase();
       localFileSet.add(dedupKey);
       
-      // Auto-tag Day/Night image requirement based on parameter text and asset type
       let imageRequirement = 'DAY';
       const paramLower = parameter.toLowerCase();
       
@@ -110,28 +133,109 @@ class MasterListService {
         direction,
         placement,
         imageRequirement,
-        questionId: `Q-${Date.now()}-${Math.floor(Math.random() * 100000)}-${validDocsToInsert.length}`, // Auto-generate with guaranteed uniqueness
+        importBatchId: importBatch._id,
+        questionId: `Q-${Date.now()}-${Math.floor(Math.random() * 100000)}-${validDocsToInsert.length}`,
         status: 'Active'
       });
     }
 
+    const newMasterListIds = [];
+
     // 4. Bulk Insert
     if (validDocsToInsert.length > 0) {
-      // Chunk inserts just in case it's huge (e.g. 50k rows)
       const chunkSize = 5000;
       for (let i = 0; i < validDocsToInsert.length; i += chunkSize) {
         const chunk = validDocsToInsert.slice(i, i + chunkSize);
-        await MasterList.insertMany(chunk, { ordered: false });
+        const insertedDocs = await MasterList.insertMany(chunk, { ordered: false });
+        newMasterListIds.push(...insertedDocs.map(doc => doc._id));
       }
       imported = validDocsToInsert.length;
     }
+
+    importBatch.imported = imported;
+    importBatch.duplicates = duplicates;
+    importBatch.invalid = invalid;
+    importBatch.status = 'Completed';
+    await importBatch.save();
 
     return {
       totalRows: rows.length,
       imported,
       duplicates,
-      invalid
+      invalid,
+      newMasterListIds,
+      importBatchId: importBatch._id
     };
+  }
+
+  async getImportHistory(project) {
+    const ImportBatch = require('../../models/ImportBatch.model');
+    const filter = {};
+    if (project) filter.project = project;
+    return ImportBatch.find(filter).sort({ createdAt: -1 }).populate('uploadedBy', 'name');
+  }
+
+  async previewDeleteImport(batchId) {
+    const ImportBatch = require('../../models/ImportBatch.model');
+    const InspectionTask = require('../../models/InspectionTask.model');
+    
+    const batch = await ImportBatch.findById(batchId);
+    if (!batch) throw new Error('Import batch not found');
+
+    const records = await MasterList.find({ importBatchId: batchId }).select('_id').lean();
+    const itemIds = records.map(r => r._id);
+
+    const tasks = await InspectionTask.find({ parameters: { $in: itemIds } });
+    
+    let referencedTasks = tasks.length;
+    let referencedRatings = 0;
+    let referencedImages = 0;
+
+    for (const task of tasks) {
+      if (task.ratings && task.ratings.length > 0) {
+        referencedRatings += task.ratings.length;
+      }
+      if (task.image && task.image.url) {
+        referencedImages++;
+      } else if (task.status !== 'PENDING_IMAGE') {
+        referencedImages++; // Might have an image or passed image stage
+      }
+    }
+
+    return {
+      batch,
+      recordsCount: itemIds.length,
+      referencedTasks,
+      referencedRatings,
+      referencedImages
+    };
+  }
+
+  async deleteImportBatch(batchId) {
+    const ImportBatch = require('../../models/ImportBatch.model');
+    const batch = await ImportBatch.findById(batchId);
+    if (!batch) throw new Error('Import batch not found');
+
+    const records = await MasterList.find({ importBatchId: batchId }).select('_id').lean();
+    const itemIds = records.map(r => r._id);
+
+    if (itemIds.length > 0) {
+      await this._cleanupTasksForDeletedParameters(itemIds);
+      await MasterList.deleteMany({ importBatchId: batchId });
+    }
+    
+    await ImportBatch.findByIdAndDelete(batchId);
+    
+    return { success: true, message: 'Import batch and associated records deleted' };
+  }
+
+  /**
+   * Cancel an import by deleting the newly inserted master list IDs
+   */
+  async cancelImport(newMasterListIds) {
+    if (!newMasterListIds || newMasterListIds.length === 0) return;
+    await MasterList.deleteMany({ _id: { $in: newMasterListIds } });
+    return { success: true, message: 'Import cancelled and rolled back' };
   }
 
   /**

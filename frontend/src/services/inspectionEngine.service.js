@@ -29,5 +29,15 @@ export const inspectionEngineService = {
   async createRoadwayBatch(data) {
     const response = await api.post('/inspection-engine/roadway', data);
     return response.data;
+  },
+
+  async listExtractionTasks(filters = {}) {
+    const response = await api.get('/inspection-engine/extraction-tasks', { params: filters });
+    return response.data;
+  },
+
+  async processExtractionTask(taskId) {
+    const response = await api.post(`/inspection-engine/extraction-tasks/${taskId}/process`);
+    return response.data;
   }
 };

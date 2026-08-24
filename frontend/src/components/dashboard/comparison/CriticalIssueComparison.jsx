@@ -3,7 +3,7 @@ import { MdOutlineDateRange, MdWarning, MdArrowUpward, MdArrowDownward } from 'r
 
 
 
-const InspectionCard = ({ title, data }) => (
+const InspectionCard = ({ title, data, parameter, category }) => (
   <div className="flex-1 bg-white p-5 rounded-xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col">
     <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
     <h4 className="font-bold text-gray-800 border-b border-gray-100 pb-2 mb-4 uppercase tracking-wider text-sm">{title}</h4>
@@ -17,6 +17,16 @@ const InspectionCard = ({ title, data }) => (
     </div>
     
     <div className="space-y-4 text-sm">
+      <div className="flex items-center gap-3">
+        <span className="text-gray-500 w-20 font-medium uppercase tracking-wide text-xs">Category</span>
+        <span className="text-gray-900 flex-1 font-bold">{category}</span>
+      </div>
+      
+      <div className="flex items-center gap-3">
+        <span className="text-gray-500 w-20 font-medium uppercase tracking-wide text-xs">Parameter</span>
+        <span className="text-gray-900 flex-1 font-bold">{parameter}</span>
+      </div>
+
       <div className="flex items-center gap-3">
         <span className="text-gray-500 w-20 font-medium uppercase tracking-wide text-xs">Rating</span>
         <span className={`px-3 py-1 rounded-md font-bold text-sm shadow-sm ${
@@ -80,23 +90,28 @@ const CriticalIssueComparison = ({ issues }) => {
 
             {/* Left, Center, Right Metadata */}
             <div className="flex flex-col lg:flex-row gap-6 items-stretch">
-              <InspectionCard title="Previous Inspection" data={item.prev} />
+              <InspectionCard title="Previous Inspection" data={item.prev} parameter={item.parameter} category={item.category} />
               
               <div className="flex flex-col items-center justify-center min-w-[140px] py-4 lg:py-0">
                 {item.status === 'Improved' ? (
                   <div className="flex flex-col items-center text-green-600 bg-green-50 p-4 rounded-xl border border-green-100 shadow-sm w-full">
                     <MdArrowUpward className="text-4xl mb-2" />
-                    <span className="font-black text-sm uppercase tracking-widest">Improved</span>
+                    <span className="font-black text-sm uppercase tracking-widest text-center">Improved</span>
+                  </div>
+                ) : item.status === 'No Change' ? (
+                  <div className="flex flex-col items-center text-orange-500 bg-orange-50 p-4 rounded-xl border border-orange-100 shadow-sm w-full">
+                    <MdWarning className="text-4xl mb-2" />
+                    <span className="font-black text-sm uppercase tracking-widest text-center">Unresolved</span>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center text-red-600 bg-red-50 p-4 rounded-xl border border-red-100 shadow-sm w-full">
                     <MdArrowDownward className="text-4xl mb-2" />
-                    <span className="font-black text-sm uppercase tracking-widest">Deteriorated</span>
+                    <span className="font-black text-sm uppercase tracking-widest text-center">Deteriorated</span>
                   </div>
                 )}
               </div>
 
-              <InspectionCard title="Current Inspection" data={item.curr} />
+              <InspectionCard title="Current Inspection" data={item.curr} parameter={item.parameter} category={item.category} />
             </div>
 
 

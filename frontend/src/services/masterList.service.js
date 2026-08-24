@@ -1,8 +1,44 @@
 import api from './api';
 
 export const masterListService = {
+  async previewAddToCycle(newMasterListIds, batchId, project) {
+    const res = await api.post('/master/preview-add-to-cycle', {
+      newMasterListIds, batchId, project
+    });
+    return res.data;
+  },
+
+  async executeAddToCycle(newMasterListIds, batchId, project) {
+    const res = await api.post('/master/execute-add-to-cycle', {
+      newMasterListIds, batchId, project
+    });
+    return res.data;
+  },
+
+  async cancelImport(newMasterListIds) {
+    const res = await api.post('/master/cancel-import', { newMasterListIds });
+    return res.data;
+  },
+
   async getMasterList(filters = {}) {
     const response = await api.get('/master', { params: filters });
+    return response.data;
+  },
+
+  async getImportHistory(project) {
+    const params = {};
+    if (project) params.project = project;
+    const response = await api.get('/master/imports', { params });
+    return response.data;
+  },
+
+  async previewDeleteImport(batchId) {
+    const response = await api.get(`/master/imports/${batchId}/preview-delete`);
+    return response.data;
+  },
+
+  async deleteImport(batchId) {
+    const response = await api.delete(`/master/imports/${batchId}`);
     return response.data;
   },
 

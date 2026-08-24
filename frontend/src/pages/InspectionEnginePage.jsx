@@ -5,9 +5,11 @@ import { inspectionEngineService } from '../services/inspectionEngine.service';
 import BatchCreationForm from './InspectionEngine/components/BatchCreationForm';
 import BatchListTable from './InspectionEngine/components/BatchListTable';
 import BatchSummaryModal from './InspectionEngine/components/BatchSummaryModal';
+import ExtractionTasksList from './InspectionEngine/components/ExtractionTasksList';
 
 const InspectionEnginePage = () => {
   const [batches, setBatches] = useState([]);
+  const [extractionTasks, setExtractionTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedBatchId, setSelectedBatchId] = useState(null);
   
@@ -26,8 +28,18 @@ const InspectionEnginePage = () => {
     }
   };
 
+  const fetchExtractionTasks = async () => {
+    try {
+      const res = await inspectionEngineService.listExtractionTasks();
+      setExtractionTasks(res.data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     fetchBatches();
+    fetchExtractionTasks();
   }, []);
 
   const handleBatchCreated = async (batchData) => {
@@ -97,6 +109,12 @@ const InspectionEnginePage = () => {
 
         {/* Batch Generator */}
         <BatchCreationForm onBatchCreated={handleBatchCreated} />
+
+        {/* Extraction Tasks List */}
+        <ExtractionTasksList 
+          tasks={extractionTasks} 
+          onRefresh={fetchExtractionTasks} 
+        />
 
         {/* Generated Batches List */}
         <h2 className="text-lg font-bold text-gray-800">Generated Batches</h2>

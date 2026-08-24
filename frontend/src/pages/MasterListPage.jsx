@@ -7,7 +7,8 @@ import MasterListTable from './MasterList/components/MasterListTable';
 import MasterListEmptyState from './MasterList/components/MasterListEmptyState';
 import MasterListImportModal from './MasterList/components/MasterListImportModal';
 import MasterListProjectFolders from './MasterList/components/MasterListProjectFolders';
-import { MdUploadFile, MdFolder, MdList, MdArrowBack } from 'react-icons/md';
+import ImportHistoryTable from './MasterList/components/ImportHistoryTable';
+import { MdUploadFile, MdFolder, MdList, MdArrowBack, MdHistory } from 'react-icons/md';
 
 const MasterListPage = () => {
   const [data, setData] = useState([]);
@@ -100,6 +101,13 @@ const MasterListPage = () => {
                 <MdList className="text-lg" />
                 List
               </button>
+              <button 
+                onClick={() => setViewMode('imports')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'imports' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                <MdHistory className="text-lg" />
+                History
+              </button>
             </div>
             
             <button 
@@ -134,6 +142,14 @@ const MasterListPage = () => {
             projects={projects} 
             onSelectProject={handleSelectProject} 
             onProjectDeleted={fetchDashboardData} 
+          />
+        ) : viewMode === 'imports' ? (
+          <ImportHistoryTable 
+            onViewImport={(batchId, project) => {
+              setFilters({ ...filters, project, importBatchId: batchId });
+              setSelectedProject(project);
+              setViewMode('table');
+            }} 
           />
         ) : !loading && data.length === 0 && Object.keys(filters).length === 0 ? (
           <MasterListEmptyState />

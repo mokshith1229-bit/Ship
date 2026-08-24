@@ -194,8 +194,9 @@ const SurveyLibraryPage = () => {
 
   const selectedProjectDisplay = selectedProject ? selectedProject : 'Select a Project...';
   
-  // Extraction button is enabled if at least one asset is READY or COMPLETED
-  const canExtract = assets.some(a => a.status === 'READY' || a.status === 'COMPLETED');
+  // Extraction button is enabled if at least one asset is READY or COMPLETED and NONE are PROCESSING
+  const isExtractingAny = assets.some(a => a.status === 'PROCESSING');
+  const canExtract = !isExtractingAny && assets.some(a => a.status === 'READY' || a.status === 'COMPLETED');
 
   return (
     <div className="flex h-screen bg-gray-50 font-sans">
@@ -360,9 +361,15 @@ const SurveyLibraryPage = () => {
                         Extraction requires at least one Survey Asset to be fully uploaded, parsed, and READY.
                       </p>
                       
-                      {!canExtract && (
+                      {!canExtract && !isExtractingAny && (
                         <div className="mb-4 text-xs font-medium text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200 w-full text-center">
                           ⚠️ Extraction is currently locked. No READY assets found.
+                        </div>
+                      )}
+                      
+                      {isExtractingAny && (
+                        <div className="mb-4 text-xs font-medium text-blue-700 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200 w-full text-center">
+                          ℹ️ Extraction is currently in progress. Please wait for it to complete.
                         </div>
                       )}
                       

@@ -55,6 +55,20 @@ const getExtractionReport = asyncHandler(async (req, res) => {
   return successResponse(res, report, 'Extraction report retrieved successfully');
 });
 
+const listExtractionTasks = asyncHandler(async (req, res) => {
+  const ExtractionTask = require('../../../models/ExtractionTask.model');
+  const query = {};
+  if (req.query.project) query.project = req.query.project;
+  const tasks = await ExtractionTask.find(query).sort({ createdAt: -1 }).populate('inspectionId', 'name status');
+  return successResponse(res, tasks, 'Extraction tasks retrieved successfully');
+});
+
+const processExtractionTask = asyncHandler(async (req, res) => {
+  const cycleExtensionService = require('../../master-list/cycleExtension.service');
+  const result = await cycleExtensionService.processExtractionTask(req.params.id, req.user);
+  return successResponse(res, result, 'Extraction task processed successfully');
+});
+
 module.exports = {
   createBatch,
   previewRoadwayBatch,
@@ -62,5 +76,7 @@ module.exports = {
   listBatches,
   getBatchDetails,
   deleteBatch,
-  getExtractionReport
+  getExtractionReport,
+  listExtractionTasks,
+  processExtractionTask
 };

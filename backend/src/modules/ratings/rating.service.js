@@ -101,7 +101,7 @@ const InspectionTask = require('../../models/InspectionTask.model');
  * Gets batches ready for rating, with the count of ratable tasks (those with images)
  */
 const getReadyBatches = async (user) => {
-  let batchQuery = { status: { $in: ['READY_FOR_RATING', 'IN_PROGRESS'] } };
+  let batchQuery = { status: { $in: ['READY_FOR_RATING', 'IN_PROGRESS', 'COMPLETED'] } };
   
   if (user && user.role === 'User') {
     const WorkAssignment = require('../../models/WorkAssignment.model');

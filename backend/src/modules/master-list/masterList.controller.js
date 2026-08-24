@@ -56,9 +56,28 @@ const importMasterList = asyncHandler(async (req, res) => {
   const { project, importMode } = req.body;
   if (!project) throw new Error('Project name is required.');
 
-  const result = await masterListService.importMasterList(req.file.buffer, project, importMode || 'append');
+  const result = await masterListService.importMasterList(req.file.buffer, project, importMode || 'append', req.user, req.file.originalname);
   
   return successResponse(res, result, 'Master List imported successfully', 201);
+});
+
+const getImportHistory = asyncHandler(async (req, res) => {
+  const masterListService = require('./masterList.service');
+  const { project } = req.query;
+  const history = await masterListService.getImportHistory(project);
+  return successResponse(res, history, 'Import history fetched successfully');
+});
+
+const previewDeleteImport = asyncHandler(async (req, res) => {
+  const masterListService = require('./masterList.service');
+  const preview = await masterListService.previewDeleteImport(req.params.id);
+  return successResponse(res, preview, 'Delete preview generated successfully');
+});
+
+const deleteImportBatch = asyncHandler(async (req, res) => {
+  const masterListService = require('./masterList.service');
+  const result = await masterListService.deleteImportBatch(req.params.id);
+  return successResponse(res, result, 'Import batch deleted successfully');
 });
 
 const updateMasterListItem = asyncHandler(async (req, res) => {
@@ -86,6 +105,13 @@ const fixImageRequirements = asyncHandler(async (req, res) => {
   return successResponse(res, result, `Image requirements fixed: ${result.updated} records updated out of ${result.total} total.`);
 });
 
+const cancelImport = asyncHandler(async (req, res) => {
+  const masterListService = require('./masterList.service');
+  const { newMasterListIds } = req.body;
+  const result = await masterListService.cancelImport(newMasterListIds);
+  return successResponse(res, result, 'Import cancelled successfully');
+});
+
 module.exports = {
   getMasterList,
   getProjects,
@@ -96,8 +122,12 @@ module.exports = {
   getChainages,
   getStats,
   importMasterList,
+  getImportHistory,
+  previewDeleteImport,
+  deleteImportBatch,
   updateMasterListItem,
   deleteMasterListItem,
   deleteProjectMasterList,
-  fixImageRequirements
+  fixImageRequirements,
+  cancelImport
 };

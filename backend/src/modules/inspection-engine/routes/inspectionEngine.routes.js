@@ -28,4 +28,10 @@ router.delete('/batches/:id', inspectionEngineController.deleteBatch);
 // Get Extraction Debug Report
 router.get('/batches/:id/extraction-report', inspectionEngineController.getExtractionReport);
 
+// List Extraction Tasks
+router.get('/extraction-tasks', inspectionEngineController.listExtractionTasks);
+
+// Process Extraction Task
+router.post('/extraction-tasks/:id/process', inspectionEngineController.processExtractionTask);
+
 module.exports = router;

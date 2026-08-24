@@ -67,6 +67,11 @@ const masterListSchema = new mongoose.Schema(
       enum: ['DAY', 'NIGHT'],
       default: 'DAY',
       index: true
+    },
+    importBatchId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ImportBatch',
+      index: true
     }
   },
   {
