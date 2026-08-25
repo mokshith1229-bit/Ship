@@ -297,186 +297,315 @@ class InspectionEngineService {
     };
   }
 
-  async _getMergedTargetChainages(project, startChainage, endChainage, intervalMetres) {
+  async _processStreams(project, streams, startChainage, endChainage, intervalMetres) {
     const minC = Math.min(startChainage, endChainage);
     const maxC = Math.max(startChainage, endChainage);
     const interval = intervalMetres / 1000;
-
-    const roadwayChainages = new Set();
-    for (let c = minC; c <= maxC; c += interval) {
-      roadwayChainages.add(parseFloat(c.toFixed(3)));
-    }
-
+    
+    // Fetch RSF questions for intersection
     const MasterList = require('../../../models/MasterList.model');
-    // We are explicitly fetching ONLY RSF active questions
-    // The user's category is 'Road Signage and Furniture'
-    const rsfCategory = 'Road Signage and Furniture';
-    
-    // Add temporary logs as requested
-    console.log("When fetching RSF:");
-    const totalMasterListRecords = await MasterList.countDocuments({ project });
-    console.log("Total MasterList records:", totalMasterListRecords);
-    
-    const rsfRecordsFound = await MasterList.countDocuments({ project, category: rsfCategory });
-    console.log("RSF records found:", rsfRecordsFound);
-    
-    const projectFilteredRecords = await MasterList.countDocuments({ project, status: 'Active' });
-    console.log("Project filtered records:", projectFilteredRecords);
-    
-    const categoryFilteredRecords = await MasterList.find({ project, status: 'Active', category: rsfCategory });
-    console.log("Category filtered records:", categoryFilteredRecords.length);
-
-    // Apply chainage filtering without limit/dedup
-    const rsfQuestions = categoryFilteredRecords.filter(q => {
-      const c = parseFloat(q.chainage);
-      return !isNaN(c) && c >= minC && c <= maxC;
-    });
-
-    console.log("Final RSF questions returned:", rsfQuestions.length);
-    console.log("Print the actual IDs and chainages:", rsfQuestions.map(q => ({ id: q._id, chainage: q.chainage })));
-
-    const rsfChainagesMap = new Map(); // chainage -> [questions]
-    
+    const rsfQuestions = await MasterList.find({ project, status: 'Active', category: 'Road Signage and Furniture' });
+    const rsfChainagesMap = new Map();
     for (const q of rsfQuestions) {
       const c = parseFloat(parseFloat(q.chainage).toFixed(3));
-      if (!rsfChainagesMap.has(c)) {
-        rsfChainagesMap.set(c, []);
+      if (!isNaN(c) && c >= minC && c <= maxC) {
+        if (!rsfChainagesMap.has(c)) rsfChainagesMap.set(c, []);
+        rsfChainagesMap.get(c).push(q);
       }
-      rsfChainagesMap.get(c).push(q);
     }
 
-    const allTargetChainages = Array.from(new Set([...roadwayChainages, ...rsfChainagesMap.keys()])).sort((a, b) => a - b);
+    const SurveyAsset = require('../../../models/SurveyAsset.model');
+    const InspectionTask = require('../../../models/InspectionTask.model');
+    const { ROADWAY_PARAMETER_CONFIG } = require('../../../constants/roadwayConfig');
+
+    const streamResults = [];
+    let totalQuestions = 0;
+    let totalTasks = 0;
+    let totalExistingImages = 0;
+    let totalMissingImages = 0;
+    const allTasksData = []; // for createRoadwayBatch
+
+    for (const stream of streams) {
+      // Determine query for assets
+      let assetQuery = { project, 'coverage.startChainage': { $exists: true, $ne: null } };
+      let expectedDirection = '-';
+      let expectedRoadType = 'Main Carriageway';
+      
+      if (stream === 'LHS') {
+        assetQuery.roadDirection = 'LHS';
+        assetQuery.roadType = { $ne: 'SR' };
+        expectedDirection = 'LHS';
+      } else if (stream === 'RHS') {
+        assetQuery.roadDirection = 'RHS';
+        assetQuery.roadType = { $ne: 'SR' };
+        expectedDirection = 'RHS';
+      } else if (stream === 'SR LHS') {
+        assetQuery.roadDirection = 'LHS';
+        assetQuery.roadType = 'SR';
+        expectedDirection = 'LHS';
+        expectedRoadType = 'Service Road';
+      } else if (stream === 'SR RHS') {
+        assetQuery.roadDirection = 'RHS';
+        assetQuery.roadType = 'SR';
+        expectedDirection = 'RHS';
+        expectedRoadType = 'Service Road';
+      }
+
+      const assets = await SurveyAsset.find(assetQuery).lean();
+      
+      // 1 & 2. Collect matching ranges and clip them to the requested start/end chainage
+      const rawRanges = [];
+      for (const asset of assets) {
+        if (asset.coverage && asset.coverage.startChainage != null && asset.coverage.endChainage != null) {
+          const s = Math.min(asset.coverage.startChainage, asset.coverage.endChainage);
+          const e = Math.max(asset.coverage.startChainage, asset.coverage.endChainage);
+          
+          const clippedS = Math.max(s, minC);
+          const clippedE = Math.min(e, maxC);
+          if (clippedS <= clippedE) {
+            rawRanges.push({ start: clippedS, end: clippedE, asset });
+          }
+        }
+      }
+
+      if (rawRanges.length === 0) {
+        streamResults.push({
+          name: stream,
+          start: null,
+          end: null,
+          matchedImages: 0
+        });
+        continue;
+      }
+
+      // 3. Sort them
+      rawRanges.sort((a, b) => a.start - b.start);
+      
+      // 4. Merge overlapping/continuous ranges
+      const mergedRanges = [];
+      let current = { start: rawRanges[0].start, end: rawRanges[0].end, assets: [rawRanges[0].asset] };
+
+      for (let i = 1; i < rawRanges.length; i++) {
+        const next = rawRanges[i];
+        if (next.start <= current.end) {
+          current.end = Math.max(current.end, next.end);
+          current.assets.push(next.asset);
+        } else {
+          mergedRanges.push(current);
+          current = { start: next.start, end: next.end, assets: [next.asset] };
+        }
+      }
+      mergedRanges.push(current);
+
+      // 5. Calculate unique covered distance and generate targets
+      let streamDistance = 0;
+      let streamMin = mergedRanges[0].start;
+      let streamMax = mergedRanges[mergedRanges.length - 1].end;
+
+      const roadwayChainages = new Set();
+      const sourceSurveyIds = new Map(); // chainage -> asset
+
+      for (const range of mergedRanges) {
+        streamDistance += (range.end - range.start);
+        
+        // Target generation only inside actual covered ranges
+        const firstMultiple = Math.ceil((range.start - minC) / interval) * interval + minC;
+        for (let t = firstMultiple; t <= range.end; t += interval) {
+          const tNum = parseFloat(t.toFixed(3));
+          roadwayChainages.add(tNum);
+          
+          const sourceAsset = range.assets.find(a => 
+            Math.min(a.coverage.startChainage, a.coverage.endChainage) <= tNum && 
+            Math.max(a.coverage.startChainage, a.coverage.endChainage) >= tNum
+          ) || range.assets[0];
+          
+          sourceSurveyIds.set(tNum, sourceAsset);
+        }
+      }
+
+      // Merge with RSF targets falling within actual covered ranges
+      const allTargetChainages = Array.from(new Set([...roadwayChainages, ...rsfChainagesMap.keys()]))
+        .filter(c => {
+          return mergedRanges.some(r => c >= r.start && c <= r.end);
+        })
+        .sort((a, b) => a - b);
+
+      for (const target of allTargetChainages) {
+        if (!sourceSurveyIds.has(target)) {
+          const range = mergedRanges.find(r => target >= r.start && target <= r.end);
+          if (range) {
+            const sourceAsset = range.assets.find(a => 
+              Math.min(a.coverage.startChainage, a.coverage.endChainage) <= target && 
+              Math.max(a.coverage.startChainage, a.coverage.endChainage) >= target
+            ) || range.assets[0];
+            sourceSurveyIds.set(target, sourceAsset);
+          }
+        }
+      }
+
+      const uniqueMatched = allTargetChainages;
+
+      // Check existing extraction reuse
+      const chainageQueries = uniqueMatched.flatMap(c => [
+        Number(c).toString(),
+        Number(c).toFixed(1),
+        Number(c).toFixed(2),
+        Number(c).toFixed(3)
+      ]);
+
+      const existingTasks = await InspectionTask.find({
+        project,
+        direction: expectedDirection,
+        roadType: expectedRoadType,
+        chainage: { $in: chainageQueries },
+        'image.cloudinaryUrl': { $exists: true, $ne: null }
+      }).select('chainage image.cloudinaryUrl extractionDiagnostics').lean();
+
+      const existingImageMap = {};
+      for (const task of existingTasks) {
+        const taskChainageNum = parseFloat(task.chainage);
+        if (!isNaN(taskChainageNum)) {
+          existingImageMap[taskChainageNum.toFixed(3)] = task.image.cloudinaryUrl;
+        }
+      }
+
+      const ROADWAY_PARAMETERS_COUNT = 15;
+      let streamTotalQuestions = 0;
+      let streamMatchedImages = uniqueMatched.length;
+      let streamExistingImages = Object.keys(existingImageMap).length;
+      let streamMissingImages = streamMatchedImages - streamExistingImages;
+
+      totalExistingImages += streamExistingImages;
+      totalMissingImages += streamMissingImages;
+      totalTasks += streamMatchedImages;
+
+      streamResults.push({
+        name: stream,
+        start: streamMin,
+        end: streamMax,
+        distanceCovered: streamDistance,
+        matchedImages: streamMatchedImages
+      });
+
+      for (const chainage of uniqueMatched) {
+        const chainageStr = chainage.toFixed(3);
+        const cNum = parseFloat(chainageStr);
+        
+        const isRoadway = roadwayChainages.has(cNum);
+        const rsfParams = rsfChainagesMap.has(cNum) ? rsfChainagesMap.get(cNum) : [];
+        const isRsf = rsfParams.length > 0;
+
+        if (isRoadway) streamTotalQuestions += ROADWAY_PARAMETERS_COUNT;
+        if (isRsf) streamTotalQuestions += rsfParams.length;
+
+        const existingImageUrl = existingImageMap[chainageStr];
+        const taskStatus = existingImageUrl ? 'READY_FOR_REVIEW' : 'PENDING_IMAGE';
+        const actualAsset = sourceSurveyIds.get(cNum);
+
+        const task = {
+          project,
+          category: isRoadway ? 'Roadway' : 'Road Signage and Furniture',
+          chainage: chainageStr,
+          assetType: 'Multi-Asset',
+          assetSubType: '',
+          direction: expectedDirection,
+          roadType: expectedRoadType,
+          imageRequirement: actualAsset ? (actualAsset.surveyType || 'DAY') : 'DAY',
+          parameters: rsfParams.map(p => p._id),
+          ratings: isRoadway ? [...ROADWAY_PARAMETER_CONFIG] : [],
+          status: taskStatus,
+          extractionDiagnostics: {
+            surveyAssetId: actualAsset ? actualAsset._id.toString() : null
+          }
+        };
+
+        if (existingImageUrl) {
+          task.image = { cloudinaryUrl: existingImageUrl };
+        }
+
+        allTasksData.push(task);
+      }
+
+      totalQuestions += streamTotalQuestions;
+    }
 
     return {
-      allTargetChainages,
-      roadwayChainages,
-      rsfChainagesMap
+      streams: streamResults,
+      totalQuestionInstances: totalQuestions,
+      matchedImages: totalTasks,
+      existingImages: totalExistingImages,
+      missingExtractionImages: totalMissingImages,
+      allTasksData
     };
   }
 
   async previewRoadwayBatch(userId, data) {
-    const { project, surveyAssetId, startChainage, endChainage, intervalMetres } = data;
-    if (!project || !surveyAssetId || startChainage == null || endChainage == null || !intervalMetres) {
+    const { project, streams, startChainage, endChainage, intervalMetres } = data;
+    if (!project || !streams || streams.length === 0 || startChainage == null || endChainage == null || !intervalMetres) {
       throw new Error('Missing required fields for Roadway preview');
     }
     
-    const { allTargetChainages, roadwayChainages, rsfChainagesMap } = await this._getMergedTargetChainages(project, startChainage, endChainage, intervalMetres);
-    const samplingData = await this._calculateRoadwaySampling(project, surveyAssetId, allTargetChainages);
+    const processed = await this._processStreams(project, streams, startChainage, endChainage, intervalMetres);
     
-    const ROADWAY_PARAMETERS_COUNT = 15;
-    let totalQuestions = 0;
-
-    for (const chainage of samplingData.uniqueMatchedChainages) {
-      const cNum = parseFloat(chainage.toFixed(3));
-      if (roadwayChainages.has(cNum)) {
-        totalQuestions += ROADWAY_PARAMETERS_COUNT;
-      }
-      if (rsfChainagesMap.has(cNum)) {
-        totalQuestions += rsfChainagesMap.get(cNum).length;
-      }
-    }
-
     return {
-      ...samplingData,
+      streams: processed.streams,
+      matchedImages: processed.matchedImages,
+      existingImages: processed.existingImages,
+      missingExtractionImages: processed.missingExtractionImages,
       startChainage: Math.min(startChainage, endChainage),
       endChainage: Math.max(startChainage, endChainage),
       intervalMetres,
-      questionsPerImage: ROADWAY_PARAMETERS_COUNT, // Deprecated conceptually, but kept for UI compat
-      totalQuestionInstances: totalQuestions
+      questionsPerImage: 15,
+      totalQuestionInstances: processed.totalQuestionInstances
     };
   }
 
   async createRoadwayBatch(userId, data) {
-    const { project, surveyAssetId, startChainage, endChainage, intervalMetres } = data;
+    const { project, streams, startChainage, endChainage, intervalMetres } = data;
+    if (!project || !streams || streams.length === 0 || startChainage == null || endChainage == null || !intervalMetres) {
+      throw new Error('Missing required fields for Roadway batch creation');
+    }
     
-    const { allTargetChainages, roadwayChainages, rsfChainagesMap } = await this._getMergedTargetChainages(project, startChainage, endChainage, intervalMetres);
-    const samplingData = await this._calculateRoadwaySampling(project, surveyAssetId, allTargetChainages);
+    const processed = await this._processStreams(project, streams, startChainage, endChainage, intervalMetres);
     
     const ROADWAY_PARAMETERS_COUNT = 15;
-
     const name = `Roadway-RSF-${project}-${new Date().toISOString().slice(0, 10)}-${Math.floor(Math.random() * 1000)}`;
-    
-    let totalQuestions = 0;
-    for (const chainage of samplingData.uniqueMatchedChainages) {
-      const cNum = parseFloat(chainage.toFixed(3));
-      if (roadwayChainages.has(cNum)) totalQuestions += ROADWAY_PARAMETERS_COUNT;
-      if (rsfChainagesMap.has(cNum)) totalQuestions += rsfChainagesMap.get(cNum).length;
-    }
 
     const newBatchData = {
       name,
       project,
-      categories: [], // Mixed context
-      assetTypes: ['Multi-Asset'], // Using Multi-Asset to indicate Roadway + RSF
+      categories: [],
+      assetTypes: ['Multi-Asset'],
       samplingPercentage: 100,
       samplingStrategy: 'CONTINUOUS',
-      totalMasterQuestions: ROADWAY_PARAMETERS_COUNT, // Informational
-      selectedQuestionsCount: totalQuestions,
-      uniqueChainagesCount: samplingData.matchedImages,
+      totalMasterQuestions: ROADWAY_PARAMETERS_COUNT,
+      selectedQuestionsCount: processed.totalQuestionInstances,
+      uniqueChainagesCount: processed.matchedImages,
       status: 'WAITING_FOR_IMAGES',
       createdBy: userId,
       isSamplingHistoryReset: false
     };
 
-    const SurveyAsset = require('../../../models/SurveyAsset.model');
-    const surveyAssets = await SurveyAsset.find({ project }).select('_id roadDirection surveyType');
-    const assetMetadataMap = new Map(surveyAssets.map(a => [a._id.toString(), { direction: a.roadDirection || '-', surveyType: a.surveyType || 'DAY' }]));
+    const Batch = require('../../../models/InspectionBatch.model');
+    const InspectionTask = require('../../../models/InspectionTask.model');
 
-    const tasksData = [];
-    
-    for (const chainage of samplingData.uniqueMatchedChainages) {
-      const chainageStr = chainage.toFixed(3);
-      const cNum = parseFloat(chainageStr);
-      const existingImageUrl = samplingData.existingImageMap[chainageStr];
-      const taskStatus = existingImageUrl ? 'READY_FOR_REVIEW' : 'PENDING_IMAGE';
-      
-      const actualAssetId = samplingData.surveyAssetId === 'all' ? samplingData.sourceSurveyIds.get(chainage) : surveyAssetId;
-      const assetMeta = actualAssetId ? assetMetadataMap.get(actualAssetId.toString()) : { direction: '-', surveyType: 'DAY' };
-      const direction = assetMeta ? assetMeta.direction : '-';
-      const imageReq = assetMeta ? assetMeta.surveyType : 'DAY';
+    const createdBatch = await Batch.create(newBatchData);
 
-      const isRoadway = roadwayChainages.has(cNum);
-      const rsfParams = rsfChainagesMap.has(cNum) ? rsfChainagesMap.get(cNum) : [];
-      const isRsf = rsfParams.length > 0;
+    const tasksToInsert = processed.allTasksData.map(task => ({
+      ...task,
+      batchId: createdBatch._id
+    }));
 
-      // Skip if neither (shouldn't happen)
-      if (!isRoadway && !isRsf) continue;
-
-      // Check idempotent creation to prevent duplicate task for this chainage in this batch.
-      // (Actually handled if the batch creation fails or retries, but we do one bulk insert anyway)
-      
-      const task = {
-        project,
-        category: isRoadway ? 'Roadway' : 'Road Signage and Furniture', // Use Roadway if Roadway exists, else RSF
-        chainage: chainageStr,
-        assetType: 'Multi-Asset', // Avoid storing "Roadway" as assetType
-        assetSubType: '',
-        direction,
-        roadType: 'Main Carriageway',
-        imageRequirement: imageReq === 'MIXED' ? 'DAY' : (imageReq || 'DAY'),
-        parameters: rsfParams.map(p => p._id), // RSF items
-        ratings: isRoadway ? [...ROADWAY_PARAMETER_CONFIG] : [], // Fixed Roadway parameters
-        status: taskStatus,
-        extractionDiagnostics: {
-          surveyAssetId: actualAssetId
-        }
-      };
-
-      if (existingImageUrl) {
-        task.image = { cloudinaryUrl: existingImageUrl };
-      }
-
-      tasksData.push(task);
+    if (tasksToInsert.length > 0) {
+      await InspectionTask.insertMany(tasksToInsert);
     }
 
-    const batch = await inspectionEngineRepository.createBatch(newBatchData, tasksData);
-    
-    if (samplingData.missingExtractionImages === 0) {
-      batch.status = 'READY_FOR_RATING';
-      await batch.save();
+    if (processed.missingExtractionImages === 0) {
+      createdBatch.status = 'READY_FOR_RATING';
+      await createdBatch.save();
     }
-    
-    return batch;
+
+    return createdBatch;
   }
 
   async listBatches(filters) {

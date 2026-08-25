@@ -13,11 +13,11 @@ export default function RoadwaySamplingPage() {
   const [selectedProject, setSelectedProject] = useState('');
   
   const [surveys, setSurveys] = useState([]);
-  const [selectedSurveyId, setSelectedSurveyId] = useState('');
+  const [selectedStreams, setSelectedStreams] = useState(['LHS', 'RHS', 'SR LHS', 'SR RHS']);
 
   const [startChainage, setStartChainage] = useState('');
   const [endChainage, setEndChainage] = useState('');
-  const [intervalMetres, setIntervalMetres] = useState(10);
+  const [intervalMetres, setIntervalMetres] = useState(20);
 
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -53,40 +53,35 @@ export default function RoadwaySamplingPage() {
     }
   };
 
-  const handleSurveyChange = (e) => {
-    const val = e.target.value;
-    setSelectedSurveyId(val);
-    setPreview(null);
-    
-    if (val === 'all') {
-      if (surveys.length > 0) {
-        let min = Infinity;
-        let max = -Infinity;
-        surveys.forEach(s => {
-          if (s.coverage) {
-            if (s.coverage.startChainage != null) min = Math.min(min, s.coverage.startChainage);
-            if (s.coverage.endChainage != null) max = Math.max(max, s.coverage.endChainage);
-          }
-        });
-        if (min !== Infinity) setStartChainage(min.toFixed(3));
-        if (max !== -Infinity) setEndChainage(max.toFixed(3));
-      }
-    } else if (val !== '') {
-      const selected = surveys.find(s => s._id === val);
-      if (selected && selected.coverage) {
-        if (selected.coverage.startChainage != null) setStartChainage(selected.coverage.startChainage.toFixed(3));
-        if (selected.coverage.endChainage != null) setEndChainage(selected.coverage.endChainage.toFixed(3));
-      }
+  useEffect(() => {
+    if (surveys.length > 0) {
+      let min = Infinity;
+      let max = -Infinity;
+      surveys.forEach(s => {
+        if (s.coverage) {
+          if (s.coverage.startChainage != null) min = Math.min(min, s.coverage.startChainage);
+          if (s.coverage.endChainage != null) max = Math.max(max, s.coverage.endChainage);
+        }
+      });
+      if (min !== Infinity) setStartChainage(min.toFixed(3));
+      if (max !== -Infinity) setEndChainage(max.toFixed(3));
     } else {
       setStartChainage('');
       setEndChainage('');
     }
+  }, [surveys]);
+
+  const handleStreamToggle = (stream) => {
+    setSelectedStreams(prev => 
+      prev.includes(stream) ? prev.filter(s => s !== stream) : [...prev, stream]
+    );
+    setPreview(null);
   };
 
   const handlePreview = async (e) => {
     e.preventDefault();
-    if (!selectedProject || !selectedSurveyId || !startChainage || !endChainage || !intervalMetres) {
-      setError('Please fill in all fields to preview the batch.');
+    if (!selectedProject || selectedStreams.length === 0 || !startChainage || !endChainage || !intervalMetres) {
+      setError('Please fill in all fields and select at least one stream to preview.');
       return;
     }
 
@@ -97,7 +92,7 @@ export default function RoadwaySamplingPage() {
     try {
       const data = {
         project: selectedProject,
-        surveyAssetId: selectedSurveyId,
+        streams: selectedStreams,
         startChainage: parseFloat(startChainage),
         endChainage: parseFloat(endChainage),
         intervalMetres: parseInt(intervalMetres, 10)
@@ -120,10 +115,18 @@ export default function RoadwaySamplingPage() {
     setLoading(true);
     setError(null);
 
+    if (selectedStreams.length === 0) {
+      setError('Please select at least one stream.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
     try {
       const data = {
         project: selectedProject,
-        surveyAssetId: selectedSurveyId,
+        streams: selectedStreams,
         startChainage: parseFloat(startChainage),
         endChainage: parseFloat(endChainage),
         intervalMetres: parseInt(intervalMetres, 10)
@@ -173,7 +176,6 @@ export default function RoadwaySamplingPage() {
                   value={selectedProject}
                   onChange={(e) => {
                     setSelectedProject(e.target.value);
-                    setSelectedSurveyId('');
                     setPreview(null);
                   }}
                   required
@@ -185,22 +187,22 @@ export default function RoadwaySamplingPage() {
                   ))}
                 </select>
               </div>
+            </div>
 
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Survey File (From Library)</label>
-                <select
-                  value={selectedSurveyId}
-                  onChange={handleSurveyChange}
-                  required
-                  disabled={!selectedProject}
-                  className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                >
-                  <option value="">Select Survey</option>
-                  <option value="all">All Videos</option>
-                  {surveys.map(s => (
-                    <option key={s._id} value={s._id}>{s.assetName} ({s.roadDirection || 'N/A'}) - {s.surveyType}</option>
-                  ))}
-                </select>
+            <div className="flex flex-col gap-2">
+              <label className="block text-sm font-medium text-gray-700">Roadway Streams</label>
+              <div className="flex flex-wrap gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                {['LHS', 'RHS', 'SR LHS', 'SR RHS'].map(stream => (
+                  <label key={stream} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedStreams.includes(stream)}
+                      onChange={() => handleStreamToggle(stream)}
+                      className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">{stream}</span>
+                  </label>
+                ))}
               </div>
             </div>
 
@@ -256,7 +258,7 @@ export default function RoadwaySamplingPage() {
             <div className="mt-2 flex justify-end">
               <button
                 type="submit"
-                disabled={loading || !selectedSurveyId}
+                disabled={loading || selectedStreams.length === 0}
                 className="px-6 py-2 bg-gray-800 text-white font-medium rounded-lg hover:bg-gray-900 disabled:opacity-50 transition-colors"
               >
                 {loading && !preview ? 'Calculating...' : 'Preview Validation'}
@@ -272,9 +274,42 @@ export default function RoadwaySamplingPage() {
               <h3>Validation Preview</h3>
             </div>
 
+            <div className="mb-6">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Coverage Preview</h4>
+              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-gray-50 text-gray-600">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Stream</th>
+                      <th className="px-4 py-3 font-medium">Distance Covered</th>
+                      <th className="px-4 py-3 font-medium">Samples</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {preview.streams && preview.streams.map(stream => (
+                      <tr key={stream.name}>
+                        <td className="px-4 py-3 font-medium text-gray-800">{stream.name}</td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {stream.start != null && stream.end != null ? 
+                            `${stream.start.toFixed(3)} to ${stream.end.toFixed(3)} km (Actual Coverage: ${(stream.distanceCovered || Math.abs(stream.end - stream.start)).toFixed(3)} km)` : 
+                            'No coverage found'}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">{stream.matchedImages}</td>
+                      </tr>
+                    ))}
+                    <tr className="bg-gray-50 font-semibold text-gray-800">
+                      <td className="px-4 py-3">TOTAL</td>
+                      <td className="px-4 py-3">-</td>
+                      <td className="px-4 py-3">{preview.matchedImages}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                <div className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">Target Chainages</div>
+                <div className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">Total Target Chainages</div>
                 <div className="text-2xl font-bold text-gray-800">{preview.matchedImages}</div>
               </div>
               
@@ -289,14 +324,14 @@ export default function RoadwaySamplingPage() {
               </div>
 
               <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                <div className="text-xs text-blue-700 font-medium uppercase tracking-wider mb-1">Questions/Img</div>
-                <div className="text-2xl font-bold text-blue-700">{preview.questionsPerImage}</div>
+                <div className="text-xs text-blue-700 font-medium uppercase tracking-wider mb-1">Total Tasks</div>
+                <div className="text-2xl font-bold text-blue-700">{preview.totalQuestionInstances}</div>
               </div>
             </div>
 
             <div className="flex justify-between items-center p-4 bg-gray-50 rounded-lg border border-gray-100">
               <div className="text-sm text-gray-600">
-                This will create <strong>{preview.matchedImages}</strong> Roadway inspection tasks. 
+                This will create a <strong>SINGLE</strong> inspection batch containing <strong>{preview.matchedImages}</strong> tasks across all selected streams. 
                 {preview.existingImages > 0 && <span> <strong>{preview.existingImages}</strong> existing images will be directly reused.</span>}
               </div>
               
