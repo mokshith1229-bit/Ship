@@ -107,7 +107,7 @@ const createApp = () => {
   // ─── Rate Limiting ────────────────────────────────────────────────────────────
   const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 500,
+    max: 20000,
     standardHeaders: true,
     legacyHeaders: false,
     message: { success: false, message: 'Too many requests. Please try again later.', errors: [] }

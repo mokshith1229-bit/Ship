@@ -48,8 +48,10 @@ const InspectorApp = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const startIndex = parseInt(searchParams.get('startIndex'), 10) || 0;
   
+  const [globalIndex, setGlobalIndex] = useState(startIndex);
+  const [loadedPage, setLoadedPage] = useState(null);
   const [tasks, setTasks] = useState([]);
-  const [currentIndex, setCurrentIndex] = useState(startIndex);
+  const [totalTasks, setTotalTasks] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [allRatings, setAllRatings] = useState({});
@@ -73,6 +75,10 @@ const InspectorApp = () => {
     }
   });
 
+  const PAGE_SIZE = 100;
+  const targetPage = Math.floor(globalIndex / PAGE_SIZE) + 1;
+  const localIndex = globalIndex % PAGE_SIZE;
+
   useEffect(() => {
     const handleStorageChange = () => {
       try {
@@ -95,40 +101,62 @@ const InspectorApp = () => {
   }, []);
 
   useEffect(() => {
-    fetchTasks();
-    // Reset currentIndex when batchId changes
-    setCurrentIndex(startIndex);
-  }, [batchId]);
+    setGlobalIndex(startIndex);
+    setLoadedPage(null); // Force reload if batchId changes
+  }, [batchId, startIndex]);
 
   useEffect(() => {
     // Reset custom remark inputs when navigating to a new task
     setCustomRemarkMode({});
     setValidationErrors({});
     
-    // Sync URL with currentIndex so refreshing preserves the state
-    setSearchParams({ startIndex: currentIndex }, { replace: true });
-  }, [currentIndex, setSearchParams]);
+    // Sync URL with globalIndex so refreshing preserves the state
+    setSearchParams({ startIndex: globalIndex }, { replace: true });
+  }, [globalIndex, setSearchParams]);
 
-  const fetchTasks = async () => {
+  useEffect(() => {
+    if (loadedPage !== targetPage && batchId) {
+      const controller = new AbortController();
+      fetchTasksForPage(targetPage, controller.signal);
+      return () => controller.abort();
+    }
+  }, [targetPage, loadedPage, batchId]);
+
+  const fetchTasksForPage = async (page, signal) => {
     try {
       setLoading(true);
-      const res = await ratingService.getBatchTasks(batchId);
-      const fetchedTasks = res.data || [];
+      const res = await ratingService.getBatchTasks(batchId, { page, limit: PAGE_SIZE });
+      if (signal && signal.aborted) return;
+      
+      const paginatedData = res?.data || res;
+      const fetchedTasks = paginatedData?.tasks || [];
+      const total = paginatedData?.total || 0;
+
       setTasks(fetchedTasks);
-      const initialAllRatings = {};
-      fetchedTasks.forEach(t => {
-        initialAllRatings[t._id] = buildInitialRatings(t);
+      setTotalTasks(total);
+      setLoadedPage(page);
+
+      setAllRatings(prev => {
+        const updated = { ...prev };
+        fetchedTasks.forEach(t => {
+          if (!updated[t._id]) {
+            updated[t._id] = buildInitialRatings(t);
+          }
+        });
+        return updated;
       });
-      setAllRatings(initialAllRatings);
     } catch (err) {
+      if (err.name === 'CanceledError' || err.name === 'AbortError') return;
       console.error(err);
       alert('Failed to load inspection tasks.');
     } finally {
-      setLoading(false);
+      if (!signal || !signal.aborted) {
+        setLoading(false);
+      }
     }
   };
 
-  const currentTask = tasks[currentIndex] || null;
+  const currentTask = tasks[localIndex] || null;
   const taskRatings = currentTask ? (allRatings[currentTask._id] || {}) : {};
 
   const getRating = (masterListId) => taskRatings[masterListId] || { score: '10', remark: '' };
@@ -302,11 +330,11 @@ const InspectorApp = () => {
       await ratingService.saveTaskRatings(currentTask._id, ratingsPayload, selectedImageUrl);
       setTasks(prev => {
         const updated = [...prev];
-        const taskToUpdate = { ...updated[currentIndex], status: 'COMPLETED', ratings: ratingsPayload };
+        const taskToUpdate = { ...updated[localIndex], status: 'COMPLETED', ratings: ratingsPayload };
         if (selectedImageUrl) {
           taskToUpdate.image = { ...taskToUpdate.image, cloudinaryUrl: selectedImageUrl };
         }
-        updated[currentIndex] = taskToUpdate;
+        updated[localIndex] = taskToUpdate;
         return updated;
       });
       return true;
@@ -322,8 +350,8 @@ const InspectorApp = () => {
   const handleNext = async () => {
     const ok = await saveCurrentTask();
     if (!ok) return;
-    if (currentIndex < tasks.length - 1) {
-      setCurrentIndex(prev => prev + 1);
+    if (globalIndex < totalTasks - 1) {
+      setGlobalIndex(prev => prev + 1);
       setActiveImageIndex(1);
       setExpandedCard(null);
     } else {
@@ -335,8 +363,8 @@ const InspectorApp = () => {
   const handlePrevious = async () => {
     const ok = await saveCurrentTask();
     if (!ok) return;
-    if (currentIndex > 0) {
-      setCurrentIndex(prev => prev - 1);
+    if (globalIndex > 0) {
+      setGlobalIndex(prev => prev - 1);
       setActiveImageIndex(1);
       setExpandedCard(null);
     }
@@ -366,7 +394,7 @@ const InspectorApp = () => {
       
       setTasks(prev => {
         const updated = [...prev];
-        updated[currentIndex] = { ...updated[currentIndex], status: returnedTask.status, skippedAssetTypes: returnedTask.skippedAssetTypes };
+        updated[localIndex] = { ...updated[localIndex], status: returnedTask.status, skippedAssetTypes: returnedTask.skippedAssetTypes };
         return updated;
       });
       
@@ -378,8 +406,8 @@ const InspectorApp = () => {
       
       // If task is fully skipped or completed, move to next ONLY if it was a full task skip
       if (!wasAssetSkip && (returnedTask.status === 'SKIPPED' || returnedTask.status === 'COMPLETED')) {
-        if (currentIndex < tasks.length - 1) {
-          setCurrentIndex(prev => prev + 1);
+        if (globalIndex < totalTasks - 1) {
+          setGlobalIndex(prev => prev + 1);
           setActiveImageIndex(1);
           setExpandedCard(null);
         } else {
@@ -587,7 +615,7 @@ const InspectorApp = () => {
     return (
       <div className="flex flex-col h-screen items-center justify-center bg-[#F8FAFC] gap-4">
         <div className="w-10 h-10 border-4 border-[#5cb85c] border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-gray-500 font-medium">Loading inspection data...</p>
+        <p className="text-gray-500 font-medium">Loading task data...</p>
       </div>
     );
   }
@@ -602,6 +630,14 @@ const InspectorApp = () => {
         >
           Return to Rating Dashboard
         </button>
+      </div>
+    );
+  }
+
+  if (!currentTask) {
+    return (
+      <div className="flex flex-col h-screen items-center justify-center bg-[#F8FAFC] gap-4">
+        <p className="text-gray-500 font-medium">Task not found.</p>
       </div>
     );
   }
@@ -629,7 +665,7 @@ const InspectorApp = () => {
           </button>
           <div>
             <h1 className="text-base font-semibold text-gray-900">Rating Interface</h1>
-            <p className="text-xs text-gray-500">Task {currentIndex + 1} of {tasks.length}</p>
+            <p className="text-xs text-gray-500">Task {globalIndex + 1} of {totalTasks || '...'}</p>
           </div>
         </div>
         <div className="text-sm font-medium text-gray-500">
@@ -689,12 +725,12 @@ const InspectorApp = () => {
               transition={{ duration: 0.2 }}
               className="z-40 w-14 h-20 sm:w-20 sm:h-32 md:w-24 md:h-40 bg-transparent border-none focus:outline-none flex items-center justify-center shrink-0 -ml-2 sm:-ml-3"
               onClick={handlePrevious}
-              disabled={currentIndex === 0 || saving}
+              disabled={globalIndex === 0 || saving}
               title="Previous Task"
             >
               <img
                 src={leftArrowImg}
-                className={`w-full h-full object-contain mix-blend-multiply drop-shadow-md transition-opacity ${currentIndex === 0 ? 'opacity-30' : 'opacity-100'}`}
+                className={`w-full h-full object-contain mix-blend-multiply drop-shadow-md transition-opacity ${globalIndex === 0 ? 'opacity-30' : 'opacity-100'}`}
                 alt="Previous Task"
                 draggable={false}
               />
@@ -717,8 +753,8 @@ const InspectorApp = () => {
               transition={{ duration: 0.2 }}
               className="z-40 w-14 h-20 sm:w-20 sm:h-32 md:w-24 md:h-40 bg-transparent border-none focus:outline-none flex items-center justify-center shrink-0 -mr-2 sm:-mr-3"
               onClick={handleNext}
-              disabled={saving}
-              title={currentIndex === tasks.length - 1 ? 'Finish' : 'Next Task'}
+              disabled={saving || (totalTasks > 0 && globalIndex >= totalTasks)}
+              title={globalIndex === totalTasks - 1 ? 'Finish' : 'Next Task'}
             >
               <img
                 src={rightArrowImg}
@@ -864,7 +900,21 @@ const InspectorApp = () => {
           {/* Save / Navigation Footer */}
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-3 flex items-center justify-start z-30 shadow-lg">
             <div className="text-sm text-gray-500">
-              Task <span className="font-semibold text-gray-800">{currentIndex + 1}</span> of <span className="font-semibold text-gray-800">{tasks.length}</span>
+              <p className="text-sm font-medium text-gray-500 mb-1">Overall Progress</p>
+              <p className="text-xl font-bold text-gray-800">
+                Task <span className="font-semibold text-gray-800">{globalIndex + 1}</span> of <span className="font-semibold text-gray-800">{totalTasks || '...'}</span>
+              </p>
+            </div>
+            <div className="flex flex-col items-center flex-1 min-w-[200px]">
+              <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden shadow-inner">
+                <div 
+                  className="h-full bg-gradient-to-r from-[#5cb85c] to-green-400 transition-all duration-300 rounded-full"
+                  style={{ width: `${totalTasks > 0 ? ((globalIndex + 1) / totalTasks) * 100 : 0}%` }}
+                ></div>
+              </div>
+              <p className="text-xs text-gray-500 mt-1.5 font-medium">{totalTasks > 0 ? (((globalIndex + 1) / totalTasks) * 100).toFixed(0) : 0}% Complete</p>
+            </div>
+            <div className="flex-1 flex justify-end items-center">
               {saving || skipping ? (
                 <span className="ml-3 px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium">Processing...</span>
               ) : currentTask.status === 'COMPLETED' ? (

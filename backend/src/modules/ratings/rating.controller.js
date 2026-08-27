@@ -99,7 +99,16 @@ const getReadyBatches = asyncHandler(async (req, res) => {
 });
 
 const getBatchTasks = asyncHandler(async (req, res) => {
-  const data = await ratingService.getBatchTasks(req.params.batchId, req.user);
+  const options = {
+    page: req.query.page,
+    limit: req.query.limit,
+    category: req.query.category,
+    direction: req.query.direction,
+    roadType: req.query.roadType,
+    minChainage: req.query.minChainage,
+    maxChainage: req.query.maxChainage
+  };
+  const data = await ratingService.getBatchTasks(req.params.batchId, req.user, options);
   return successResponse(res, data, 'Batch tasks retrieved');
 });
 

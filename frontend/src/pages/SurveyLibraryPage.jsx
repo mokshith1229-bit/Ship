@@ -48,6 +48,15 @@ const SurveyLibraryPage = () => {
     fetchProjects();
   }, []);
 
+  // Live polling every 5 seconds to update asset statuses (Ready / Processing / Completed)
+  useEffect(() => {
+    if (!selectedProject) return;
+    const interval = setInterval(() => {
+      loadLibraryForProject(selectedProject);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [selectedProject]);
+
   const fetchProjects = async () => {
     try {
       const res = await masterListService.getProjects();

@@ -149,6 +149,10 @@ const inspectionTaskSchema = new mongoose.Schema(
   }
 );
 
+inspectionTaskSchema.index({ batchId: 1, chainage: 1 });
+
+
+
 const InspectionTask = mongoose.model('InspectionTask', inspectionTaskSchema);
 
 module.exports = InspectionTask;

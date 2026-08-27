@@ -96,6 +96,7 @@ const getVersionHistory = async (projectId) => {
 
 const InspectionBatch = require('../../models/InspectionBatch.model');
 const InspectionTask = require('../../models/InspectionTask.model');
+const MasterList = require('../../models/MasterList.model');
 
 /**
  * Gets batches ready for rating, with the count of ratable tasks (those with images)
@@ -146,23 +147,44 @@ const WorkAssignment = require('../../models/WorkAssignment.model');
  * Also attaches previous and next images for contextual display.
  * Implements RBAC: 'User' role only sees their assigned tasks.
  */
-const getBatchTasks = async (batchId, user) => {
+const getBatchTasks = async (batchId, user, options = {}) => {
   let queryFilter = {
     batchId,
     status: { $nin: ['EXTRACTION_FAILED', 'PENDING_IMAGE'] }
   };
+
+  if (options.category && options.category !== 'All') {
+    queryFilter.category = options.category;
+  }
+  if (options.direction && options.direction !== 'Choose Direction' && options.direction !== 'All') {
+    queryFilter.direction = options.direction;
+  }
+  if (options.roadType && options.roadType !== 'Choose Road Type' && options.roadType !== 'All') {
+    if (options.roadType === 'SR') {
+      queryFilter.roadType = { $in: ['SR', 'Service Road'] };
+    } else if (options.roadType === 'MCW') {
+      queryFilter.roadType = { $in: ['MCW', 'Main Carriageway'] };
+    } else {
+      queryFilter.roadType = options.roadType;
+    }
+  }
+  if (options.minChainage || options.maxChainage) {
+    queryFilter.chainage = {};
+    if (options.minChainage) queryFilter.chainage.$gte = parseFloat(options.minChainage);
+    if (options.maxChainage) queryFilter.chainage.$lte = parseFloat(options.maxChainage);
+  }
 
   // If user is a 'User', restrict to their assignment
   if (user && user.role === 'User') {
     const assignment = await WorkAssignment.findOne({
       batchId,
       assignedTo: user._id,
-      status: { $in: ['Assigned', 'In Progress'] }
+      status: { $in: ['Assigned', 'In Progress', 'Completed'] }
     });
     
     if (!assignment) {
       // Return empty if no active assignment
-      return [];
+      return { tasks: [], total: 0, page: 1, totalPages: 0 };
     }
 
     // Update assignment status to In Progress if it was just Assigned
@@ -177,60 +199,68 @@ const getBatchTasks = async (batchId, user) => {
     }
   }
 
-  const tasks = await InspectionTask.find(queryFilter)
+  // Pagination support — default: all tasks (limit=0 means no limit)
+  const page = Math.max(1, parseInt(options.page) || 1);
+  const limit = parseInt(options.limit) || 0; // 0 = no pagination (backward compat)
+  const skip = limit > 0 ? (page - 1) * limit : 0;
+  let total = 0;
+  if (limit > 0) {
+    total = await InspectionTask.countDocuments(queryFilter);
+  }
+  let query = InspectionTask.find(queryFilter)
+    .select('-metadata -extractionDiagnostics')
     .populate('parameters')
-    .sort({ chainage: 1 })
-    .lean();
-    
-  if (!tasks.length) return tasks;
+    .sort({ chainage: 1 });
+  if (limit > 0) {
+    query = query.skip(skip).limit(limit);
+  }
 
-  // Retrieve project-wide images to find nearest context (previous/next)
-  const projectId = tasks[0].project;
-  
-  const allProjectImages = await InspectionTask.find({
-    project: projectId,
-    'image.cloudinaryUrl': { $exists: true, $ne: null, $ne: '' }
-  })
-    .select('chainage image')
-    .lean();
+  const tasks = await query.lean();
+  if (!tasks.length) {
+    return limit > 0
+      ? { tasks: [], total, page, totalPages: Math.ceil(total / limit) }
+      : tasks;
+  }
 
-  // Parse chainages to float and sort for accurate nearest-neighbor matching
-  const sortedImages = allProjectImages
-    .map(img => ({ ...img, numericChainage: parseFloat(img.chainage) }))
-    .filter(img => !isNaN(img.numericChainage))
-    .sort((a, b) => a.numericChainage - b.numericChainage);
-
-  // Attach previous and next images
-  const tasksWithContext = tasks.map(task => {
-    const taskChainage = parseFloat(task.chainage);
-    if (isNaN(taskChainage)) return task;
-
-    let prevImage = null;
-    let nextImage = null;
-
-    // Find nearest less than current
-    for (let i = sortedImages.length - 1; i >= 0; i--) {
-      if (sortedImages[i].numericChainage < taskChainage) {
-        prevImage = sortedImages[i];
+  // ── Attach prev/next images using the already-fetched sorted tasks ──────────
+  // PERF FIX: Previously this re-queried ALL project tasks (another ~29 MB download).
+  // Now we compute prev/next from the sorted tasks we already have in memory.
+  // Tasks are already sorted by chainage ascending from the query above.
+  const tasksWithContext = tasks.map((task, idx) => {
+    // Walk backwards to find the nearest previous task that has an image
+    let prevTask = null;
+    for (let i = idx - 1; i >= 0; i--) {
+      if (tasks[i].image && tasks[i].image.cloudinaryUrl) {
+        prevTask = tasks[i];
         break;
       }
     }
 
-    // Find nearest greater than current
-    for (let i = 0; i < sortedImages.length; i++) {
-      if (sortedImages[i].numericChainage > taskChainage) {
-        nextImage = sortedImages[i];
+    // Walk forward to find the nearest next task that has an image
+    let nextTask = null;
+    for (let i = idx + 1; i < tasks.length; i++) {
+      if (tasks[i].image && tasks[i].image.cloudinaryUrl) {
+        nextTask = tasks[i];
         break;
       }
     }
 
     return {
       ...task,
-      previousImage: prevImage ? { url: prevImage.image.cloudinaryUrl, chainage: prevImage.chainage } : null,
-      nextImage: nextImage ? { url: nextImage.image.cloudinaryUrl, chainage: nextImage.chainage } : null
+      previousImage: prevTask ? { url: prevTask.image.cloudinaryUrl, chainage: prevTask.chainage } : null,
+      nextImage: nextTask ? { url: nextTask.image.cloudinaryUrl, chainage: nextTask.chainage } : null
     };
   });
   
+  // Return paginated result if pagination was requested, otherwise bare array (backward compat)
+  if (limit > 0) {
+    return {
+      tasks: tasksWithContext,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    };
+  }
   return tasksWithContext;
 };
 

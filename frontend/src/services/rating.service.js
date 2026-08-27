@@ -10,10 +10,20 @@ export const ratingService = {
   },
 
   /**
-   * Fetch all ratable tasks (with images) for a specific batch
+   * Fetch ratable tasks for a specific batch, with optional pagination.
+   * @param {string} batchId
+   * @param {object} [opts] - { page, limit } for pagination; omit for full list
    */
-  async getBatchTasks(batchId) {
-    const response = await api.get(`/ratings/batches/${batchId}/tasks`);
+  async getBatchTasks(batchId, opts = {}) {
+    const params = {};
+    if (opts.page) params.page = opts.page;
+    if (opts.limit) params.limit = opts.limit;
+    if (opts.category && opts.category !== 'All') params.category = opts.category;
+    if (opts.direction && opts.direction !== 'Choose Direction' && opts.direction !== 'All') params.direction = opts.direction;
+    if (opts.roadType && opts.roadType !== 'Choose Road Type' && opts.roadType !== 'All') params.roadType = opts.roadType;
+    if (opts.minChainage) params.minChainage = opts.minChainage;
+    if (opts.maxChainage) params.maxChainage = opts.maxChainage;
+    const response = await api.get(`/ratings/batches/${batchId}/tasks`, { params });
     return response.data;
   },
 

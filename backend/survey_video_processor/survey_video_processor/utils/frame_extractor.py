@@ -34,9 +34,13 @@ def extract_frames(video_path: str, records: List[Dict[str, Any]], output_dir: s
     frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
     video_duration_msec = (frame_count / fps) * 1000 if fps > 0 else 0
     
-    updated_records = []
-    
-    for i, record in enumerate(records):
+    # Sort records chronologically for sequential video reading
+    indexed_records = list(enumerate(records))
+    indexed_records.sort(key=lambda item: time_to_msec(item[1]['start_time']))
+
+    updated_records_map = {}
+
+    for original_idx, record in indexed_records:
         start_time_msec = time_to_msec(record['start_time'])
         
         new_record = record.copy()
@@ -51,14 +55,15 @@ def extract_frames(video_path: str, records: List[Dict[str, Any]], output_dir: s
         
         if video_duration_msec > 0 and start_time_msec > video_duration_msec:
             new_record['error'] = f"Calculated timestamp ({record['start_time']}) is outside the video duration ({new_record.get('video_duration', 'Unknown')})."
-            updated_records.append(new_record)
+            updated_records_map[original_idx] = new_record
             continue
         
-        # Frame-accurate seeking:
-        # OpenCV CAP_PROP_POS_MSEC seeks to the nearest keyframe (often seconds off in MP4s)
-        # We seek to 2 seconds before target, then read frames until we hit the exact millisecond
-        seek_time_msec = max(0, start_time_msec - 2000)
-        cap.set(cv2.CAP_PROP_POS_MSEC, seek_time_msec)
+        # Smart seeking:
+        # Only seek if current frame position is behind or more than 3 seconds ahead of target
+        current_msec = cap.get(cv2.CAP_PROP_POS_MSEC)
+        if current_msec > start_time_msec or (start_time_msec - current_msec) > 3000:
+            seek_time_msec = max(0, start_time_msec - 1000)
+            cap.set(cv2.CAP_PROP_POS_MSEC, seek_time_msec)
         
         ret = False
         frame = None
@@ -97,7 +102,7 @@ def extract_frames(video_path: str, records: List[Dict[str, Any]], output_dir: s
             cv2.rectangle(frame, top_left, bottom_right, (0, 0, 0), -1)
             cv2.putText(frame, text, (x, y), font, font_scale, (255, 255, 255), font_thickness, cv2.LINE_AA)
             
-            chainage_val = record.get('target_chainage', record.get('chainage', i + 1))
+            chainage_val = record.get('target_chainage', record.get('chainage', original_idx + 1))
             frame_filename = f"frame_{chainage_val}.jpg"
             frame_path = os.path.join(output_dir, frame_filename)
             
@@ -111,11 +116,11 @@ def extract_frames(video_path: str, records: List[Dict[str, Any]], output_dir: s
             cv2.imwrite(frame_path, frame)
             
             new_record['frame_name'] = frame_filename
-            updated_records.append(new_record)
+            updated_records_map[original_idx] = new_record
         else:
             new_record['error'] = f"FFmpeg extraction failed: Could not read frame at {record['start_time']}"
             logger.warning(new_record['error'])
-            updated_records.append(new_record)
+            updated_records_map[original_idx] = new_record
             
     cap.release()
-    return updated_records
+    return [updated_records_map[i] for i in range(len(records)) if i in updated_records_map]

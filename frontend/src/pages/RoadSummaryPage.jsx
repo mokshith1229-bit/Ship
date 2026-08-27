@@ -44,13 +44,69 @@ const RoadSummaryPage = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [navigate]);
-  
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeBatchId, setActiveBatchId] = useState(null);
-  
+  const [loadingProgress, setLoadingProgress] = useState({ loaded: 0, total: 0 });
+
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
+
+  // Fetch a single page from the API based on current filters and page
+  const fetchPageData = async (batchId, page, filters, signal) => {
+    try {
+      setLoading(true);
+      const PAGE_SIZE = 10;
+      
+      const options = {
+        page,
+        limit: PAGE_SIZE,
+        ...filters
+      };
+
+      const result = await ratingService.getBatchTasks(batchId, options);
+      if (signal && signal.aborted) return;
+      
+      const paginatedData = result?.data || result;
+      const fetchedTasks = paginatedData?.tasks || (Array.isArray(paginatedData) ? paginatedData : []);
+      const total = paginatedData?.total || 0;
+      const totalPages = paginatedData?.totalPages || 1;
+
+      setTotalRecords(total);
+      setServerTotalPages(totalPages);
+
+      const tasksAsAssets = fetchedTasks.map((task, localIndex) => {
+        const firstParam = task.parameters?.[0] || {};
+        return {
+          _id: task._id,
+          assetId: (task._id || '').toString().slice(-6).toUpperCase(),
+          project: task.project || firstParam.project,
+          category: task.category || firstParam.category || '-',
+          assetType: task.assetSubType ? `${task.assetType} (${task.assetSubType})` : (task.assetType || firstParam.assetType || '-'),
+          chainage: task.chainage,
+          parameterCount: (task.category === 'Roadway' || task.category === 'Structures' || task.category === 'Project Facilities' || task.category === 'ATMS') ? (task.ratings?.length || 0) : (task.parameters?.length || 0),
+          taskGlobalIndex: ((page - 1) * PAGE_SIZE) + localIndex,
+          status: task.status,
+          createdAt: task.createdAt,
+          direction: task.direction || firstParam.direction || '-',
+          roadType: task.roadType || firstParam.roadType || '-',
+          parameterCategories: (task.parameters || []).map(p => p.category)
+        };
+      });
+      setQuestions(tasksAsAssets);
+    } catch (err) {
+      if (err.name !== 'CanceledError' && err.name !== 'AbortError') {
+        console.error(err);
+      }
+    } finally {
+      if (!signal || !signal.aborted) {
+        setLoading(false);
+      }
+    }
+  };
+
   useEffect(() => {
-    const fetchTasks = async () => {
+    const fetchBatches = async () => {
       try {
         setLoading(true);
         const batchesRes = await ratingService.getReadyBatches();
@@ -65,40 +121,17 @@ const RoadSummaryPage = () => {
           setActiveBatchId(latestBatch._id);
           const dateStr = new Date(latestBatch.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
           setVersion(`${dateStr} - ${latestBatch.name || 'Unnamed'}`);
-          
-          const data = await ratingService.getBatchTasks(latestBatch._id);
-          const fetchedTasks = Array.isArray(data) ? data : (data?.data || []);
-          
-          const tasksAsAssets = fetchedTasks.map((task, globalIndex) => {
-            const firstParam = task.parameters?.[0] || {};
-            return {
-              _id: task._id,
-              assetId: (task._id || '').toString().slice(-6).toUpperCase(),
-              project: task.project || firstParam.project,
-              category: task.category || firstParam.category || '-',
-              assetType: task.assetSubType ? `${task.assetType} (${task.assetSubType})` : (task.assetType || firstParam.assetType || '-'),
-              chainage: task.chainage,
-              parameterCount: (task.category === 'Roadway' || task.category === 'Structures' || task.category === 'Project Facilities' || task.category === 'ATMS') ? (task.ratings?.length || 0) : (task.parameters?.length || 0),
-              taskGlobalIndex: globalIndex,
-              status: task.status,
-              createdAt: task.createdAt,
-              direction: task.direction || firstParam.direction || '-',
-              roadType: task.roadType || firstParam.roadType || '-',
-              parameterCategories: (task.parameters || []).map(p => p.category)
-            };
-          });
-          setQuestions(tasksAsAssets);
         } else {
           setQuestions([]);
+          setLoading(false);
         }
       } catch (err) {
         console.error(err);
-      } finally {
         setLoading(false);
       }
     };
     if (roadId) {
-      fetchTasks();
+      fetchBatches();
     }
   }, [roadId]);
 
@@ -111,71 +144,21 @@ const RoadSummaryPage = () => {
       
       if (selectedBatch && selectedBatch._id !== activeBatchId) {
         setActiveBatchId(selectedBatch._id);
-        setLoading(true);
-        ratingService.getBatchTasks(selectedBatch._id)
-          .then(data => {
-            const fetchedTasks = Array.isArray(data) ? data : (data?.data || []);
-            const tasksAsAssets = fetchedTasks.map((task, globalIndex) => {
-              const firstParam = task.parameters?.[0] || {};
-              return {
-                _id: task._id,
-                assetId: (task._id || '').toString().slice(-6).toUpperCase(),
-                project: task.project || firstParam.project,
-                category: task.category || firstParam.category || '-',
-                assetType: task.assetSubType ? `${task.assetType} (${task.assetSubType})` : (task.assetType || firstParam.assetType || '-'),
-                chainage: task.chainage,
-                parameterCount: (task.category === 'Roadway' || task.category === 'Structures' || task.category === 'Project Facilities' || task.category === 'ATMS') ? (task.ratings?.length || 0) : (task.parameters?.length || 0),
-                taskGlobalIndex: globalIndex,
-                status: task.status,
-                createdAt: task.createdAt,
-                direction: task.direction || firstParam.direction || '-',
-                roadType: task.roadType || firstParam.roadType || '-',
-                parameterCategories: (task.parameters || []).map(p => p.category)
-              };
-            });
-            setQuestions(tasksAsAssets);
-          })
-          .catch(console.error)
-          .finally(() => setLoading(false));
+        setCurrentPage(1); // Reset page on version change
       }
     }
-  }, [version, projectBatches, activeBatchId]);
+  }, [version, projectBatches]);
 
-  let currentData = questions;
-  
-  // Apply filters based on appliedFilters state
-  if (appliedFilters.category && appliedFilters.category !== 'All') {
-    currentData = currentData.filter(q => {
-      if (q.category === appliedFilters.category) return true;
-      if (q.parameterCategories && q.parameterCategories.includes(appliedFilters.category)) return true;
-      return false;
-    });
-  }
-  if (appliedFilters.direction && appliedFilters.direction !== 'Choose Direction' && appliedFilters.direction !== 'All') {
-    currentData = currentData.filter(q => q.direction === appliedFilters.direction);
-  }
-  if (appliedFilters.roadType && appliedFilters.roadType !== 'Choose Road Type' && appliedFilters.roadType !== 'All') {
-    currentData = currentData.filter(q => q.roadType === appliedFilters.roadType);
-  }
-  if (appliedFilters.minChainage) {
-    const min = parseFloat(appliedFilters.minChainage);
-    if (!isNaN(min)) {
-      currentData = currentData.filter(q => parseFloat(q.chainage) >= min);
+  useEffect(() => {
+    if (activeBatchId) {
+      const ctrl = new AbortController();
+      fetchPageData(activeBatchId, currentPage, appliedFilters, ctrl.signal);
+      return () => ctrl.abort();
     }
-  }
-  if (appliedFilters.maxChainage) {
-    const max = parseFloat(appliedFilters.maxChainage);
-    if (!isNaN(max)) {
-      currentData = currentData.filter(q => parseFloat(q.chainage) <= max);
-    }
-  }
-  
-  let totalPages = Math.ceil(currentData.length / 10) || 1;
-  
-  // Apply Pagination
-  const indexOfLastItem = currentPage * 10;
-  const indexOfFirstItem = indexOfLastItem - 10;
-  const currentItems = currentData.slice(indexOfFirstItem, indexOfLastItem);
+  }, [activeBatchId, currentPage, appliedFilters]);
+
+  let currentItems = questions;
+  let totalPages = serverTotalPages;
   
   const handleGetRatings = () => {
     setAppliedFilters({
@@ -373,7 +356,18 @@ const RoadSummaryPage = () => {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="8" className="text-center py-8">Loading...</td></tr>
+                <tr><td colSpan="8" className="text-center py-10">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-7 h-7 border-4 border-[#5cb85c] border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-sm text-gray-500">
+                      Loading tasks...
+                    </span>
+                  </div>
+                </td></tr>
+              ) : currentItems.length === 0 ? (
+                <tr><td colSpan="8" className="text-center py-10">
+                  <span className="text-sm text-gray-500">No tasks found.</span>
+                </td></tr>
               ) : currentItems.map((q, index) => {
                 return (
                 <tr 

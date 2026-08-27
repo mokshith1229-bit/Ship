@@ -33,12 +33,12 @@ class SurveyProcessingService {
       throw new Error('An extraction process is already running for this project.');
     }
 
-    const assets = await SurveyAsset.find({ project, status: 'READY' }).sort({ createdAt: -1 });
+    const assets = await SurveyAsset.find({ project, status: { $in: ['READY', 'COMPLETED'] } }).sort({ createdAt: -1 });
     if (!assets.length) {
-      throw new Error('No ready assets found for this project.');
-    }
-
-    const pendingBatches = await InspectionBatch.find({
+      const err = new Error('No ready or completed assets found for this project.');
+      err.statusCode = 400;
+      throw err;
+    }const pendingBatches = await InspectionBatch.find({
       project,
       status: { $in: ['WAITING_FOR_IMAGES', 'FAILED', 'PROCESSING', 'READY_FOR_REVIEW', 'READY_FOR_RATING', 'IN_PROGRESS'] }
     });
@@ -71,12 +71,23 @@ class SurveyProcessingService {
     const taskGroups = new Map();
     let unmappedTasks = [];
 
+    const normalizeRoadType = (rt) => {
+      if (!rt) return 'ALL';
+      const s = String(rt).trim().toUpperCase();
+      if (s === 'MCW' || s === 'MAIN CARRIAGEWAY') return 'MCW';
+      if (s === 'SR' || s === 'SERVICE ROAD') return 'SR';
+      return 'ALL';
+    };
+
     for (const task of tasks) {
       const isStructure = task.category === 'Structures';
       const offset = 0; // -20m offset removed for Structures
       const c = parseFloat(task.chainage) - offset;
-      const taskDirection = task.parameters && task.parameters.length > 0 ? task.parameters[0].direction : 'N/A';
+      const taskDirection = (task.direction && task.direction !== 'N/A')
+        ? task.direction
+        : (task.parameters && task.parameters.length > 0 && task.parameters[0].direction ? task.parameters[0].direction : 'N/A');
       const taskReq = task.imageRequirement || 'DAY';
+      const normTaskRt = normalizeRoadType(task.roadType);
       
       let bestAsset = null;
       let highestScore = -1;
@@ -90,16 +101,28 @@ class SurveyProcessingService {
         
         if (!matchesChainage) continue;
 
+        const normAssetRt = normalizeRoadType(a.roadType);
+
+        // Strict Road Type eligibility: An asset for 'SR' must NEVER map to an 'MCW' task
+        if (normAssetRt !== 'ALL' && normTaskRt !== 'ALL' && normAssetRt !== normTaskRt) {
+          continue;
+        }
+
+        // Strict Direction eligibility: An asset for 'LHS' must NEVER map to an 'RHS' task
+        if ((taskDirection === 'LHS' || taskDirection === 'RHS') && a.roadDirection && a.roadDirection !== taskDirection) {
+          continue;
+        }
+
         let score = 10; // Chainage matches
         
         // Priority: Video and VTT paths exist
         if (a.video && a.video.path) score += 20;
         if (a.vtt && a.vtt.path) score += 20;
         
-        // Priority: Road Type Match
-        if (a.roadType === task.roadType) {
+        // Priority: Road Type Match (exact match preferred over All Types)
+        if (normAssetRt === normTaskRt && normTaskRt !== 'ALL') {
           score += 10;
-        } else if (a.roadType === 'All Types') {
+        } else if (normAssetRt === 'ALL') {
           score += 5;
         }
 
@@ -121,8 +144,8 @@ class SurveyProcessingService {
       }
 
       if (!bestAsset) {
-        task.extractionDiagnostics = { failureReason: 'No Survey Asset covers this chainage' };
         task.status = 'EXTRACTION_FAILED';
+        task.extractionDiagnostics = { failureReason: 'NO_COMPATIBLE_SURVEY_ASSET' };
         unmappedTasks.push(task);
       } else {
         if (!taskGroups.has(bestAsset._id.toString())) {
@@ -177,7 +200,34 @@ class SurveyProcessingService {
           const results = JSON.parse(fs.readFileSync(resultsJsonPath, 'utf8'));
           
           if (results.success) {
-            for (const task of groupTasks) {
+            const frameUploadCache = new Map();
+
+            const uploadFrame = async (task, record, suffix) => {
+              if (!record || record.error || !record.frame_name) return null;
+              const framePath = path.join(outputDir, record.frame_name);
+              if (!fs.existsSync(framePath)) return null;
+
+              const cacheKey = `${asset._id}_${record.frame_name}`;
+              if (frameUploadCache.has(cacheKey)) {
+                return await frameUploadCache.get(cacheKey);
+              }
+
+              const uploadPromise = (async () => {
+                const cloudRes = await cloudinary.uploader.upload(framePath, {
+                  folder: `hirate/survey-images/${project}/${task.batchId}`,
+                  public_id: `asset_${asset._id}_frame_${record.frame_name.replace(/\.[^/.]+$/, '')}`,
+                  overwrite: true,
+                  invalidate: true,
+                  transformation: [{ quality: 'auto', fetch_format: 'auto' }]
+                });
+                return cloudRes.secure_url;
+              })();
+
+              frameUploadCache.set(cacheKey, uploadPromise);
+              return await uploadPromise;
+            };
+
+            const processSingleTask = async (task) => {
               const isStructure = task.category === 'Structures';
               const offset = 0; // -20m offset removed for Structures
               const extractionChainage = parseFloat(task.chainage) - offset;
@@ -206,34 +256,20 @@ class SurveyProcessingService {
                   task.status = 'EXTRACTION_FAILED';
                   failCount++;
                 } else if (centerRecord.frame_name) {
-                  
-                  const uploadFrame = async (record, suffix) => {
-                    if (!record || record.error || !record.frame_name) return null;
-                    const framePath = path.join(outputDir, record.frame_name);
-                    if (!fs.existsSync(framePath)) return null;
-                    const cloudRes = await cloudinary.uploader.upload(framePath, {
-                      folder: `hirate/survey-images/${project}/${task.batchId}`,
-                      public_id: `chainage_${task.chainage.replace(/\./g, '_')}_${task.imageRequirement}_${suffix}`,
-                      overwrite: true,
-                      invalidate: true,
-                      transformation: [{ quality: 'auto', fetch_format: 'auto' }]
-                    });
-                    return cloudRes.secure_url;
-                  };
-
                   try {
-                    const centerUrl = await uploadFrame(centerRecord, 'center');
-                    
-                    if (centerUrl) {
-                      const prevUrl = await uploadFrame(prevRecord, 'prev');
-                      const nextUrl = await uploadFrame(nextRecord, 'next');
+                    // Parallel upload of center, prev, next frames
+                    const [centerUrl, prevUrl, nextUrl] = await Promise.all([
+                      uploadFrame(task, centerRecord, 'center'),
+                      uploadFrame(task, prevRecord, 'prev'),
+                      uploadFrame(task, nextRecord, 'next')
+                    ]);
 
+                    if (centerUrl) {
                       const imgObj = { cloudinaryUrl: centerUrl };
                       if (prevUrl) imgObj.previousUrl = prevUrl;
                       if (nextUrl) imgObj.nextUrl = nextUrl;
                       
                       task.image = imgObj;
-
                       task.metadata = {
                         latitude: centerRecord.latitude,
                         longitude: centerRecord.longitude,
@@ -263,7 +299,30 @@ class SurveyProcessingService {
                 task.status = 'EXTRACTION_FAILED';
                 failCount++; 
               }
-              await task.save();
+            };
+
+            // Process task uploads in parallel chunks of 10 and bulkWrite to MongoDB
+            const CONCURRENCY = 10;
+            for (let i = 0; i < groupTasks.length; i += CONCURRENCY) {
+              const chunk = groupTasks.slice(i, i + CONCURRENCY);
+              await Promise.all(chunk.map(t => processSingleTask(t)));
+              
+              const bulkOps = chunk.map(t => ({
+                updateOne: {
+                  filter: { _id: t._id },
+                  update: {
+                    $set: {
+                      status: t.status,
+                      image: t.image,
+                      metadata: t.metadata,
+                      extractionDiagnostics: t.extractionDiagnostics
+                    }
+                  }
+                }
+              }));
+              if (bulkOps.length > 0) {
+                await InspectionTask.bulkWrite(bulkOps);
+              }
             }
           }
           
@@ -330,8 +389,8 @@ class SurveyProcessingService {
 
       const totalPendingAfter = await InspectionTask.countDocuments({ batchId: { $in: batchIds }, status: { $in: ['PENDING_IMAGE', 'EXTRACTION_FAILED'] } });
 
-      // Change any 'COMPLETED' assets back to 'READY' so they can be reused for future batches
-      await SurveyAsset.updateMany({ project, status: 'COMPLETED' }, { $set: { status: 'READY' } });
+      // Reset any leftover PROCESSING assets back to READY/COMPLETED
+      await SurveyAsset.updateMany({ project, status: 'PROCESSING' }, { $set: { status: 'READY' } });
 
       const failTotal = failCount + totalPendingAfter;
       
@@ -386,13 +445,15 @@ class SurveyProcessingService {
         });
       }
       
+      await SurveyAsset.updateMany({ project, status: 'PROCESSING' }, { $set: { status: 'READY' } });
       throw err;
     }
   }
 
   runPythonExtractor(cliPath, videoPath, vttPath, outputDir, chainagesStr) {
     return new Promise((resolve, reject) => {
-      const pythonProcess = spawn('python', [
+      const pythonExecutable = process.platform === 'win32' ? 'py' : 'python3';
+      const pythonProcess = spawn(pythonExecutable, [
         cliPath,
         '--video', videoPath,
         '--vtt', vttPath,

@@ -178,7 +178,12 @@ const ImageReviewDetailModal = ({ batch, onClose }) => {
                   <div className="p-4 flex-1 flex flex-col text-sm">
                     <div className="grid grid-cols-2 gap-y-2 gap-x-4 mb-4">
                       <div><span className="text-gray-500">Chainage:</span> <strong className="text-gray-900">{task.chainage}</strong></div>
-                      <div><span className="text-gray-500">Params:</span> <strong className="text-gray-900">{task.parameters?.length || task.ratings?.length || 0}</strong></div>
+                      <div>
+                        <span className="text-gray-500">Direction:</span>{' '}
+                        <strong className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${task.direction === 'LHS' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
+                          {task.direction || 'N/A'}
+                        </strong>
+                      </div>
                       <div><span className="text-gray-500">Road Type:</span> <strong className="text-gray-900">{task.roadType || '-'}</strong></div>
                       <div>
                         <span className="text-gray-500">Img Req:</span>{' '}
