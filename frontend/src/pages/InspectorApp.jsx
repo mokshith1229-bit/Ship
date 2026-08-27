@@ -101,9 +101,12 @@ const InspectorApp = () => {
   }, []);
 
   useEffect(() => {
-    setGlobalIndex(startIndex);
-    setLoadedPage(null); // Force reload if batchId changes
-  }, [batchId, startIndex]);
+    setGlobalIndex((prev) => prev !== startIndex ? startIndex : prev);
+  }, [startIndex]);
+
+  useEffect(() => {
+    setLoadedPage(null); // Force reload ONLY if batchId changes
+  }, [batchId]);
 
   useEffect(() => {
     // Reset custom remark inputs when navigating to a new task
@@ -906,13 +909,6 @@ const InspectorApp = () => {
               </p>
             </div>
             <div className="flex flex-col items-center flex-1 min-w-[200px]">
-              <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden shadow-inner">
-                <div 
-                  className="h-full bg-gradient-to-r from-[#5cb85c] to-green-400 transition-all duration-300 rounded-full"
-                  style={{ width: `${totalTasks > 0 ? ((globalIndex + 1) / totalTasks) * 100 : 0}%` }}
-                ></div>
-              </div>
-              <p className="text-xs text-gray-500 mt-1.5 font-medium">{totalTasks > 0 ? (((globalIndex + 1) / totalTasks) * 100).toFixed(0) : 0}% Complete</p>
             </div>
             <div className="flex-1 flex justify-end items-center">
               {saving || skipping ? (
