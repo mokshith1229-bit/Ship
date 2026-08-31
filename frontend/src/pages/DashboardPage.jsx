@@ -23,7 +23,7 @@ import ExecutiveCharts from '../components/dashboard/ExecutiveCharts';
 import UserDashboard from '../components/dashboard/UserDashboard';
 import { useAuth } from '../context/AuthContext';
 import RollingLogo from '../components/common/RollingLogo';
-import LiveActivityFeed from '../components/dashboard/LiveActivityFeed';
+
 
 const DashboardPage = () => {
   const { user } = useAuth();
@@ -101,8 +101,8 @@ const DashboardPage = () => {
                 
                 <ExecutiveCharts />
 
-                <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
-                   <div className="lg:col-span-2">
+                <div className="mt-4 grid grid-cols-1 gap-6">
+                   <div className="w-full">
                      <AllProjectsMap />
                      
                      <div className="w-full bg-white border border-gray-300 rounded shadow-sm flex flex-col p-6 mt-6">
@@ -114,10 +114,6 @@ const DashboardPage = () => {
                          </div>
                        </div>
                      </div>
-                   </div>
-
-                   <div className="lg:col-span-1 flex flex-col h-full">
-                     <LiveActivityFeed />
                    </div>
                 </div>
               </div>
