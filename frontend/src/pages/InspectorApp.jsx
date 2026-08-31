@@ -8,6 +8,7 @@ import { ratingService } from '../services/rating.service';
 import { resolveRemarkRating } from '../utils/remarkRatingResolver';
 import leftArrowImg from '../assets/leftarrow.PNG';
 import rightArrowImg from '../assets/rightarrow.PNG';
+import MasterListEditModal from '../pages/MasterList/components/MasterListEditModal';
 
 // REMARK_OPTIONS removed in favor of dynamic JSON config
 const SKIP_REASONS = [
@@ -58,6 +59,7 @@ const InspectorApp = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [expandedCard, setExpandedCard] = useState(null);
   const [headerRemarks, setHeaderRemarks] = useState({});
+  const [editingMasterListParam, setEditingMasterListParam] = useState(null);
   const [activeImageIndex, setActiveImageIndex] = useState(1);
   const [customRemarkMode, setCustomRemarkMode] = useState({});
   const [skipModalOpen, setSkipModalOpen] = useState(false);
@@ -476,7 +478,21 @@ const InspectorApp = () => {
         className="flex flex-col border border-borderColor p-4 rounded bg-gray-50/30 shadow-sm flex-1 min-w-[300px]"
       >
         <div className="flex items-center justify-between mb-3 border-b border-gray-100 pb-2">
-          <h3 className="font-medium text-lg text-gray-800">{param.parameterName || param.parameter}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-medium text-lg text-gray-800">{param.parameterName || param.parameter}</h3>
+            {isEditMode && param._id && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditingMasterListParam(param);
+                }}
+                className="w-8 h-8 rounded-full flex items-center justify-center bg-[#D4AF37] text-white hover:bg-yellow-600 shadow-sm transition-colors"
+                title="Edit Master List Item"
+              >
+                <MdEdit className="text-sm" />
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-4">
             <label className="flex items-center gap-1.5 cursor-pointer group">
               <input
@@ -1031,6 +1047,17 @@ const InspectorApp = () => {
             )}
           </AnimatePresence>
 
+
+      {editingMasterListParam && (
+        <MasterListEditModal
+          item={editingMasterListParam}
+          onClose={() => setEditingMasterListParam(null)}
+          onSuccess={() => {
+            setEditingMasterListParam(null);
+            window.location.reload();
+          }}
+        />
+      )}
         </div>
       </div>
     </div>

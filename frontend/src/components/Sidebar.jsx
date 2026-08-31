@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { cn } from '../utils/cn';
 import { MdStarRate, MdPerson, MdChevronLeft, MdChevronRight, MdClose, MdDashboard, MdContentCopy, MdCheck, MdNotifications, MdGroup, MdList, MdOutlinePrecisionManufacturing, MdOutlineVideoCameraFront, MdImageSearch, MdInsights, MdAddRoad, MdDomain, MdBusinessCenter, MdLibraryBooks, MdCameraOutdoor } from 'react-icons/md';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useSpring } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import { projectService } from '../services/project.service';
 
@@ -136,21 +136,86 @@ const Sidebar = () => {
 
   const clickTimeout = useRef(null);
 
-  const handleSidebarClick = (item) => {
+  // Premium Framer Motion Smooth Scroll state
+  const scrollContainerRef = useRef(null);
+  const scrollContentRef = useRef(null);
+  const [maxScroll, setMaxScroll] = useState(0);
+  const smoothY = useSpring(0, { stiffness: 150, damping: 20, mass: 0.5 });
+
+  useEffect(() => {
+    const updateMax = () => {
+      if (scrollContainerRef.current && scrollContentRef.current) {
+        const cHeight = scrollContainerRef.current.clientHeight;
+        const sHeight = scrollContentRef.current.scrollHeight;
+        setMaxScroll(Math.max(0, sHeight - cHeight));
+      }
+    };
+    updateMax();
+    // Observe content height changes
+    const observer = new ResizeObserver(updateMax);
+    if (scrollContentRef.current) observer.observe(scrollContentRef.current);
+    return () => observer.disconnect();
+  }, [isCollapsed, menuItems.length]);
+
+  // Handle Wheel Scrolling
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    
+    const handleWheel = (e) => {
+      if (maxScroll <= 0) return;
+      e.preventDefault();
+      const currentY = smoothY.get();
+      // framer-motion y is negative when scrolling down
+      const newY = Math.min(Math.max(currentY - (e.deltaY * 0.8), -maxScroll), 0);
+      smoothY.set(newY);
+    };
+    
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, [maxScroll, smoothY]);
+
+  // Handle Mouse Movement Scrolling (Premium effect)
+  const handleMouseMove = (e) => {
+    if (maxScroll <= 0 || !scrollContainerRef.current) return;
+    
+    const { top, height } = scrollContainerRef.current.getBoundingClientRect();
+    const relativeY = e.clientY - top;
+    
+    // Add a padding (15%) so users can easily reach the very top/bottom without pixel-perfect precision
+    const padding = height * 0.15;
+    
+    let percentage = 0;
+    if (relativeY > padding) {
+      if (relativeY > height - padding) {
+        percentage = 1;
+      } else {
+        percentage = (relativeY - padding) / (height - 2 * padding);
+      }
+    }
+    
+    // Map percentage to target Y scroll (-maxScroll to 0)
+    const targetY = -1 * (percentage * maxScroll);
+    smoothY.set(targetY);
+  };
+
+  const handleSidebarClick = (e, item) => {
     const isDashboard = item.name === 'Dashboard';
     
     if (isDashboard) {
-      if (clickTimeout.current) {
-        // Double click detected
-        clearTimeout(clickTimeout.current);
-        clickTimeout.current = null;
+      if (e.detail === 2) {
+        // Double click detected natively by browser
+        if (clickTimeout.current) {
+          clearTimeout(clickTimeout.current);
+          clickTimeout.current = null;
+        }
         setOpenMenu(prev => prev === item.name ? null : item.name);
-      } else {
-        // First click
+      } else if (e.detail === 1) {
+        // First click - delay slightly to see if a second click arrives
         clickTimeout.current = setTimeout(() => {
           clickTimeout.current = null;
           handleNav(item.path);
-        }, 250); // 250ms delay to wait for second click
+        }, 300);
       }
     } else {
       handleNav(item.path);
@@ -186,8 +251,20 @@ const Sidebar = () => {
         </div>
       )}
 
-      <div className="flex-1 py-6 px-3.5 relative z-50">
-        <ul className="flex flex-col gap-3">
+      <div 
+        ref={scrollContainerRef}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => {
+            // Optional: reset to a specific state or just leave it where it is
+        }}
+        className="flex-1 py-6 px-3.5 relative z-50"
+        style={{ clipPath: 'inset(0px -999px 0px -999px)' }}
+      >
+        <motion.ul 
+          ref={scrollContentRef}
+          style={{ y: smoothY }}
+          className="flex flex-col gap-3 pb-10"
+        >
           {menuItems.filter(item => !item.allowedRoles || (user && item.allowedRoles.includes(user.role))).map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname.startsWith(item.path);
@@ -199,7 +276,7 @@ const Sidebar = () => {
                 className="relative"
               >
                 <button
-                  onClick={() => handleSidebarClick(item)}
+                  onClick={(e) => handleSidebarClick(e, item)}
                   className={cn(
                     "flex w-full items-center gap-3.5 px-3 py-3 rounded-[12px] text-sm font-medium transition-all duration-300 border",
                     isActive 
@@ -271,7 +348,7 @@ const Sidebar = () => {
               </li>
             )
           })}
-        </ul>
+        </motion.ul>
       </div>
     </div>
   );

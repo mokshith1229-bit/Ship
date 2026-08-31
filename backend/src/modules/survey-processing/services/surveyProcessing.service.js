@@ -247,6 +247,11 @@ class SurveyProcessingService {
                 coverageEnd: asset.coverage.endChainage,
               };
 
+              // Map the video's direction from Survey Library to the task
+              if (asset.roadDirection) {
+                task.direction = asset.roadDirection;
+              }
+
               if (centerRecord) {
                 task.extractionDiagnostics.calculatedTimestamp = centerRecord.start_time;
                 task.extractionDiagnostics.videoDuration = centerRecord.video_duration;
@@ -315,7 +320,8 @@ class SurveyProcessingService {
                       status: t.status,
                       image: t.image,
                       metadata: t.metadata,
-                      extractionDiagnostics: t.extractionDiagnostics
+                      extractionDiagnostics: t.extractionDiagnostics,
+                      ...(t.direction && { direction: t.direction })
                     }
                   }
                 }
