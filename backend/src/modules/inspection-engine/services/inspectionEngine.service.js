@@ -70,18 +70,34 @@ class InspectionEngineService {
     // 3. Group Master List into Physical Assets
     const assetsMap = new Map();
     masterListPopulation.forEach(q => {
-      const key = `${q.project}_${q.chainage}_${q.assetType}_${q.assetSubType || ''}_${q.roadType || ''}`;
-      if (!assetsMap.has(key)) {
-        assetsMap.set(key, {
-          project: q.project,
-          chainage: q.chainage,
-          assetType: q.assetType,
-          assetSubType: q.assetSubType,
-          roadType: q.roadType,
-          parameters: []
-        });
+      // Determine which directional groups this question belongs to
+      let targetDirections = [];
+      if (q.direction === 'Both') {
+        targetDirections = ['LHS', 'RHS'];
+      } else if (q.direction === 'LHS' || q.direction === 'RHS') {
+        targetDirections = [q.direction];
+      } else {
+        // N/A or Missing
+        targetDirections = [q.direction || 'Missing'];
       }
-      assetsMap.get(key).parameters.push(q);
+
+      targetDirections.forEach(dir => {
+        // Use chainage + direction + roadType as the core identity
+        const key = `${q.project}_${q.chainage}_${dir}_${q.assetType}_${q.assetSubType || ''}_${q.roadType || ''}`;
+        
+        if (!assetsMap.has(key)) {
+          assetsMap.set(key, {
+            project: q.project,
+            chainage: q.chainage,
+            direction: dir,
+            assetType: q.assetType,
+            assetSubType: q.assetSubType,
+            roadType: q.roadType,
+            parameters: []
+          });
+        }
+        assetsMap.get(key).parameters.push(q);
+      });
     });
 
     const physicalAssets = Array.from(assetsMap.values());
@@ -133,6 +149,7 @@ class InspectionEngineService {
         tasksData.push({
           project: asset.project,
           chainage: asset.chainage,
+          direction: asset.direction !== 'Missing' ? asset.direction : undefined,
           assetType: asset.assetType,
           assetSubType: asset.assetSubType,
           roadType: asset.roadType,
@@ -147,6 +164,7 @@ class InspectionEngineService {
         tasksData.push({
           project: asset.project,
           chainage: asset.chainage,
+          direction: asset.direction !== 'Missing' ? asset.direction : undefined,
           assetType: asset.assetType,
           assetSubType: asset.assetSubType,
           roadType: asset.roadType,
@@ -302,15 +320,19 @@ class InspectionEngineService {
     const maxC = Math.max(startChainage, endChainage);
     const interval = intervalMetres / 1000;
     
-    // Fetch RSF questions for intersection
+    // Fetch Additional Category questions for intersection (RSF, Structures, etc.)
     const MasterList = require('../../../models/MasterList.model');
-    const rsfQuestions = await MasterList.find({ project, status: 'Active', category: 'Road Signage and Furniture' });
-    const rsfChainagesMap = new Map();
-    for (const q of rsfQuestions) {
+    const additionalQuestions = await MasterList.find({ 
+      project, 
+      status: 'Active', 
+      category: { $in: ['Road Signage and Furniture', 'Structures', 'Project Facilities', 'ATMS'] } 
+    });
+    const additionalChainagesMap = new Map();
+    for (const q of additionalQuestions) {
       const c = parseFloat(parseFloat(q.chainage).toFixed(3));
       if (!isNaN(c) && c >= minC && c <= maxC) {
-        if (!rsfChainagesMap.has(c)) rsfChainagesMap.set(c, []);
-        rsfChainagesMap.get(c).push(q);
+        if (!additionalChainagesMap.has(c)) additionalChainagesMap.set(c, []);
+        additionalChainagesMap.get(c).push(q);
       }
     }
 
@@ -423,8 +445,8 @@ class InspectionEngineService {
         }
       }
 
-      // Merge with RSF targets falling within actual covered ranges
-      const allTargetChainages = Array.from(new Set([...roadwayChainages, ...rsfChainagesMap.keys()]))
+      // Merge with additional category targets falling within actual covered ranges
+      const allTargetChainages = Array.from(new Set([...roadwayChainages, ...additionalChainagesMap.keys()]))
         .filter(c => {
           return mergedRanges.some(r => c >= r.start && c <= r.end);
         })
@@ -492,26 +514,52 @@ class InspectionEngineService {
         const cNum = parseFloat(chainageStr);
         
         const isRoadway = roadwayChainages.has(cNum);
-        const rsfParams = rsfChainagesMap.has(cNum) ? rsfChainagesMap.get(cNum) : [];
-        const isRsf = rsfParams.length > 0;
+        const allParamsAtChainage = additionalChainagesMap.has(cNum) ? additionalChainagesMap.get(cNum) : [];
+        
+        // Filter parameters based on strict direction and roadType rules
+        const validParams = allParamsAtChainage.filter(p => {
+          if (!p.direction || p.direction === 'N/A') return false; // N/A is not duplicated or auto-included
+          
+          // Check Road Type strict match
+          if (p.roadType !== expectedRoadType) return false;
+          
+          // Check Direction strict match
+          if (p.direction === 'Both') return true; // Both goes to LHS and RHS streams of the SAME roadType
+          return p.direction === expectedDirection; // Strict LHS->LHS, RHS->RHS match
+        });
+
+        const hasAdditionalParams = validParams.length > 0;
+
+        // Skip task creation if it has neither roadway nor valid additional parameters
+        if (!isRoadway && !hasAdditionalParams) continue;
 
         if (isRoadway) streamTotalQuestions += ROADWAY_PARAMETERS_COUNT;
-        if (isRsf) streamTotalQuestions += rsfParams.length;
+        if (hasAdditionalParams) streamTotalQuestions += validParams.length;
 
         const existingImageUrl = existingImageMap[chainageStr];
         const taskStatus = existingImageUrl ? 'READY_FOR_REVIEW' : 'PENDING_IMAGE';
         const actualAsset = sourceSurveyIds.get(cNum);
 
+        // Determine category for task (if mixed, default to Roadway)
+        let primaryCategory = 'Multi-Asset'; // Fallback
+        if (isRoadway) {
+          primaryCategory = 'Roadway';
+        } else if (hasAdditionalParams) {
+          primaryCategory = validParams[0].category; // Just take the first one's category if only one type is present
+        }
+
         const task = {
           project,
-          category: isRoadway ? 'Roadway' : 'Road Signage and Furniture',
+          category: primaryCategory,
           chainage: chainageStr,
           assetType: 'Multi-Asset',
           assetSubType: '',
           direction: expectedDirection,
           roadType: expectedRoadType,
           imageRequirement: actualAsset ? (actualAsset.surveyType || 'DAY') : 'DAY',
-          parameters: rsfParams.map(p => p._id),
+          parameters: validParams.map(p => p._id),
+          // Attach full param object temporarily for the preview testing script (it will be stripped out when saving)
+          _test_params: validParams, 
           ratings: isRoadway ? [...ROADWAY_PARAMETER_CONFIG] : [],
           status: taskStatus,
           extractionDiagnostics: {
@@ -591,10 +639,11 @@ class InspectionEngineService {
 
     const createdBatch = await Batch.create(newBatchData);
 
-    const tasksToInsert = processed.allTasksData.map(task => ({
-      ...task,
-      batchId: createdBatch._id
-    }));
+    const tasksToInsert = processed.allTasksData.map(task => {
+      const taskCopy = { ...task, batchId: createdBatch._id };
+      delete taskCopy._test_params; // Remove testing artifacts
+      return taskCopy;
+    });
 
     if (tasksToInsert.length > 0) {
       await InspectionTask.insertMany(tasksToInsert);
