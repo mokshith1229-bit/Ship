@@ -2,18 +2,11 @@ import React, { useState } from 'react';
 import { MdSearch, MdFilterList } from 'react-icons/md';
 import CustomDropdown from '../common/CustomDropdown';
 
-const GlobalFilters = ({ selectedProject, setSelectedProject, analyticsView, setAnalyticsView, globalFilters = {}, setGlobalFilters }) => {
-  const updateFilter = (key, value) => {
-    if (setGlobalFilters) {
-      setGlobalFilters(prev => ({ ...prev, [key]: value }));
-    }
-  };
-
-  const viewOptions = [
-    { label: 'Executive Overview', value: 'Executive Overview' },
-    { label: 'Skip Analytics', value: 'Skip Analytics' },
-    { label: 'Inspection Comparison', value: 'Inspection Comparison' }
-  ];
+const GlobalFilters = ({ selectedProject, setSelectedProject }) => {
+  const [selectedState, setSelectedState] = useState('');
+  const [selectedAsset, setSelectedAsset] = useState('');
+  const [selectedRating, setSelectedRating] = useState('');
+  const [selectedTime, setSelectedTime] = useState('');
 
   const stateOptions = [
     { label: 'All States', value: '' },
@@ -64,27 +57,14 @@ const GlobalFilters = ({ selectedProject, setSelectedProject, analyticsView, set
           type="text" 
           placeholder="Search projects, roads, or assets..." 
           className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#5cb85c]/20 focus:border-[#5cb85c] transition-all"
-          value={globalFilters.search || ''}
-          onChange={(e) => updateFilter('search', e.target.value)}
         />
       </div>
-
-      {selectedProject && (
-        <div className="w-[180px] shrink-0 border-r border-gray-200 pr-4">
-          <CustomDropdown
-            options={viewOptions}
-            value={analyticsView}
-            onChange={setAnalyticsView}
-            placeholder="Analytics View"
-          />
-        </div>
-      )}
 
       <div className="w-[140px] shrink-0">
         <CustomDropdown
           options={stateOptions}
-          value={globalFilters.state || ''}
-          onChange={(val) => updateFilter('state', val)}
+          value={selectedState}
+          onChange={setSelectedState}
           placeholder="All States"
         />
       </div>
@@ -101,8 +81,8 @@ const GlobalFilters = ({ selectedProject, setSelectedProject, analyticsView, set
       <div className="w-[160px] shrink-0">
         <CustomDropdown
           options={assetOptions}
-          value={globalFilters.asset || ''}
-          onChange={(val) => updateFilter('asset', val)}
+          value={selectedAsset}
+          onChange={setSelectedAsset}
           placeholder="Asset Type"
         />
       </div>
@@ -110,8 +90,8 @@ const GlobalFilters = ({ selectedProject, setSelectedProject, analyticsView, set
       <div className="w-[180px] shrink-0">
         <CustomDropdown
           options={ratingOptions}
-          value={globalFilters.rating || ''}
-          onChange={(val) => updateFilter('rating', val)}
+          value={selectedRating}
+          onChange={setSelectedRating}
           placeholder="Rating Status"
         />
       </div>
@@ -119,8 +99,8 @@ const GlobalFilters = ({ selectedProject, setSelectedProject, analyticsView, set
       <div className="w-[140px] shrink-0">
         <CustomDropdown
           options={timeOptions}
-          value={globalFilters.time || ''}
-          onChange={(val) => updateFilter('time', val)}
+          value={selectedTime}
+          onChange={setSelectedTime}
           placeholder="Last 30 Days"
         />
       </div>

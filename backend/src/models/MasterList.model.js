@@ -61,17 +61,6 @@ const masterListSchema = new mongoose.Schema(
       enum: ['Active', 'Inactive'],
       default: 'Active',
       index: true
-    },
-    imageRequirement: {
-      type: String,
-      enum: ['DAY', 'NIGHT'],
-      default: 'DAY',
-      index: true
-    },
-    importBatchId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'ImportBatch',
-      index: true
     }
   },
   {

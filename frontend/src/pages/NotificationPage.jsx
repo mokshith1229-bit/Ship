@@ -25,6 +25,10 @@ import {
   LuPlay
 } from 'react-icons/lu';
 
+import AnimatedAssignButton from '../components/common/AnimatedAssignButton';
+import AnimatedDeliveryButton from '../components/common/AnimatedDeliveryButton';
+import DynamicGlowButton from '../components/common/DynamicGlowButton';
+
 // Helper to format date into "DD MMM YYYY"
 const formatDate = (dateStr) => {
   if (!dateStr) return '';
@@ -79,10 +83,43 @@ const NotificationPage = () => {
           workAssignmentService.getStats(),
           masterListService.getProjects()
         ]);
-        setUsers(usersData || []);
+        const usersArray = usersData || [];
+        const assignmentsArray = assignmentsData || [];
+        
+        setUsers(usersArray);
         setReadyBatches(batchesData || []);
-        setAssignments(assignmentsData || []);
-        setStats(statsData || { assignedToday: 0, pendingTasks: 0, completedToday: 0, totalUsers: 0, availableUsers: 0 });
+        setAssignments(assignmentsArray);
+        
+        // Calculate stats locally
+        const now = new Date();
+        const pendingCount = assignmentsArray.filter(a => a.status !== 'Completed').length;
+        const assignedToday = assignmentsArray.filter(a => {
+          const created = new Date(a.createdAt || a.assignDate);
+          return created.getDate() === now.getDate() && created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+        }).length;
+        const completedToday = assignmentsArray.filter(a => {
+          if (a.status !== 'Completed') return false;
+          const completedDate = a.completedTime ? new Date(a.completedTime) : new Date(a.updatedAt);
+          return completedDate.getDate() === now.getDate() && completedDate.getMonth() === now.getMonth() && completedDate.getFullYear() === now.getFullYear();
+        }).length;
+        
+        const totalUsers = usersArray.length;
+        const availableUsers = usersArray.filter(u => u.isActive).length;
+
+        // Merge with statsData if it exists, or just override with local calculations
+        setStats({ 
+          assignedToday, 
+          pendingTasks: pendingCount, 
+          completedToday, 
+          totalUsers, 
+          availableUsers,
+          ...statsData, // Let backend override if it returns valid values, otherwise use local
+          assignedToday: statsData?.assignedToday || assignedToday,
+          pendingTasks: statsData?.pendingTasks || pendingCount,
+          completedToday: statsData?.completedToday || completedToday,
+          totalUsers: statsData?.totalUsers || totalUsers,
+          availableUsers: statsData?.availableUsers || availableUsers
+        });
         setMasterProjects(masterProjectsData?.data || masterProjectsData || []);
       } else {
         const assignmentsData = await workAssignmentService.getMine();
@@ -338,8 +375,8 @@ const NotificationPage = () => {
   const bulkRouteDisplayValue = bulkSelectedRouteProject ? bulkSelectedRouteProject.displayName : 'Select Route / Section';
 
   // Calculations for auto-splitting or full pages allocation
-  const activeBulkUsers = users.filter(u => u.status === 'Active' && u.role.toLowerCase() === 'user');
-  const selectedBulkUsers = activeBulkUsers.filter(u => bulkFormData.selectedUserIds.includes(u.id || u.email));
+  const activeBulkUsers = users.filter(u => u.isActive && u.role.toLowerCase() === 'user');
+  const selectedBulkUsers = activeBulkUsers.filter(u => bulkFormData.selectedUserIds.includes(u._id || u.id || u.email));
   const totalPagesNum = parseInt(bulkFormData.totalPages) || 0;
   const bulkPreviewList = [];
 
@@ -397,16 +434,18 @@ const NotificationPage = () => {
       });
       await fetchData();
 
-      // Reset bulk states
-      setIsBulkOpen(false);
-      setBulkFormData({
-        roadProject: '',
-        routeSection: '',
-        category: 'Roadway',
-        totalPages: '',
-        autoSplit: true,
-        selectedUserIds: []
-      });
+      // Wait for the AnimatedDeliveryButton animation (approx 6s) before closing modal
+      setTimeout(() => {
+        setIsBulkOpen(false);
+        setBulkFormData({
+          roadProject: '',
+          routeSection: '',
+          category: 'Roadway',
+          totalPages: '',
+          autoSplit: true,
+          selectedUserIds: []
+        });
+      }, 5500);
     } catch (err) {
       console.error(err);
       alert(err?.response?.data?.message || 'Failed to create bulk assignments.');
@@ -429,7 +468,7 @@ const NotificationPage = () => {
   // Select all active users
   const handleSelectAllBulkUsers = () => {
     setBulkFormData(prev => {
-      const allActiveIds = activeBulkUsers.map(u => u._id);
+      const allActiveIds = activeBulkUsers.map(u => u._id || u.id);
       const isAllSelected = prev.selectedUserIds.length === allActiveIds.length;
       return {
         ...prev,
@@ -604,12 +643,11 @@ const NotificationPage = () => {
             </div>
             
             {isAdmin && (
-              <button
+              <DynamicGlowButton
                 onClick={() => setIsBulkOpen(true)}
-                className="px-5 h-10 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold shadow-sm transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
               >
                 Bulk Assignment
-              </button>
+              </DynamicGlowButton>
             )}
           </div>
 
@@ -861,7 +899,7 @@ const NotificationPage = () => {
                     <button
                       onClick={() => setUserPage(prev => Math.max(prev - 1, 1))}
                       disabled={userPage === 1}
-                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 active:bg-gray-100 disabled:opacity-40 transition-colors cursor-pointer"
+                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:border-[#5cb85c] hover:text-[#5cb85c] hover:bg-green-50 active:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:text-gray-400 disabled:hover:bg-transparent transition-colors cursor-pointer text-gray-600"
                     >
                       <LuChevronLeft className="text-sm" />
                     </button>
@@ -869,19 +907,24 @@ const NotificationPage = () => {
                       <button
                         key={p}
                         onClick={() => setUserPage(p)}
-                        className={`w-8 h-8 rounded-lg text-xs font-bold transition-all duration-200 border cursor-pointer ${
+                        className={`group relative overflow-hidden w-8 h-8 rounded-lg text-xs font-bold transition-all duration-300 border cursor-pointer flex items-center justify-center ${
                           userPage === p 
-                            ? 'bg-green-600 text-white border-green-600' 
-                            : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-600'
+                            ? 'bg-[#5cb85c] text-white border-[#5cb85c] shadow-[0_4px_12px_rgba(92,184,92,0.3)]' 
+                            : 'bg-white border-gray-200 text-gray-600'
                         }`}
                       >
-                        {p}
+                        {/* Slide-Up Green Fill */}
+                        <span className={`absolute inset-0 bg-[#5cb85c] transition-transform duration-300 ease-out ${userPage === p ? 'translate-y-0' : 'translate-y-[101%] group-hover:translate-y-0'}`}></span>
+                        {/* Text */}
+                        <span className={`relative z-10 transition-colors duration-300 ${userPage === p ? 'text-white' : 'group-hover:text-white'}`}>
+                          {p}
+                        </span>
                       </button>
                     ))}
                     <button
                       onClick={() => setUserPage(prev => Math.min(prev + 1, totalUserPages))}
                       disabled={userPage === totalUserPages}
-                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 active:bg-gray-100 disabled:opacity-40 transition-colors cursor-pointer"
+                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:border-[#5cb85c] hover:text-[#5cb85c] hover:bg-green-50 active:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:text-gray-400 disabled:hover:bg-transparent transition-colors cursor-pointer text-gray-600"
                     >
                       <LuChevronRight className="text-sm" />
                     </button>
@@ -1113,13 +1156,23 @@ const NotificationPage = () => {
                       Update Assignment
                     </button>
                   ) : (
-                    <button
+                    <AnimatedAssignButton
                       type="submit"
-                      className="px-6 h-10 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold shadow-sm transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <LuSend className="text-sm" />
-                      Assign Work
-                    </button>
+                      disabled={saving}
+                      onClick={(e) => {
+                        if (!selectedEmployee) {
+                          alert("Please select a user from the table first.");
+                          e.preventDefault();
+                          return false;
+                        }
+                        if (!formData.routeSection) {
+                          alert("Please select an Inspection Batch.");
+                          e.preventDefault();
+                          return false;
+                        }
+                        return true;
+                      }}
+                    />
                   )}
                 </div>
               </form>
@@ -1662,7 +1715,7 @@ const NotificationPage = () => {
                 <div className="border border-gray-100 rounded-lg divide-y divide-gray-50 max-h-40 overflow-y-auto bg-white p-1">
                   {activeBulkUsers.length > 0 ? (
                     activeBulkUsers.map(user => {
-                      const uId = user.id || user.email;
+                      const uId = user._id || user.id || user.email;
                       const isChecked = bulkFormData.selectedUserIds.includes(uId);
                       return (
                         <div 
@@ -1726,13 +1779,28 @@ const NotificationPage = () => {
                 >
                   Cancel
                 </button>
-                <button
+                <AnimatedDeliveryButton
                   type="submit"
-                  disabled={selectedBulkUsers.length === 0 || totalPagesNum <= 0}
-                  className="px-6 h-10 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center cursor-pointer"
-                >
-                  Assign Work
-                </button>
+                  disabled={saving}
+                  onClick={(e) => {
+                    if (!bulkFormData.routeSection) {
+                      alert("Please select a valid Project and Route Section.");
+                      e.preventDefault();
+                      return false;
+                    }
+                    if (selectedBulkUsers.length === 0) {
+                      alert("Please select at least one active user.");
+                      e.preventDefault();
+                      return false;
+                    }
+                    if (totalPagesNum <= 0) {
+                      alert("Please enter a valid number of total pages.");
+                      e.preventDefault();
+                      return false;
+                    }
+                    return true;
+                  }}
+                />
               </div>
             </form>
           </div>

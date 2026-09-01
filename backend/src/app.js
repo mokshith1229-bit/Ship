@@ -27,31 +27,24 @@ const ratingsRoutes = require('./modules/ratings/rating.routes');
 const auditRoutes = require('./modules/audit/audit.routes');
 const notificationRoutes = require('./modules/notifications/notification.routes');
 const inspectionEngineRoutes = require('./modules/inspection-engine/routes/inspectionEngine.routes');
-const structureEngineRoutes = require('./modules/structure-engine/routes/structureEngine.routes');
-const projectFacilitiesRoutes = require('./modules/project-facilities/routes/projectFacilities.routes');
-const atmsRoutes = require('./modules/atms/routes/atms.routes');
 const surveyProcessingRoutes = require('./modules/survey-processing/routes/surveyProcessing.routes');
 const surveyLibraryRoutes = require('./modules/survey-library/routes/surveyLibrary.routes');
 const imageReviewRoutes = require('./modules/image-review/routes/imageReview.routes');
 const workAssignmentRoutes = require('./modules/work-assignment/workAssignment.routes');
 const shipRoutes = require('./modules/ship/ship.routes');
-const reportRoutes = require('./modules/reports/report.routes');
+const reportsRoutes = require('./modules/reports/reports.routes');
 
 // ─── Due-date reminder cron (runs every hour) ─────────────────────────────────
 const { sendDueDateReminders, markOverdueAssignments } = require('./modules/work-assignment/workAssignment.service');
-
-// Do not run setInterval in Vercel Serverless environments, it will cause 500 Function Timeout errors
-if (!process.env.VERCEL) {
-  setInterval(async () => {
-    try {
-      await sendDueDateReminders();
-      await markOverdueAssignments();
-    } catch (e) {
-      // Non-fatal — log only
-      console.error('[Cron] Work assignment reminder error:', e.message);
-    }
-  }, 60 * 60 * 1000); // every 1 hour
-}
+setInterval(async () => {
+  try {
+    await sendDueDateReminders();
+    await markOverdueAssignments();
+  } catch (e) {
+    // Non-fatal — log only
+    console.error('[Cron] Work assignment reminder error:', e.message);
+  }
+}, 60 * 60 * 1000); // every 1 hour
 
 const createApp = () => {
   const app = express();
@@ -66,38 +59,16 @@ const createApp = () => {
     })
   );
 
-  // ─── Trust Proxy ──────────────────────────────────────────────────────────────
-  app.set('trust proxy', 1);
-
   // ─── CORS ─────────────────────────────────────────────────────────────────────
-  const allowedOrigins = [
-    'http://localhost:5173',
-    'https://ship-phi-ruddy.vercel.app',
-    'https://hirate-backend.vercel.app'
-  ];
-  if (process.env.FRONTEND_URL) {
-    allowedOrigins.push(...process.env.FRONTEND_URL.split(','));
-  }
-
   app.use(
     cors({
-      origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
-        
-        // Allow dynamic Vercel preview deployments
-        if (
-          allowedOrigins.indexOf(origin) !== -1 || 
-          allowedOrigins.includes('*') ||
-          origin.endsWith('.vercel.app')
-        ) {
-          callback(null, true);
-        } else {
-          // Do not throw an Error, this causes a 500 crash in Vercel
-          // Instead, return false to indicate CORS rejection gracefully
-          callback(null, false);
-        }
-      },
+      origin: [
+        'http://localhost:5173',
+        'http://localhost:5174',
+        'http://localhost:5175',
+        'http://localhost:3000',
+        process.env.FRONTEND_URL
+      ].filter(Boolean),
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization']
@@ -107,7 +78,7 @@ const createApp = () => {
   // ─── Rate Limiting ────────────────────────────────────────────────────────────
   const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 20000,
+    max: 500,
     standardHeaders: true,
     legacyHeaders: false,
     message: { success: false, message: 'Too many requests. Please try again later.', errors: [] }
@@ -155,26 +126,20 @@ const createApp = () => {
   app.use('/api/v1/users', apiLimiter, userRoutes);
   app.use('/api/v1/projects', apiLimiter, projectRoutes);
   app.use('/api/v1/master', apiLimiter, masterListRoutes);
-  app.use('/api/v1/ship', apiLimiter, shipRoutes);
-  app.use('/api/v1/reports', apiLimiter, reportRoutes);
-
-
+  app.use('/api/v1/survey', apiLimiter, surveyRoutes);
+  app.use('/api/v1/inspections', apiLimiter, inspectionRoutes);
   app.use('/api/v1/dashboard', apiLimiter, dashboardRoutes);
   app.use('/api/v1/analytics', apiLimiter, analyticsRoutes);
   app.use('/api/v1/ratings', apiLimiter, ratingsRoutes);
   app.use('/api/v1/audit', apiLimiter, auditRoutes);
   app.use('/api/v1/notifications', apiLimiter, notificationRoutes);
-  app.use('/api/v1/survey', apiLimiter, surveyRoutes);
-  app.use('/api/v1/inspections', apiLimiter, inspectionRoutes);
   app.use('/api/v1/inspection-engine', apiLimiter, inspectionEngineRoutes);
-  app.use('/api/v1/structure-engine', apiLimiter, structureEngineRoutes);
-  app.use('/api/v1/project-facilities', apiLimiter, projectFacilitiesRoutes);
-  app.use('/api/v1/atms', apiLimiter, atmsRoutes);
   app.use('/api/v1/survey-library', apiLimiter, surveyLibraryRoutes);
   app.use('/api/v1/survey-processing', apiLimiter, surveyProcessingRoutes);
   app.use('/api/v1/image-review', apiLimiter, imageReviewRoutes);
   app.use('/api/v1/work-assignments', apiLimiter, workAssignmentRoutes);
   app.use('/api/v1/ship', apiLimiter, shipRoutes);
+  app.use('/api/v1/reports', apiLimiter, reportsRoutes);
 
   // ─── 404 Handler ─────────────────────────────────────────────────────────────
   app.use(notFoundHandler);

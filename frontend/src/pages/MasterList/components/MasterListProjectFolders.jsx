@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { masterListService } from '../../../services/masterList.service';
-import { MdFolder, MdDelete, MdWarning } from 'react-icons/md';
+import { MdDelete, MdWarning } from 'react-icons/md';
+import AnimatedFolderIcon from './AnimatedFolderIcon';
 
 const MasterListProjectFolders = ({ projects, onSelectProject, onProjectDeleted }) => {
   const [deleting, setDeleting] = useState(null);
@@ -35,7 +36,7 @@ const MasterListProjectFolders = ({ projects, onSelectProject, onProjectDeleted 
         <div 
           key={project}
           onClick={() => onSelectProject(project)}
-          className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center cursor-pointer hover:border-blue-300 hover:shadow-md transition-all group relative"
+          className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center cursor-pointer hover:-translate-y-1 hover:border-green-300 hover:shadow-lg transition-all duration-300 group relative"
         >
           <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
             <button 
@@ -51,7 +52,7 @@ const MasterListProjectFolders = ({ projects, onSelectProject, onProjectDeleted 
               )}
             </button>
           </div>
-          <MdFolder className="text-6xl text-blue-400 mb-4 group-hover:text-blue-500 transition-colors" />
+          <AnimatedFolderIcon className="text-green-500 mb-4 group-hover:text-green-600 transition-colors duration-300" />
           <h3 className="text-lg font-semibold text-gray-800 text-center w-full truncate">{project}</h3>
           <p className="text-xs text-gray-400 mt-2">Click to view items</p>
         </div>

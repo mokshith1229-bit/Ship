@@ -144,7 +144,27 @@ const updateProject = asyncHandler(async (req, res) => {
   return successResponse(res, project, 'Project updated successfully');
 });
 
+/**
+ * @swagger
+ * /api/v1/projects/code/{code}/complete:
+ *   patch:
+ *     tags: [Projects]
+ *     summary: Complete a project
+ *     parameters:
+ *       - in: path
+ *         name: code
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Project marked as completed
+ */
+const completeProject = asyncHandler(async (req, res) => {
+  const project = await projectService.completeProject(req.params.code);
+  return successResponse(res, project, 'Project marked as completed successfully');
+});
+
 module.exports = {
   getAllProjects, getStatusDistribution, getProjectByCode,
-  getProjectById, getProjectStats, createProject, updateProject
+  getProjectById, getProjectStats, createProject, updateProject, completeProject
 };

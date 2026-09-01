@@ -4,7 +4,6 @@ import Navbar from './../Navbar';
 import Sidebar from './../Sidebar';
 import CloneImageCarousel from './CloneImageCarousel';
 import CustomDropdown from './../common/CustomDropdown';
-import { resolveRemarkRating } from '../../utils/remarkRatingResolver';
 import { 
   MdUndo, MdEdit, MdMap, MdTerrain, MdArrowForward, 
   MdEditRoad, MdVerticalAlignBottom, MdGpsFixed,
@@ -19,14 +18,6 @@ const CloneRatingPage = ({ rowData = {}, config }) => {
   const [isLargeScreen, setIsLargeScreen] = useState(false);
   const [pageActiveImages, setPageActiveImages] = useState({});
   const [expandedCard, setExpandedCard] = useState(null);
-  const [remarkMasterConfig, setRemarkMasterConfig] = useState({});
-
-  useEffect(() => {
-    fetch('/remarkMaster.json')
-      .then(res => res.json())
-      .then(data => setRemarkMasterConfig(data))
-      .catch(err => console.error('Failed to load remarkMaster.json', err));
-  }, []);
 
   const [globalReviewData, setGlobalReviewData] = useState({});
 
@@ -120,9 +111,7 @@ const CloneRatingPage = ({ rowData = {}, config }) => {
   const remarks = currentData.remarks;
   const headerRemarks = currentData.headerRemarks;
 
-  const currentCategory = currentSlideConfig.overrides.category || rowData.category || 'N/A';
-  const categoryRemarks = remarkMasterConfig[currentCategory] || [];
-  const remarkOptions = [...categoryRemarks, 'Other'];
+  const remarkOptions = ['Due to crack', 'Due to rutting', 'Due to pothole'];
 
   const toggleEditMode = () => {
     setIsEditMode(!isEditMode);
@@ -296,23 +285,7 @@ const CloneRatingPage = ({ rowData = {}, config }) => {
                           <CustomDropdown 
                             options={remarkOptions}
                             value={remarks[key]}
-                            onChange={(val) => {
-                              setGlobalReviewData(prevGlobal => {
-                                const current = prevGlobal[currentPageIndex] || getInitialState();
-                                const newRemarks = { ...current.remarks, [key]: val };
-                                const newRatings = { ...current.ratings };
-                                
-                                const resolvedRating = resolveRemarkRating(currentCategory, val);
-                                if (resolvedRating !== null) {
-                                  newRatings[key] = resolvedRating;
-                                }
-                                
-                                return {
-                                  ...prevGlobal,
-                                  [currentPageIndex]: { ...current, remarks: newRemarks, ratings: newRatings }
-                                };
-                              });
-                            }}
+                            onChange={(val) => setRemarks(prev => ({ ...prev, [key]: val }))}
                             placeholder="Remark"
                             direction="up"
                           />

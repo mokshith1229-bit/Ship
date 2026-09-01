@@ -46,7 +46,7 @@ const AllProjectsMap = () => {
           <svg width="12" height="16" viewBox="0 0 24 36" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C5.373 0 0 5.373 0 12c0 9 12 24 12 24s12-15 12-24c0-6.627-5.373-12-12-12zm0 17.5c-3.038 0-5.5-2.462-5.5-5.5s2.462-5.5 5.5-5.5 5.5 2.462 5.5 5.5-2.462 5.5-5.5 5.5z" fill="#3B82F6"/></svg> Project Location
         </div>
       </div>
-      <MapContainer center={center} zoom={4.5} scrollWheelZoom={false} className="w-full h-full">
+      <MapContainer center={center} zoom={4.5} scrollWheelZoom={true} className="w-full h-full">
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

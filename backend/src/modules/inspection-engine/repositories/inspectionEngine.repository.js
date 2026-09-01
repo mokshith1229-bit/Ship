@@ -56,29 +56,10 @@ class InspectionEngineRepository {
   }
 
   async deleteBatch(batchId) {
-    const { cloudinary } = require('../../../config/cloudinary');
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-      // Find the batch to get the project name for the Cloudinary folder prefix
-      const batch = await InspectionBatch.findById(batchId).session(session);
-      if (!batch) {
-        throw new Error('Batch not found');
-      }
-
-      // Delete images from Cloudinary using the folder prefix
-      // Folder structure is: hirate/survey-images/{project}/{batchId}
-      try {
-        const prefix = `hirate/survey-images/${batch.project}/${batch._id}/`;
-        await cloudinary.api.delete_resources_by_prefix(prefix);
-        // Also delete the folder itself
-        await cloudinary.api.delete_folder(prefix.slice(0, -1));
-      } catch (cloudErr) {
-        console.error(`Failed to delete Cloudinary resources for batch ${batch._id}:`, cloudErr);
-        // We log the error but don't fail the transaction, ensuring DB records are still cleaned up
-      }
-
       await InspectionTask.deleteMany({ batchId }, { session });
       await InspectionBatch.findByIdAndDelete(batchId, { session });
 
@@ -99,29 +80,6 @@ class InspectionEngineRepository {
       .lean();
     
     return tasks;
-  }
-
-  async getPreviouslyInspectedMasterListIds(project) {
-    const lastResetBatch = await InspectionBatch.findOne({ 
-      project, 
-      isSamplingHistoryReset: true 
-    }).sort({ createdAt: -1 }).lean();
-
-    const taskQuery = { project };
-    if (lastResetBatch) {
-      taskQuery.createdAt = { $gte: lastResetBatch.createdAt };
-    }
-
-    const tasks = await InspectionTask.find(taskQuery).select('parameters').lean();
-
-    const inspectedIds = new Set();
-    tasks.forEach(task => {
-      if (task.parameters && Array.isArray(task.parameters)) {
-        task.parameters.forEach(p => inspectedIds.add(p.toString()));
-      }
-    });
-
-    return Array.from(inspectedIds);
   }
 }
 

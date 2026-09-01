@@ -4,7 +4,6 @@ import Navbar from './../Navbar';
 import Sidebar from './../Sidebar';
 import ImageCarousel from './ImageCarousel';
 import CustomDropdown from './../common/CustomDropdown';
-import { resolveRemarkRating } from '../../utils/remarkRatingResolver';
 import { MdUndo, MdEdit } from 'react-icons/md';
 import { motion, AnimatePresence } from 'framer-motion';
 import leftArrowImg from '../../assets/leftarrow.PNG';
@@ -16,38 +15,9 @@ const GenericRatingPage = ({ rowData = {}, config }) => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [pageActiveImages, setPageActiveImages] = useState({});
   const [expandedCard, setExpandedCard] = useState(null);
-  const [remarkMasterConfig, setRemarkMasterConfig] = useState({});
-  const [userCustomRemarks, setUserCustomRemarks] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('userCustomRemarks')) || {};
-    } catch {
-      return {};
-    }
-  });
 
   // Store data per page and per image
   const [globalReviewData, setGlobalReviewData] = useState({});
-
-  useEffect(() => {
-    const handleStorageChange = () => {
-      try {
-        setUserCustomRemarks(JSON.parse(localStorage.getItem('userCustomRemarks')) || {});
-      } catch(e) {}
-    };
-    window.addEventListener('customRemarksUpdated', handleStorageChange);
-    window.addEventListener('storage', handleStorageChange);
-    return () => {
-      window.removeEventListener('customRemarksUpdated', handleStorageChange);
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, []);
-
-  useEffect(() => {
-    fetch('/remarkMaster.json')
-      .then(res => res.json())
-      .then(data => setRemarkMasterConfig(data))
-      .catch(err => console.error('Failed to load remarkMaster.json', err));
-  }, []);
 
   const pagesData = config?.pagesData || [];
   const parameters = config?.parameters || [];
@@ -110,10 +80,7 @@ const GenericRatingPage = ({ rowData = {}, config }) => {
   const remarks = currentData.remarks;
   const headerRemarks = currentData.headerRemarks;
 
-  const currentCategory = currentPage.overrides?.category || rowData.category || 'N/A';
-  const categoryRemarks = remarkMasterConfig[currentCategory] || [];
-  const customRemarks = userCustomRemarks[currentCategory] || [];
-  const remarkOptions = [...new Set([...categoryRemarks, ...customRemarks]), 'Other'];
+  const remarkOptions = ['Due to crack', 'Due to rutting', 'Due to pothole', 'Rectified', 'Not Rectified'];
 
   const toggleEditMode = () => {
     setIsEditMode(!isEditMode);
@@ -126,57 +93,14 @@ const GenericRatingPage = ({ rowData = {}, config }) => {
   };
 
   // Next/prev page navigation
-  const handleSaveData = () => {
-    // Extract and save custom remarks before saving
-    const currentCat = currentPage.overrides?.category || rowData.category || 'N/A';
-    const existingOptions = remarkMasterConfig[currentCat] || [];
-    const newCustomRemarks = [];
-    
-    Object.values(remarks).forEach(val => {
-      const remark = val?.trim();
-      if (remark && remark !== 'Other' && !existingOptions.includes(remark)) {
-        newCustomRemarks.push(remark);
-      }
-    });
-
-    if (newCustomRemarks.length > 0) {
-      try {
-        const stored = JSON.parse(localStorage.getItem('userCustomRemarks')) || {};
-        const catStored = stored[currentCat] || [];
-        let updated = false;
-        newCustomRemarks.forEach(r => {
-          if (!catStored.includes(r)) {
-            catStored.push(r);
-            updated = true;
-          }
-        });
-        if (updated) {
-          stored[currentCat] = catStored;
-          localStorage.setItem('userCustomRemarks', JSON.stringify(stored));
-          window.dispatchEvent(new Event('customRemarksUpdated'));
-        }
-      } catch(e) {
-        console.error("Error saving custom remarks", e);
-      }
-    }
-
-    console.log('Saved data:', { globalReviewData });
+  const handlePrevPage = () => {
+    setCurrentPageIndex(prev => Math.max(0, prev - 1));
+    setExpandedCard(null); // Close expanded remark box
   };
 
   const handleNextPage = () => {
-    handleSaveData();
-    if (currentPageIndex < pagesData.length - 1) {
-      setCurrentPageIndex(currentPageIndex + 1);
-      setExpandedCard(null); // Close expanded remark box
-    }
-  };
-
-  const handlePrevPage = () => {
-    handleSaveData();
-    if (currentPageIndex > 0) {
-      setCurrentPageIndex(currentPageIndex - 1);
-      setExpandedCard(null); // Close expanded remark box
-    }
+    setCurrentPageIndex(prev => Math.min(pagesData.length - 1, prev + 1));
+    setExpandedCard(null); // Close expanded remark box
   };
 
   // Simulate updating chainage based on page
@@ -299,7 +223,7 @@ const GenericRatingPage = ({ rowData = {}, config }) => {
             <h2 className="text-lg font-medium text-center mb-2 mt-0 border-b pb-1 text-gray-800">Rating Parameters</h2>
 
             {/* Parameters Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 w-full mb-0">
+            <div className="flex flex-col xl:flex-row gap-6 w-full mb-0">
               {parameters.map(param => {
                 const key = param.key;
                 const title = param.title;
@@ -370,31 +294,13 @@ const GenericRatingPage = ({ rowData = {}, config }) => {
                         <CustomDropdown 
                           options={remarkOptions}
                           value={remarks[key]}
-                          searchable={true}
                           onChange={(val) => {
-                            setGlobalReviewData(prevGlobal => {
-                              const current = prevGlobal[currentPageIndex] || getInitialState();
-                              const newRemarks = { ...current.remarks, [key]: val };
-                              const newRatings = { ...current.ratings };
-                              
-                              if (val && val.toLowerCase() === 'rectified') {
-                                newRatings[key] = '10';
-                              } else if (val && val.toLowerCase() === 'not rectified') {
-                                newRatings[key] = '5';
-                              } else if (val === 'Other') {
-                                newRatings[key] = '5';
-                              } else {
-                                const resolvedRating = resolveRemarkRating(currentCategory, val);
-                                if (resolvedRating !== null) {
-                                  newRatings[key] = resolvedRating;
-                                }
-                              }
-                              
-                              return {
-                                ...prevGlobal,
-                                [currentPageIndex]: { ...current, remarks: newRemarks, ratings: newRatings }
-                              };
-                            });
+                            setRemarks(prev => ({ ...prev, [key]: val }));
+                            if (val && val.toLowerCase() === 'rectified') {
+                              setRatings(prev => ({ ...prev, [key]: '10' }));
+                            } else if (val && val.toLowerCase() === 'not rectified') {
+                              setRatings(prev => ({ ...prev, [key]: '5' }));
+                            }
                           }}
                           placeholder="Remark"
                           direction="up"

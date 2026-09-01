@@ -6,7 +6,7 @@ const BatchListTable = ({ batches, loading, onDelete, onView }) => {
   if (loading) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col min-h-[400px] items-center justify-center">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin mb-4"></div>
         <p className="text-gray-500 text-sm">Loading inspection batches...</p>
       </div>
     );
@@ -52,7 +52,7 @@ const BatchListTable = ({ batches, loading, onDelete, onView }) => {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {batches.map((batch) => (
-              <tr key={batch._id} className="hover:bg-blue-50/30 transition-colors">
+              <tr key={batch._id} className="hover:bg-green-50/30 transition-colors">
                 <td className="px-5 py-3 font-medium text-gray-800">{batch.name}</td>
                 <td className="px-5 py-3 text-gray-600 font-medium">{batch.project}</td>
                 <td className="px-5 py-3 text-gray-600">
@@ -73,7 +73,7 @@ const BatchListTable = ({ batches, loading, onDelete, onView }) => {
                   <div className="flex items-center justify-end gap-2">
                     <button 
                       onClick={() => onView(batch)}
-                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
+                      className="p-1.5 text-green-600 hover:bg-green-50 rounded"
                       title="View Details"
                     >
                       <MdVisibility size={18} />

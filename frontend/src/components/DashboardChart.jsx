@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Sector, Tooltip } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSocket } from '../context/SocketContext';
 
 const chartData = [
   { id: 1, name: "HO Rated", value: 6, color: "#368c3f" }, // Logo Green
@@ -95,27 +96,47 @@ const DashboardChart = () => {
   const [activeIndex, setActiveIndex] = useState(null);
   const [isEngineStarted, setIsEngineStarted] = useState(false);
   const [data, setData] = useState([]);
+  const socket = useSocket();
 
-  React.useEffect(() => {
+  const fetchChartData = () => {
     import('../services/dashboard.service').then(({ dashboardService }) => {
       dashboardService.getRoadsStatus().then(res => {
         // Map backend data to chart format with colors
         const colors = {
-          'COMPLETED': '#368c3f', // Green
-          'ONGOING': '#1b5e20', // Dark Green
-          'PENDING': '#1a1a1a'  // Dark Gray
+          'HO-RATED': '#368c3f', // Green
+          'SPV-RATED': '#368c3f', // Green
+          'ON-GOING': '#1b5e20', // Dark Green
+          'HO-PROCESS': '#1a1a1a', // Dark Gray
+          'NOT-RATED': '#1a1a1a'  // Dark Gray
         };
         const responseData = Array.isArray(res) ? res : (res.data || []);
         const mappedData = responseData.map(item => ({
           id: item._id,
-          name: item._id,
+          name: item._id ? item._id.replace('-', ' ') : 'UNKNOWN',
           value: item.count,
           color: colors[item._id] || '#8884d8'
         }));
         setData(mappedData.length ? mappedData : [{ name: 'No Data', value: 1, color: '#ccc' }]);
       }).catch(console.error);
     });
+  };
+
+  useEffect(() => {
+    fetchChartData();
   }, []);
+
+  useEffect(() => {
+    if (!socket) return;
+    
+    const handleUpdate = () => {
+      fetchChartData();
+    };
+
+    socket.on('DASHBOARD_METRICS_UPDATED', handleUpdate);
+    return () => {
+      socket.off('DASHBOARD_METRICS_UPDATED', handleUpdate);
+    };
+  }, [socket]);
 
   const total = useMemo(() => data.reduce((acc, curr) => acc + curr.value, 0), [data]);
   const activeData = activeIndex !== null ? data[activeIndex] : null;

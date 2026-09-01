@@ -30,14 +30,7 @@ const AuditLog = require('../../models/AuditLog.model');
  */
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  
-  // Production debug logging
-  console.log(`[AUTH] Login attempt received for email: ${email}, from IP: ${req.ip}`);
-  
   const result = await authService.login(email, password);
-
-  // Production debug logging
-  console.log(`[AUTH] Login successful for email: ${email}`);
 
   // Audit log
   await AuditLog.create({

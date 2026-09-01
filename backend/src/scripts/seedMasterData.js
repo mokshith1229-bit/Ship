@@ -3,7 +3,7 @@
 require('dotenv').config();
 
 const mongoose = require('mongoose');
-const MasterData = require('../models/MasterData.model');
+const MasterList = require('../models/MasterList.model');
 
 /**
  * Sample Master Data seed — representative parameters for each category.
@@ -26,9 +26,6 @@ const MASTER_DATA = [
   { category: 'Roadway', assetType: 'Drainage', roadType: 'Both', placement: 'Both', typeOfWork: 'Maintenance', parameter: 'Vegetation Overgrowth', question: 'Rate vegetation overgrowth obstructing drainage flow', ratingScale: [0, 1, 5, 10], sortOrder: 3 },
   { category: 'Roadway', assetType: 'Shoulder', roadType: 'Both', placement: 'Both', typeOfWork: 'Maintenance', parameter: 'Condition', question: 'Rate the overall condition of the shoulder', ratingScale: [0, 1, 5, 10], sortOrder: 1 },
   { category: 'Roadway', assetType: 'Kerb', roadType: 'Both', placement: 'Both', typeOfWork: 'Maintenance', parameter: 'Damage', question: 'Rate the damage to kerb and edge elements', ratingScale: [0, 1, 5, 10], sortOrder: 1 },
-  { category: 'Roadway', assetType: 'ROW', roadType: 'Both', placement: 'Both', typeOfWork: 'Maintenance', parameter: 'Cleanliness of ROW', question: 'Rate the cleanliness of the ROW', ratingScale: [0, 1, 5, 10], sortOrder: 1 },
-  { category: 'Roadway', assetType: 'Median Plantation', roadType: 'Both', placement: 'Both', typeOfWork: 'Maintenance', parameter: 'Physical condition of median plants', question: 'Rate the physical condition of median plants', ratingScale: [0, 1, 5, 10], sortOrder: 1 },
-  { category: 'Roadway', assetType: 'Median Plantation', roadType: 'Both', placement: 'Both', typeOfWork: 'Maintenance', parameter: 'Cleanliness of median grass', question: 'Rate the cleanliness of median grass', ratingScale: [0, 1, 5, 10], sortOrder: 2 },
 
   // ── ROAD SIGNAGE AND FURNITURE ────────────────────────────────────────────────
   { category: 'Road Signage and Furniture', assetType: 'Signages', roadType: 'Both', placement: 'Both', typeOfWork: 'Maintenance', parameter: 'Retro Reflectivity', question: 'Rate the retro-reflectivity of signage', ratingScale: [0, 1, 5, 10], sortOrder: 1 },
@@ -90,9 +87,9 @@ const seedMasterData = async () => {
       placement: record.placement
     };
 
-    const existing = await MasterData.findOne(filter);
+    const existing = await MasterList.findOne(filter);
     if (!existing) {
-      await MasterData.create(record);
+      await MasterList.create(record);
       inserted++;
     } else {
       skipped++;

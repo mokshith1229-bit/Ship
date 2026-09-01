@@ -15,16 +15,6 @@ const inspectionTaskSchema = new mongoose.Schema(
       required: true,
       index: true
     },
-    category: {
-      type: String,
-      trim: true,
-      index: true
-    },
-    direction: {
-      type: String,
-      trim: true,
-      index: true
-    },
     assetType: {
       type: String,
       index: true
@@ -47,18 +37,6 @@ const inspectionTaskSchema = new mongoose.Schema(
         type: mongoose.Schema.Types.ObjectId,
         ref: 'MasterList'
       },
-      parameterKey: {
-        type: String,
-        trim: true
-      },
-      parameterName: {
-        type: String,
-        trim: true
-      },
-      group: {
-        type: String,
-        trim: true
-      },
       score: {
         type: Number,
         default: 10
@@ -71,12 +49,6 @@ const inspectionTaskSchema = new mongoose.Schema(
     chainage: {
       type: String,
       required: true,
-      index: true
-    },
-    imageRequirement: {
-      type: String,
-      enum: ['DAY', 'NIGHT'],
-      default: 'DAY',
       index: true
     },
     status: {
@@ -116,9 +88,6 @@ const inspectionTaskSchema = new mongoose.Schema(
       speed: Number,
       extractedAt: String
     },
-    assetMetadata: {
-      type: mongoose.Schema.Types.Mixed
-    },
     extractionDiagnostics: {
       surveyAssetId: { type: mongoose.Schema.Types.ObjectId, ref: 'SurveyAsset' },
       videoFilename: String,
@@ -133,14 +102,7 @@ const inspectionTaskSchema = new mongoose.Schema(
       remarks: String,
       skippedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
       skippedAt: Date
-    },
-    skippedAssetTypes: [{
-      assetType: { type: String, required: true },
-      reason: String,
-      remarks: String,
-      skippedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-      skippedAt: { type: Date, default: Date.now }
-    }]
+    }
   },
   {
     timestamps: true,
@@ -148,10 +110,6 @@ const inspectionTaskSchema = new mongoose.Schema(
     toObject: { virtuals: true }
   }
 );
-
-inspectionTaskSchema.index({ batchId: 1, chainage: 1 });
-
-
 
 const InspectionTask = mongoose.model('InspectionTask', inspectionTaskSchema);
 

@@ -1,12 +1,7 @@
 import axios from 'axios';
 
-// Safely determine base URL: if running on localhost, use local backend, otherwise use Vercel backend
-const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-const PROD_URL = 'https://hirate-backend.vercel.app/api/v1';
-const DEV_URL = 'http://localhost:5000/api/v1';
-
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || (isLocal ? DEV_URL : PROD_URL),
+  baseURL: 'http://localhost:5555/api/v1',
   headers: {
     'Content-Type': 'application/json'
   }
@@ -35,8 +30,6 @@ api.interceptors.response.use(
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
-    } else if (!error.response) {
-      console.error('Network Error: Make sure the backend server is running and CORS is configured.', error);
     }
     return Promise.reject(error);
   }

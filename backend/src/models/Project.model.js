@@ -31,7 +31,7 @@ const projectSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: {
-        values: ['ON-GOING', 'HO-PROCESS', 'HO-RATED', 'SPV-RATED', 'NOT-RATED'],
+        values: ['ON-GOING', 'HO-PROCESS', 'HO-RATED', 'SPV-RATED', 'NOT-RATED', 'COMPLETED'],
         message: 'Invalid status'
       },
       default: 'NOT-RATED'
@@ -42,6 +42,12 @@ const projectSchema = new mongoose.Schema(
     },
     dateCreated: {
       type: String
+    },
+    completedAt: {
+      type: Date
+    },
+    endDate: {
+      type: Date
     },
     coordinates: {
       lat: { type: Number },

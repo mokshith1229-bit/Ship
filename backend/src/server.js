@@ -7,24 +7,10 @@ const createApp = require('./app');
 const connectDB = require('./config/db');
 const logger = require('./config/logger');
 
-const PORT = process.env.PORT || 5000;
+const PORT = 5555; // Explicitly use 5555 to avoid conflicts
 
 const startServer = async () => {
   try {
-    // Initialize required directories
-    const fs = require('fs');
-    const path = require('path');
-    const dirs = [
-      path.join(__dirname, '..', 'uploads', 'survey-library'),
-      path.join(__dirname, '..', 'logs')
-    ];
-    for (const dir of dirs) {
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-        logger.info(`Created directory: ${dir}`);
-      }
-    }
-
     // Connect to MongoDB
     await connectDB();
 
@@ -33,6 +19,10 @@ const startServer = async () => {
 
     // Create HTTP server
     const server = http.createServer(app);
+
+    // Initialize Socket.io
+    const { initializeSocket } = require('./config/socket');
+    initializeSocket(server);
 
     // Start listening
     server.listen(PORT, () => {

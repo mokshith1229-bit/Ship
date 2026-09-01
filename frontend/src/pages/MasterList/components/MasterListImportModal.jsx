@@ -2,26 +2,21 @@ import React, { useState } from 'react';
 import { MdClose, MdUploadFile } from 'react-icons/md';
 import { masterListService } from '../../../services/masterList.service';
 import { projectService } from '../../../services/project.service';
-import AddToCycleModal from './AddToCycleModal';
 
 const MasterListImportModal = ({ onClose, onSuccess }) => {
   const [file, setFile] = useState(null);
   const [project, setProject] = useState('');
-  const [isNewProject, setIsNewProject] = useState(false);
-  const [newProjectCode, setNewProjectCode] = useState('');
-  const [newProjectName, setNewProjectName] = useState('');
   const [projectsList, setProjectsList] = useState([]);
   const [importMode, setImportMode] = useState('append');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
-  const [showAddToCycleModal, setShowAddToCycleModal] = useState(false);
 
   React.useEffect(() => {
     projectService.getAllProjects()
       .then(data => {
         // Assume data might be an array of projects with `code` or `name`
-        setProjectsList(Array.isArray(data) ? data : []);
+        setProjectsList(data || []);
       })
       .catch(console.error);
   }, []);
@@ -34,42 +29,20 @@ const MasterListImportModal = ({ onClose, onSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    let targetProject = project;
-
-    if (isNewProject) {
-      if (!newProjectCode || !newProjectName) {
-        setError('Both Project Code and Project Name are required for a new project.');
-        return;
-      }
-      targetProject = newProjectCode.toUpperCase();
-    }
-
-    if (!file || !targetProject) {
-      setError('Project and File are required.');
+    if (!file || !project) {
+      setError('Project Name and File are required.');
       return;
     }
 
     setLoading(true);
     setError(null);
 
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('project', project.toUpperCase());
+    formData.append('importMode', importMode);
+
     try {
-      // Auto-create new project if needed
-      if (isNewProject) {
-        const exists = projectsList.find(p => p.code === targetProject);
-        if (!exists) {
-          await projectService.createProject({
-            code: targetProject,
-            fullName: newProjectName
-          });
-        }
-      }
-
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('project', targetProject);
-      formData.append('importMode', importMode);
-
       const res = await masterListService.importMasterList(formData);
       if (res.success) {
         setResult(res.data);
@@ -84,10 +57,10 @@ const MasterListImportModal = ({ onClose, onSuccess }) => {
   };
 
   const handleClose = () => {
-    if (result && onSuccess) {
+    if (result) {
       onSuccess(); // Refresh the list if we succeeded
     }
-    if (onClose) onClose();
+    onClose();
   };
 
   return (
@@ -133,38 +106,12 @@ const MasterListImportModal = ({ onClose, onSuccess }) => {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3 mt-8">
-                {result.newMasterListIds && result.newMasterListIds.length > 0 && (
-                  <button 
-                    onClick={() => setShowAddToCycleModal(true)}
-                    className="w-full py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm flex items-center justify-center gap-2"
-                  >
-                    Add to Existing Inspection Cycle
-                  </button>
-                )}
-                
-                <div className="flex gap-3">
-                  {result.newMasterListIds && result.newMasterListIds.length > 0 && (
-                    <button 
-                      onClick={async () => {
-                        if (result.newMasterListIds && result.newMasterListIds.length > 0) {
-                          await masterListService.cancelImport(result.newMasterListIds);
-                        }
-                        onClose();
-                      }}
-                      className="w-1/2 py-2.5 font-medium rounded-lg text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
-                    >
-                      Cancel Import
-                    </button>
-                  )}
-                  <button 
-                    onClick={handleClose}
-                    className={`flex-1 py-2.5 font-medium rounded-lg transition-colors ${(result.newMasterListIds && result.newMasterListIds.length > 0) ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
+              <button 
+                onClick={handleClose}
+                className="mt-8 w-full py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Done
+              </button>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-5">
@@ -177,54 +124,20 @@ const MasterListImportModal = ({ onClose, onSuccess }) => {
 
               {/* Project Input */}
               <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="block text-sm font-medium text-gray-700">Project</label>
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      setIsNewProject(!isNewProject);
-                      setError(null);
-                    }}
-                    className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline focus:outline-none"
-                  >
-                    {isNewProject ? 'Select Existing Project' : '+ Add New Project'}
-                  </button>
-                </div>
-                
-                {isNewProject ? (
-                  <div className="flex flex-col gap-3">
-                    <input
-                      type="text"
-                      required
-                      placeholder="Project Code (e.g., APEL)"
-                      value={newProjectCode}
-                      onChange={(e) => setNewProjectCode(e.target.value.toUpperCase())}
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 uppercase"
-                    />
-                    <input
-                      type="text"
-                      required
-                      placeholder="Project Full Name (e.g., Ahmedabad Project)"
-                      value={newProjectName}
-                      onChange={(e) => setNewProjectName(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    />
-                  </div>
-                ) : (
-                  <select
-                    required
-                    value={project}
-                    onChange={(e) => setProject(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 uppercase"
-                  >
-                    <option value="" disabled>Select a project</option>
-                    {Array.isArray(projectsList) && projectsList.map(p => (
-                      <option key={p._id || p.code} value={p.code}>
-                        {p.code} - {p.fullName}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
+                <select
+                  required
+                  value={project}
+                  onChange={(e) => setProject(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 uppercase"
+                >
+                  <option value="" disabled>Select a project</option>
+                  {projectsList.map(p => (
+                    <option key={p._id || p.code} value={p.code}>
+                      {p.code} - {p.fullName}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Import Mode */}
@@ -287,7 +200,7 @@ const MasterListImportModal = ({ onClose, onSuccess }) => {
                 </button>
                 <button
                   type="submit"
-                  disabled={loading || !file || (isNewProject ? (!newProjectCode || !newProjectName) : !project)}
+                  disabled={loading || !file || !project}
                   className="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 transition-colors flex items-center gap-2"
                 >
                   {loading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
@@ -299,19 +212,6 @@ const MasterListImportModal = ({ onClose, onSuccess }) => {
           )}
         </div>
       </div>
-      
-      {showAddToCycleModal && (
-        <AddToCycleModal 
-          project={project || newProjectCode.toUpperCase()}
-          newMasterListIds={result.newMasterListIds}
-          onClose={() => setShowAddToCycleModal(false)}
-          onSuccess={() => {
-            setShowAddToCycleModal(false);
-            if (onSuccess) onSuccess();
-            if (onClose) onClose();
-          }}
-        />
-      )}
     </div>
   );
 };

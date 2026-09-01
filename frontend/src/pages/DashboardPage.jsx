@@ -15,7 +15,6 @@ import AnalyticsCharts from '../components/dashboard/AnalyticsCharts';
 import InspectorLeaderboard from '../components/dashboard/InspectorLeaderboard';
 import RecentActivityTimeline from '../components/dashboard/RecentActivityTimeline';
 import SkipAnalytics from '../components/dashboard/SkipAnalytics';
-import InspectionComparison from '../components/dashboard/comparison/InspectionComparison';
 import LogoCarousel from '../components/dashboard/LogoCarousel';
 import AllProjectsMap from '../components/dashboard/AllProjectsMap';
 
@@ -23,6 +22,8 @@ import ExecutiveCards from '../components/dashboard/ExecutiveCards';
 import ExecutiveCharts from '../components/dashboard/ExecutiveCharts';
 import UserDashboard from '../components/dashboard/UserDashboard';
 import { useAuth } from '../context/AuthContext';
+import RollingLogo from '../components/common/RollingLogo';
+
 
 const DashboardPage = () => {
   const { user } = useAuth();
@@ -31,16 +32,6 @@ const DashboardPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedProject = searchParams.get('project');
   const coordinates = selectedProject ? projectCoordinates[selectedProject] : null;
-
-  const [analyticsView, setAnalyticsView] = React.useState('Executive Overview');
-  
-  const [globalFilters, setGlobalFilters] = React.useState({
-    search: '',
-    state: '',
-    asset: '',
-    rating: '',
-    time: ''
-  });
 
   const setSelectedProject = (project) => {
     if (project) {
@@ -61,10 +52,6 @@ const DashboardPage = () => {
             <GlobalFilters 
               selectedProject={selectedProject} 
               setSelectedProject={setSelectedProject} 
-              analyticsView={analyticsView}
-              setAnalyticsView={setAnalyticsView}
-              globalFilters={globalFilters}
-              setGlobalFilters={setGlobalFilters}
             />
           </div>
 
@@ -91,7 +78,7 @@ const DashboardPage = () => {
                     {/* Logo Box container to match diagonal green width */}
                     <div className="w-[170px] flex justify-center shrink-0">
                       <div className="bg-white px-3 py-1.5 rounded shadow-sm flex items-center justify-center">
-                         <img src={logoText} alt="HiRATE" className="h-[22px] object-contain" />
+                         <RollingLogo />
                       </div>
                     </div>
 
@@ -114,24 +101,22 @@ const DashboardPage = () => {
                 
                 <ExecutiveCharts />
 
-                <div className="mt-4">
-                   <AllProjectsMap />
-                </div>
-                
-                <div className="w-full bg-white border border-gray-300 rounded shadow-sm flex flex-col p-6 mt-6">
-                  <h2 className="text-gray-500 font-bold text-sm tracking-wide mb-8 uppercase">Roads Status</h2>
-                  <div className="flex-1 flex flex-col items-center justify-center -mt-8">
-                    <DashboardChart />
-                    <div className="text-center mt-2">
-                      <span className="font-bold text-gray-700 text-lg">Total Roads : 27</span>
-                    </div>
-                  </div>
+                <div className="mt-4 grid grid-cols-1 gap-6">
+                   <div className="w-full">
+                     <AllProjectsMap />
+                     
+                     <div className="w-full bg-white border border-gray-300 rounded shadow-sm flex flex-col p-6 mt-6">
+                       <h2 className="text-gray-500 font-bold text-sm tracking-wide mb-8 uppercase">Roads Status</h2>
+                       <div className="flex-1 flex flex-col items-center justify-center -mt-8">
+                         <DashboardChart />
+                         <div className="text-center mt-2">
+                           <span className="font-bold text-gray-700 text-lg">Total Roads : 27</span>
+                         </div>
+                       </div>
+                     </div>
+                   </div>
                 </div>
               </div>
-            ) : analyticsView === 'Skip Analytics' ? (
-              <SkipAnalytics selectedProject={selectedProject} globalFilters={globalFilters} />
-            ) : analyticsView === 'Inspection Comparison' ? (
-              <InspectionComparison selectedProject={selectedProject} globalFilters={globalFilters} />
             ) : (
               // PROJECT SPECIFIC VIEW
               <>
@@ -162,6 +147,10 @@ const DashboardPage = () => {
                   <div className="lg:col-span-1">
                     <InspectorLeaderboard selectedProject={selectedProject} />
                   </div>
+                </div>
+
+                <div className="mb-10">
+                  <SkipAnalytics selectedProject={selectedProject} />
                 </div>
               </>
             )}

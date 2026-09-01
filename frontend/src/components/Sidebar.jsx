@@ -1,17 +1,123 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { cn } from '../utils/cn';
-import { MdStarRate, MdPerson, MdChevronLeft, MdChevronRight, MdClose, MdDashboard, MdContentCopy, MdCheck, MdNotifications, MdGroup, MdList, MdOutlinePrecisionManufacturing, MdOutlineVideoCameraFront, MdImageSearch, MdInsights, MdAddRoad, MdDomain, MdBusinessCenter, MdLibraryBooks, MdCameraOutdoor } from 'react-icons/md';
-import { motion, AnimatePresence, useSpring } from 'framer-motion';
+import { MdStarRate, MdPerson, MdChevronLeft, MdChevronRight, MdClose, MdDashboard, MdContentCopy, MdCheck, MdNotifications, MdGroup, MdList, MdOutlinePrecisionManufacturing, MdOutlineVideoCameraFront, MdImageSearch, MdVideoLibrary, MdInsights } from 'react-icons/md';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
-import { projectService } from '../services/project.service';
 
-const fallbackProjects = [
+const allProjects = [
   'ADTPL', 'APEL', 'BFHL', 'BWHPL', 'DATL', 'DHMEPL', 'FRHL', 'GAEPL',
   'JMTPL', 'JUHPL', 'KETPL', 'KHEPL', 'KMTPL', 'KTIPL', 'MBEL', 'MHPL',
   'MKTPL', 'MSHP', 'NAM', 'NDEPL', 'NKTPL', 'SIPL', 'SMTPL', 'SPPL',
   'WMPTL', 'WUPTL', 'WVEL'
 ];
+
+const SidebarHoverButton = ({ isActive, onClick, children }) => {
+  const buttonRef = useRef(null);
+
+  useEffect(() => {
+    const btn = buttonRef.current;
+    if (!btn) return;
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
+
+    let rafId = null;
+    let targetX = 0.5;
+    let targetY = 0.5;
+    let currentX = 0.5;
+    let currentY = 0.5;
+    let isHovered = false;
+
+    const lerp = (start, end, factor) => start + (end - start) * factor;
+
+    const render = () => {
+      currentX = lerp(currentX, targetX, 0.15);
+      currentY = lerp(currentY, targetY, 0.15);
+
+      if (isHovered) {
+        btn.style.setProperty('--light-x', `${currentX * 100}%`);
+        btn.style.setProperty('--light-y', `${currentY * 100}%`);
+      } else {
+        targetX = 0.5;
+        targetY = 0.5;
+      }
+
+      rafId = requestAnimationFrame(render);
+    };
+
+    rafId = requestAnimationFrame(render);
+
+    const handleMouseMove = (e) => {
+      const rect = btn.getBoundingClientRect();
+      targetX = (e.clientX - rect.left) / rect.width;
+      targetY = (e.clientY - rect.top) / rect.height;
+    };
+
+    const handleMouseEnter = () => {
+      isHovered = true;
+    };
+
+    const handleMouseLeave = () => {
+      isHovered = false;
+    };
+
+    btn.addEventListener('mousemove', handleMouseMove);
+    btn.addEventListener('mouseenter', handleMouseEnter);
+    btn.addEventListener('mouseleave', handleMouseLeave);
+
+    return () => {
+      btn.removeEventListener('mousemove', handleMouseMove);
+      btn.removeEventListener('mouseenter', handleMouseEnter);
+      btn.removeEventListener('mouseleave', handleMouseLeave);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, []);
+
+  return (
+    <button
+      ref={buttonRef}
+      onClick={onClick}
+      className={cn(
+        "sidebar-3d-btn relative w-full rounded-[12px] text-sm font-medium transition-all duration-300 border overflow-hidden group outline-none",
+        isActive 
+          ? "bg-gradient-to-r from-green-500 to-green-400 border-transparent text-white shadow-md shadow-green-500/25 active-btn" 
+          : "bg-white border-gray-200 text-gray-500 hover:border-green-400 hover:text-green-700 inactive-btn"
+      )}
+      style={{
+        '--light-x': '50%',
+        '--light-y': '50%',
+      }}
+    >
+      <style>
+        {`
+          .sidebar-3d-btn.inactive-btn .glow-layer {
+            background: radial-gradient(
+              circle 70px at var(--light-x) var(--light-y), 
+              rgba(21, 128, 61, 0.15) 0%, 
+              rgba(220, 252, 231, 1) 100% 
+            );
+          }
+
+          .sidebar-3d-btn.active-btn .glow-layer {
+            background: radial-gradient(
+              circle 70px at var(--light-x) var(--light-y), 
+              rgba(20, 83, 45, 0.3) 0%, 
+              transparent 100%
+            );
+          }
+        `}
+      </style>
+      {/* Background layer for the hover glow */}
+      <div className="glow-layer absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-0"></div>
+      
+      {/* Content wrapper to stay above the glow */}
+      <div className="relative z-10 flex w-full items-center gap-3.5 px-3 py-3">
+        {children}
+      </div>
+    </button>
+  );
+};
 
 const Sidebar = () => {
   const { user } = useAuth();
@@ -19,31 +125,10 @@ const Sidebar = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const selectedProject = searchParams.get('project');
-  const [dynamicProjects, setDynamicProjects] = useState(fallbackProjects);
-
-  useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        if (user && (user.role === 'Admin' || user.role === 'Administrator')) {
-          const res = await projectService.getAllProjects();
-          const projects = res.data || res || [];
-          const projectNames = projects.map(p => typeof p === 'string' ? p : (p.code || p.name || 'UNKNOWN'))
-                                       .filter(p => p !== 'UNKNOWN');
-          
-          if (projectNames.length > 0) {
-            setDynamicProjects([...new Set(projectNames)].sort());
-          }
-        }
-      } catch (err) {
-        console.error('Failed to fetch projects for sidebar', err);
-      }
-    };
-    fetchProjects();
-  }, [user]);
 
   const projectOptions = useMemo(() => {
-    if (!user) return dynamicProjects;
-    if (user.role === 'Admin' || user.role === 'Administrator') return dynamicProjects;
+    if (!user) return allProjects;
+    if (user.role === 'Admin' || user.role === 'Administrator') return allProjects;
     if (user.roadAssignment) {
       return user.roadAssignment
         .split(',')
@@ -51,7 +136,7 @@ const Sidebar = () => {
         .filter(p => p);
     }
     return [];
-  }, [user, dynamicProjects]);
+  }, [user]);
 
   
   // Sidebar collapsed by default on desktop, but persist user preference
@@ -92,11 +177,7 @@ const Sidebar = () => {
     { name: 'Dashboard', icon: MdDashboard, path: '/dashboard', allowedRoles: ['Admin', 'Administrator', 'HO', 'SPV', 'User'] },
     { name: 'Master List', icon: MdList, path: '/master-list', allowedRoles: ['Admin', 'Administrator'] },
     { name: 'Inspection Engine', icon: MdOutlinePrecisionManufacturing, path: '/inspection-engine', allowedRoles: ['Admin', 'Administrator'] },
-    { name: 'Roadway Sampling', icon: MdAddRoad, path: '/roadway-sampling', allowedRoles: ['Admin', 'Administrator'] },
-    { name: 'Structures Sampling', icon: MdDomain, path: '/structure-sampling', allowedRoles: ['Admin', 'Administrator'] },
-    { name: 'Project Facilities', icon: MdBusinessCenter, path: '/project-facilities', allowedRoles: ['Admin', 'Administrator'] },
-    { name: 'ATMS', icon: MdCameraOutdoor, path: '/atms', allowedRoles: ['Admin', 'Administrator'] },
-    { name: 'Survey Library', icon: MdLibraryBooks, path: '/survey-library', allowedRoles: ['Admin', 'Administrator'] },
+    { name: 'Survey Library', icon: MdVideoLibrary, path: '/survey-library', allowedRoles: ['Admin', 'Administrator'] },
     { name: 'Survey Processing', icon: MdOutlineVideoCameraFront, path: '/survey-processing', allowedRoles: ['Admin', 'Administrator'] },
     { name: 'Image Review', icon: MdImageSearch, path: '/image-review', allowedRoles: ['Admin', 'Administrator', 'HO'] },
     { name: 'Rating', icon: MdStarRate, path: '/rating', allowedRoles: ['Admin', 'Administrator', 'HO', 'SPV', 'User'] },
@@ -136,86 +217,21 @@ const Sidebar = () => {
 
   const clickTimeout = useRef(null);
 
-  // Premium Framer Motion Smooth Scroll state
-  const scrollContainerRef = useRef(null);
-  const scrollContentRef = useRef(null);
-  const [maxScroll, setMaxScroll] = useState(0);
-  const smoothY = useSpring(0, { stiffness: 150, damping: 20, mass: 0.5 });
-
-  useEffect(() => {
-    const updateMax = () => {
-      if (scrollContainerRef.current && scrollContentRef.current) {
-        const cHeight = scrollContainerRef.current.clientHeight;
-        const sHeight = scrollContentRef.current.scrollHeight;
-        setMaxScroll(Math.max(0, sHeight - cHeight));
-      }
-    };
-    updateMax();
-    // Observe content height changes
-    const observer = new ResizeObserver(updateMax);
-    if (scrollContentRef.current) observer.observe(scrollContentRef.current);
-    return () => observer.disconnect();
-  }, [isCollapsed, menuItems.length]);
-
-  // Handle Wheel Scrolling
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    
-    const handleWheel = (e) => {
-      if (maxScroll <= 0) return;
-      e.preventDefault();
-      const currentY = smoothY.get();
-      // framer-motion y is negative when scrolling down
-      const newY = Math.min(Math.max(currentY - (e.deltaY * 0.8), -maxScroll), 0);
-      smoothY.set(newY);
-    };
-    
-    container.addEventListener('wheel', handleWheel, { passive: false });
-    return () => container.removeEventListener('wheel', handleWheel);
-  }, [maxScroll, smoothY]);
-
-  // Handle Mouse Movement Scrolling (Premium effect)
-  const handleMouseMove = (e) => {
-    if (maxScroll <= 0 || !scrollContainerRef.current) return;
-    
-    const { top, height } = scrollContainerRef.current.getBoundingClientRect();
-    const relativeY = e.clientY - top;
-    
-    // Add a padding (15%) so users can easily reach the very top/bottom without pixel-perfect precision
-    const padding = height * 0.15;
-    
-    let percentage = 0;
-    if (relativeY > padding) {
-      if (relativeY > height - padding) {
-        percentage = 1;
-      } else {
-        percentage = (relativeY - padding) / (height - 2 * padding);
-      }
-    }
-    
-    // Map percentage to target Y scroll (-maxScroll to 0)
-    const targetY = -1 * (percentage * maxScroll);
-    smoothY.set(targetY);
-  };
-
-  const handleSidebarClick = (e, item) => {
+  const handleSidebarClick = (item) => {
     const isDashboard = item.name === 'Dashboard';
     
     if (isDashboard) {
-      if (e.detail === 2) {
-        // Double click detected natively by browser
-        if (clickTimeout.current) {
-          clearTimeout(clickTimeout.current);
-          clickTimeout.current = null;
-        }
+      if (clickTimeout.current) {
+        // Double click detected
+        clearTimeout(clickTimeout.current);
+        clickTimeout.current = null;
         setOpenMenu(prev => prev === item.name ? null : item.name);
-      } else if (e.detail === 1) {
-        // First click - delay slightly to see if a second click arrives
+      } else {
+        // First click
         clickTimeout.current = setTimeout(() => {
           clickTimeout.current = null;
           handleNav(item.path);
-        }, 300);
+        }, 250); // 250ms delay to wait for second click
       }
     } else {
       handleNav(item.path);
@@ -251,20 +267,8 @@ const Sidebar = () => {
         </div>
       )}
 
-      <div 
-        ref={scrollContainerRef}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={() => {
-            // Optional: reset to a specific state or just leave it where it is
-        }}
-        className="flex-1 py-6 px-3.5 relative z-50"
-        style={{ clipPath: 'inset(0px -999px 0px -999px)' }}
-      >
-        <motion.ul 
-          ref={scrollContentRef}
-          style={{ y: smoothY }}
-          className="flex flex-col gap-3 pb-10"
-        >
+      <div className="flex-1 py-6 px-3.5 relative z-50">
+        <ul className="flex flex-col gap-3">
           {menuItems.filter(item => !item.allowedRoles || (user && item.allowedRoles.includes(user.role))).map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname.startsWith(item.path);
@@ -275,14 +279,9 @@ const Sidebar = () => {
                 key={item.path} 
                 className="relative"
               >
-                <button
-                  onClick={(e) => handleSidebarClick(e, item)}
-                  className={cn(
-                    "flex w-full items-center gap-3.5 px-3 py-3 rounded-[12px] text-sm font-medium transition-all duration-300 border",
-                    isActive 
-                      ? "bg-gradient-to-r from-green-500 to-green-400 border-transparent text-white shadow-md shadow-green-500/25" 
-                      : "bg-white border-gray-200 text-gray-500 hover:bg-green-50 hover:border-green-400 hover:text-green-600 group"
-                  )}
+                <SidebarHoverButton
+                  onClick={() => handleSidebarClick(item)}
+                  isActive={isActive}
                 >
                   <Icon className={cn(
                     "text-[22px] shrink-0 transition-colors duration-300",
@@ -297,7 +296,7 @@ const Sidebar = () => {
                   >
                     {item.name}
                   </span>
-                </button>
+                </SidebarHoverButton>
 
                 {/* Double-Click Sub-Menu for Dashboard */}
                 <AnimatePresence>
@@ -348,7 +347,7 @@ const Sidebar = () => {
               </li>
             )
           })}
-        </motion.ul>
+        </ul>
       </div>
     </div>
   );

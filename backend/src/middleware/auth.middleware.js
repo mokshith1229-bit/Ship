@@ -23,7 +23,7 @@ const authenticate = asyncHandler(async (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_key_for_development_only');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // Fetch fresh user from DB to ensure account is still active
     const user = await User.findById(decoded.id).select('-passwordHash');

@@ -96,13 +96,12 @@ const getVersionHistory = async (projectId) => {
 
 const InspectionBatch = require('../../models/InspectionBatch.model');
 const InspectionTask = require('../../models/InspectionTask.model');
-const MasterList = require('../../models/MasterList.model');
 
 /**
  * Gets batches ready for rating, with the count of ratable tasks (those with images)
  */
 const getReadyBatches = async (user) => {
-  let batchQuery = { status: { $in: ['READY_FOR_RATING', 'IN_PROGRESS', 'COMPLETED'] } };
+  let batchQuery = { status: { $in: ['READY_FOR_RATING', 'IN_PROGRESS'] } };
   
   if (user && user.role === 'User') {
     const WorkAssignment = require('../../models/WorkAssignment.model');
@@ -147,44 +146,28 @@ const WorkAssignment = require('../../models/WorkAssignment.model');
  * Also attaches previous and next images for contextual display.
  * Implements RBAC: 'User' role only sees their assigned tasks.
  */
-const getBatchTasks = async (batchId, user, options = {}) => {
+const getBatchTasks = async (batchId, user) => {
   let queryFilter = {
     batchId,
-    status: { $nin: ['EXTRACTION_FAILED', 'PENDING_IMAGE'] }
+    status: { $nin: ['EXTRACTION_FAILED', 'PENDING_IMAGE'] },
+    $and: [
+      { 'image.cloudinaryUrl': { $exists: true } },
+      { 'image.cloudinaryUrl': { $ne: null } },
+      { 'image.cloudinaryUrl': { $ne: '' } }
+    ]
   };
-
-  if (options.category && options.category !== 'All') {
-    queryFilter.category = options.category;
-  }
-  if (options.direction && options.direction !== 'Choose Direction' && options.direction !== 'All') {
-    queryFilter.direction = options.direction;
-  }
-  if (options.roadType && options.roadType !== 'Choose Road Type' && options.roadType !== 'All') {
-    if (options.roadType === 'SR') {
-      queryFilter.roadType = { $in: ['SR', 'Service Road'] };
-    } else if (options.roadType === 'MCW') {
-      queryFilter.roadType = { $in: ['MCW', 'Main Carriageway'] };
-    } else {
-      queryFilter.roadType = options.roadType;
-    }
-  }
-  if (options.minChainage || options.maxChainage) {
-    queryFilter.chainage = {};
-    if (options.minChainage) queryFilter.chainage.$gte = parseFloat(options.minChainage);
-    if (options.maxChainage) queryFilter.chainage.$lte = parseFloat(options.maxChainage);
-  }
 
   // If user is a 'User', restrict to their assignment
   if (user && user.role === 'User') {
     const assignment = await WorkAssignment.findOne({
       batchId,
       assignedTo: user._id,
-      status: { $in: ['Assigned', 'In Progress', 'Completed'] }
+      status: { $in: ['Assigned', 'In Progress'] }
     });
     
     if (!assignment) {
       // Return empty if no active assignment
-      return { tasks: [], total: 0, page: 1, totalPages: 0 };
+      return [];
     }
 
     // Update assignment status to In Progress if it was just Assigned
@@ -199,68 +182,60 @@ const getBatchTasks = async (batchId, user, options = {}) => {
     }
   }
 
-  // Pagination support — default: all tasks (limit=0 means no limit)
-  const page = Math.max(1, parseInt(options.page) || 1);
-  const limit = parseInt(options.limit) || 0; // 0 = no pagination (backward compat)
-  const skip = limit > 0 ? (page - 1) * limit : 0;
-  let total = 0;
-  if (limit > 0) {
-    total = await InspectionTask.countDocuments(queryFilter);
-  }
-  let query = InspectionTask.find(queryFilter)
-    .select('-metadata -extractionDiagnostics')
+  const tasks = await InspectionTask.find(queryFilter)
     .populate('parameters')
-    .sort({ chainage: 1 });
-  if (limit > 0) {
-    query = query.skip(skip).limit(limit);
-  }
+    .sort({ chainage: 1 })
+    .lean();
+    
+  if (!tasks.length) return tasks;
 
-  const tasks = await query.lean();
-  if (!tasks.length) {
-    return limit > 0
-      ? { tasks: [], total, page, totalPages: Math.ceil(total / limit) }
-      : tasks;
-  }
+  // Retrieve project-wide images to find nearest context (previous/next)
+  const projectId = tasks[0].project;
+  
+  const allProjectImages = await InspectionTask.find({
+    project: projectId,
+    'image.cloudinaryUrl': { $exists: true, $ne: null, $ne: '' }
+  })
+    .select('chainage image')
+    .lean();
 
-  // ── Attach prev/next images using the already-fetched sorted tasks ──────────
-  // PERF FIX: Previously this re-queried ALL project tasks (another ~29 MB download).
-  // Now we compute prev/next from the sorted tasks we already have in memory.
-  // Tasks are already sorted by chainage ascending from the query above.
-  const tasksWithContext = tasks.map((task, idx) => {
-    // Walk backwards to find the nearest previous task that has an image
-    let prevTask = null;
-    for (let i = idx - 1; i >= 0; i--) {
-      if (tasks[i].image && tasks[i].image.cloudinaryUrl) {
-        prevTask = tasks[i];
+  // Parse chainages to float and sort for accurate nearest-neighbor matching
+  const sortedImages = allProjectImages
+    .map(img => ({ ...img, numericChainage: parseFloat(img.chainage) }))
+    .filter(img => !isNaN(img.numericChainage))
+    .sort((a, b) => a.numericChainage - b.numericChainage);
+
+  // Attach previous and next images
+  const tasksWithContext = tasks.map(task => {
+    const taskChainage = parseFloat(task.chainage);
+    if (isNaN(taskChainage)) return task;
+
+    let prevImage = null;
+    let nextImage = null;
+
+    // Find nearest less than current
+    for (let i = sortedImages.length - 1; i >= 0; i--) {
+      if (sortedImages[i].numericChainage < taskChainage) {
+        prevImage = sortedImages[i];
         break;
       }
     }
 
-    // Walk forward to find the nearest next task that has an image
-    let nextTask = null;
-    for (let i = idx + 1; i < tasks.length; i++) {
-      if (tasks[i].image && tasks[i].image.cloudinaryUrl) {
-        nextTask = tasks[i];
+    // Find nearest greater than current
+    for (let i = 0; i < sortedImages.length; i++) {
+      if (sortedImages[i].numericChainage > taskChainage) {
+        nextImage = sortedImages[i];
         break;
       }
     }
 
     return {
       ...task,
-      previousImage: prevTask ? { url: prevTask.image.cloudinaryUrl, chainage: prevTask.chainage } : null,
-      nextImage: nextTask ? { url: nextTask.image.cloudinaryUrl, chainage: nextTask.chainage } : null
+      previousImage: prevImage ? { url: prevImage.image.cloudinaryUrl, chainage: prevImage.chainage } : null,
+      nextImage: nextImage ? { url: nextImage.image.cloudinaryUrl, chainage: nextImage.chainage } : null
     };
   });
   
-  // Return paginated result if pagination was requested, otherwise bare array (backward compat)
-  if (limit > 0) {
-    return {
-      tasks: tasksWithContext,
-      total,
-      page,
-      totalPages: Math.ceil(total / limit)
-    };
-  }
   return tasksWithContext;
 };
 
@@ -276,7 +251,7 @@ const saveTaskRatings = async (taskId, ratingsData, selectedImageUrl, user) => {
     const assignment = await WorkAssignment.findOne({
       batchId: task.batchId,
       assignedTo: user._id,
-      status: { $in: ['Assigned', 'In Progress', 'Completed'] }
+      status: { $in: ['Assigned', 'In Progress'] }
     });
 
     if (!assignment) {
@@ -296,21 +271,7 @@ const saveTaskRatings = async (taskId, ratingsData, selectedImageUrl, user) => {
     if (!task.image) task.image = {};
     task.image.cloudinaryUrl = selectedImageUrl;
   }
-  
-  if (task.category === 'Roadway') {
-    const ratedRoadwayGroups = new Set((task.ratings || []).filter(r => r.group).map(r => r.group));
-    const skippedGroups = new Set((task.skippedAssetTypes || []).map(s => s.assetType));
-    const requiredRoadwayGroups = ['Pavement', 'Shoulder', 'Kerb', 'Pavement Markings', 'ROW', 'Median Plantation'];
-    const isRoadwayCompleted = requiredRoadwayGroups.every(g => ratedRoadwayGroups.has(g) || skippedGroups.has(g));
-    
-    if (isRoadwayCompleted) {
-      task.status = 'COMPLETED';
-    } else {
-      task.status = 'IN_PROGRESS';
-    }
-  } else {
-    task.status = 'COMPLETED';
-  }
+  task.status = 'COMPLETED'; // Or 'RATED' based on the workflow
   await task.save();
 
   // Check if batch is completed
@@ -348,60 +309,33 @@ const saveTaskRatings = async (taskId, ratingsData, selectedImageUrl, user) => {
 /**
  * Export completed ratings to CSV
  */
-const exportRatingsCSV = async (projectId, batchId) => {
-  const query = { 
+const exportRatingsCSV = async (projectId) => {
+  const tasks = await InspectionTask.find({ 
     project: projectId, 
-    status: { $in: ['COMPLETED', 'SKIPPED'] }
-  };
-  
-  if (batchId) {
-    query.batchId = batchId;
-  }
-
-  const tasks = await InspectionTask.find(query)
+    status: 'COMPLETED' 
+  })
     .populate('parameters')
     .sort({ chainage: 1 });
 
   const headers = ['ASSET ID', 'PROJECT', 'CATEGORY', 'ASSET TYPE', 'CHAINAGE', 'DIRECTION', 'PARAMETER', 'SCORE', 'REMARK', 'IMAGE URL', 'RATED AT'];
   const rows = [];
   rows.push(headers.join(','));
-  
-  const skipHeaders = ['CATEGORY', 'ASSET TYPE', 'CHAINAGE', 'SKIP REASON', 'REMARKS', 'IMAGE URL'];
-  const skipRows = [];
-  skipRows.push(skipHeaders.join(','));
 
   tasks.forEach(task => {
     const assetId = (task._id || '').toString().slice(-6).toUpperCase();
+    const aType = task.assetSubType ? `${task.assetType} (${task.assetSubType})` : (task.assetType || '-');
     const project = task.project || '-';
     const chainage = task.chainage || '-';
     const imageUrl = task.image?.cloudinaryUrl || '-';
     const ratedAt = task.updatedAt ? new Date(task.updatedAt).toLocaleDateString('en-GB') : '-';
 
-    // Process Ratings
-    if (task.status === 'COMPLETED' && task.ratings && task.ratings.length > 0) {
+    if (task.ratings && task.ratings.length > 0) {
       task.ratings.forEach(rating => {
-        let category = '-';
-        let paramText = '-';
-        let direction = '-';
-        let aType = task.assetSubType ? `${task.assetType} (${task.assetSubType})` : (task.assetType || '-');
-
-        if (rating.masterListId) {
-          const param = task.parameters.find(p => p._id.toString() === rating.masterListId.toString());
-          category = param ? param.category : '-';
-          paramText = param ? param.parameter : '-';
-          direction = param && param.direction ? param.direction : '-';
-          if (param && param.assetType) {
-            aType = param.assetSubType ? `${param.assetType} (${param.assetSubType})` : param.assetType;
-          }
-        } else if (rating.parameterKey) {
-          category = task.category || 'Roadway';
-          // Correctly map Roadway group to Asset Type
-          if (category === 'Roadway' && rating.group) {
-            aType = rating.group;
-          }
-          paramText = rating.parameterName || rating.parameterKey;
-          direction = task.direction || '-';
-        }
+        // Find matching parameter
+        const param = task.parameters.find(p => p._id.toString() === rating.masterListId.toString());
+        const category = param ? param.category : '-';
+        const paramText = param ? param.parameter : '-';
+        const direction = param && param.direction ? param.direction : '-';
         
         const row = [
           `"${assetId}"`,
@@ -419,35 +353,9 @@ const exportRatingsCSV = async (projectId, batchId) => {
         rows.push(row.join(','));
       });
     }
-
-    // Process Skips
-    if (task.skippedAssetTypes && task.skippedAssetTypes.length > 0) {
-      task.skippedAssetTypes.forEach(skip => {
-        const skipRow = [
-          `"${task.category || '-'}"`,
-          `"${skip.assetType || '-'}"`,
-          `"${chainage}"`,
-          `"${(skip.reason || '').replace(/"/g, '""')}"`,
-          `"${(skip.remarks || '').replace(/"/g, '""')}"`,
-          `"${imageUrl}"`
-        ];
-        skipRows.push(skipRow.join(','));
-      });
-    } else if (task.status === 'SKIPPED' && task.skipMetadata) {
-      // Legacy / full task skip
-      const skipRow = [
-        `"${task.category || '-'}"`,
-        `"${task.assetType || '-'}"`,
-        `"${chainage}"`,
-        `"${(task.skipMetadata.reason || '').replace(/"/g, '""')}"`,
-        `"${(task.skipMetadata.remarks || '').replace(/"/g, '""')}"`,
-        `"${imageUrl}"`
-      ];
-      skipRows.push(skipRow.join(','));
-    }
   });
 
-  return rows.join('\n') + '\n\n' + '=== SKIP GALLERY / SKIPPED ASSETS ===\n\n' + skipRows.join('\n');
+  return rows.join('\n');
 };
 
 /**
@@ -462,7 +370,7 @@ const skipTask = async (taskId, skipData, user) => {
     const assignment = await WorkAssignment.findOne({
       batchId: task.batchId,
       assignedTo: user._id,
-      status: { $in: ['Assigned', 'In Progress', 'Completed'] }
+      status: { $in: ['Assigned', 'In Progress'] }
     });
 
     if (!assignment) {
@@ -477,60 +385,21 @@ const skipTask = async (taskId, skipData, user) => {
     }
   }
 
-  const reason = skipData.skipReason || skipData.reason;
-  if (!reason) {
+  if (!skipData.reason) {
     throw Object.assign(new Error('Skip reason is required'), { statusCode: 400 });
   }
 
-  if (reason === 'Other' && !skipData.remarks) {
+  if (skipData.reason === 'Other' && !skipData.remarks) {
     throw Object.assign(new Error('Remarks are required when skip reason is "Other"'), { statusCode: 400 });
   }
 
-  if (skipData.assetType) {
-    // Asset-level skip
-    if (!task.skippedAssetTypes) task.skippedAssetTypes = [];
-    
-    // Remove if already exists to update
-    task.skippedAssetTypes = task.skippedAssetTypes.filter(s => s.assetType !== skipData.assetType);
-    
-    task.skippedAssetTypes.push({
-      assetType: skipData.assetType,
-      reason: reason,
-      remarks: skipData.remarks || '',
-      skippedBy: user._id,
-      skippedAt: new Date()
-    });
-
-    if (task.category === 'Roadway') {
-      const ratedRoadwayGroups = new Set((task.ratings || []).filter(r => r.group).map(r => r.group));
-      const skippedGroups = new Set(task.skippedAssetTypes.map(s => s.assetType));
-      const requiredRoadwayGroups = ['Pavement', 'Shoulder', 'Kerb', 'Pavement Markings', 'ROW', 'Median Plantation'];
-      const isRoadwayCompleted = requiredRoadwayGroups.every(g => ratedRoadwayGroups.has(g) || skippedGroups.has(g));
-      
-      if (isRoadwayCompleted) {
-        task.status = 'COMPLETED';
-      } else {
-        task.status = 'IN_PROGRESS';
-      }
-    } else {
-      const totalAssetTypes = new Set((task.parameters || []).map(p => p.assetType)).size;
-      if (task.skippedAssetTypes.length >= totalAssetTypes) {
-        task.status = 'SKIPPED';
-      } else {
-        task.status = 'IN_PROGRESS';
-      }
-    }
-  } else {
-    // Legacy / Full task skip
-    task.status = 'SKIPPED';
-    task.skipMetadata = {
-      reason: reason,
-      remarks: skipData.remarks || '',
-      skippedBy: user._id,
-      skippedAt: new Date()
-    };
-  }
-  
+  task.status = 'SKIPPED';
+  task.skipMetadata = {
+    reason: skipData.reason,
+    remarks: skipData.remarks || '',
+    skippedBy: user._id,
+    skippedAt: new Date()
+  };
   await task.save();
 
   // Check if batch is completed

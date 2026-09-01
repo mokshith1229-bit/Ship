@@ -10,20 +10,10 @@ export const ratingService = {
   },
 
   /**
-   * Fetch ratable tasks for a specific batch, with optional pagination.
-   * @param {string} batchId
-   * @param {object} [opts] - { page, limit } for pagination; omit for full list
+   * Fetch all ratable tasks (with images) for a specific batch
    */
-  async getBatchTasks(batchId, opts = {}) {
-    const params = {};
-    if (opts.page) params.page = opts.page;
-    if (opts.limit) params.limit = opts.limit;
-    if (opts.category && opts.category !== 'All') params.category = opts.category;
-    if (opts.direction && opts.direction !== 'Choose Direction' && opts.direction !== 'All') params.direction = opts.direction;
-    if (opts.roadType && opts.roadType !== 'Choose Road Type' && opts.roadType !== 'All') params.roadType = opts.roadType;
-    if (opts.minChainage) params.minChainage = opts.minChainage;
-    if (opts.maxChainage) params.maxChainage = opts.maxChainage;
-    const response = await api.get(`/ratings/batches/${batchId}/tasks`, { params });
+  async getBatchTasks(batchId) {
+    const response = await api.get(`/ratings/batches/${batchId}/tasks`);
     return response.data;
   },
 
@@ -36,11 +26,10 @@ export const ratingService = {
   },
 
   /**
-   * Export all ratings for a project to CSV, optionally filtered by batch
+   * Export all ratings for a project to CSV
    */
-  async exportRatingsCSV(projectId, batchId) {
-    const url = batchId ? `/ratings/project/${projectId}/export?batchId=${batchId}` : `/ratings/project/${projectId}/export`;
-    const response = await api.get(url, {
+  async exportRatingsCSV(projectId) {
+    const response = await api.get(`/ratings/project/${projectId}/export`, {
       responseType: 'blob',
     });
     return response.data;
@@ -49,8 +38,8 @@ export const ratingService = {
   /**
    * Skip a task
    */
-  async skipTask(taskId, payload) {
-    const response = await api.post(`/ratings/tasks/${taskId}/skip`, payload);
+  async skipTask(taskId, reason, remarks = '') {
+    const response = await api.post(`/ratings/tasks/${taskId}/skip`, { reason, remarks });
     return response.data;
   }
 };

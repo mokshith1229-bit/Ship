@@ -18,6 +18,7 @@ const logger = winston.createLogger({
     json()
   ),
   transports: [
+    // Console transport
     new winston.transports.Console({
       format: combine(
         colorize({ all: true }),
@@ -26,27 +27,26 @@ const logger = winston.createLogger({
         consoleFormat
       )
     }),
-    // Only add file transports if NOT in Vercel (read-only filesystem)
-    ...(process.env.VERCEL ? [] : [
-      new winston.transports.File({
-        filename: path.join(__dirname, '../../logs/error.log'),
-        level: 'error',
-        maxsize: 5242880,
-        maxFiles: 5
-      }),
-      new winston.transports.File({
-        filename: path.join(__dirname, '../../logs/combined.log'),
-        maxsize: 5242880,
-        maxFiles: 5
-      })
-    ])
+    // Error file
+    new winston.transports.File({
+      filename: path.join(__dirname, '../../logs/error.log'),
+      level: 'error',
+      maxsize: 5242880, // 5MB
+      maxFiles: 5
+    }),
+    // Combined file
+    new winston.transports.File({
+      filename: path.join(__dirname, '../../logs/combined.log'),
+      maxsize: 5242880,
+      maxFiles: 5
+    })
   ],
-  exceptionHandlers: process.env.VERCEL ? [] : [
+  exceptionHandlers: [
     new winston.transports.File({
       filename: path.join(__dirname, '../../logs/exceptions.log')
     })
   ],
-  rejectionHandlers: process.env.VERCEL ? [] : [
+  rejectionHandlers: [
     new winston.transports.File({
       filename: path.join(__dirname, '../../logs/rejections.log')
     })

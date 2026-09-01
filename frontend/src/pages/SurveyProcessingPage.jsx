@@ -36,7 +36,7 @@ const SurveyProcessingPage = () => {
         
         {/* Header section */}
         <div className="flex items-center gap-3 mb-2">
-          <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
+          <div className="p-3 bg-green-50 text-green-600 rounded-xl">
             <MdOutlineVideoCameraFront className="text-2xl" />
           </div>
           <div>
@@ -49,7 +49,7 @@ const SurveyProcessingPage = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
             <h2 className="text-sm font-semibold text-gray-800">Pending Batches</h2>
-            <div className="text-xs font-medium bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full">
+            <div className="text-xs font-medium bg-green-100 text-green-800 px-2.5 py-1 rounded-full">
               {batches.length} Waiting
             </div>
           </div>
@@ -109,7 +109,7 @@ const SurveyProcessingPage = () => {
                           className={`inline-flex items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors text-sm ${
                             batch.status === 'FAILED'
                               ? 'bg-red-50 text-red-700 hover:bg-red-600 hover:text-white'
-                              : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white'
+                              : 'bg-green-50 text-green-700 hover:bg-green-600 hover:text-white'
                           }`}
                         >
                           <MdOutlineCloudUpload className="text-lg" />

@@ -75,6 +75,25 @@ const updateProject = async (id, data) => {
 };
 
 /**
+ * Marks a project as completed if not already completed
+ */
+const completeProject = async (code) => {
+  const project = await Project.findOne({ code: code.toUpperCase() });
+  if (!project) throw Object.assign(new Error('Project not found'), { statusCode: 404 });
+
+  if (project.status === 'COMPLETED') {
+    return project; // Already completed, avoid duplicate updates
+  }
+
+  project.status = 'COMPLETED';
+  project.completedAt = new Date();
+  project.endDate = new Date();
+  
+  await project.save();
+  return project;
+};
+
+/**
  * Gets project inspection statistics
  */
 const getProjectStats = async (projectId) => {
@@ -121,6 +140,7 @@ module.exports = {
   getProjectByCode,
   createProject,
   updateProject,
+  completeProject,
   getProjectStats,
   getStatusDistribution
 };

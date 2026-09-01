@@ -15,21 +15,18 @@ const inspectionBatchSchema = new mongoose.Schema(
       trim: true,
       index: true
     },
-    categories: [{
+    category: {
       type: String,
-      trim: true
-    }],
-    assetTypes: [{
-      type: String,
-      trim: true
-    }],
+      trim: true,
+      default: null
+    },
     samplingPercentage: {
       type: Number,
       required: true
     },
     samplingStrategy: {
       type: String,
-      enum: ['RANDOM', 'STRATIFIED', 'CUSTOM', 'CONTINUOUS'],
+      enum: ['RANDOM', 'STRATIFIED', 'CUSTOM'],
       default: 'RANDOM'
     },
     totalMasterQuestions: {
@@ -63,10 +60,6 @@ const inspectionBatchSchema = new mongoose.Schema(
       type: Date
     },
     reviewCompleted: {
-      type: Boolean,
-      default: false
-    },
-    isSamplingHistoryReset: {
       type: Boolean,
       default: false
     }

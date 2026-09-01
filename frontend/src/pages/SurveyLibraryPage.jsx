@@ -10,6 +10,8 @@ import {
   MdKeyboardArrowDown, MdEdit, MdAdd
 } from 'react-icons/md';
 import { LuPlay, LuLoader, LuFileText } from 'react-icons/lu';
+import Premium3DButton from '../components/common/Premium3DButton';
+import CustomDropdown from '../components/common/CustomDropdown';
 
 const SurveyLibraryPage = () => {
   const navigate = useNavigate();
@@ -35,7 +37,6 @@ const SurveyLibraryPage = () => {
   const [assetName, setAssetName] = useState('');
   const [roadDirection, setRoadDirection] = useState('LHS');
   const [roadType, setRoadType] = useState('All Types');
-  const [surveyType, setSurveyType] = useState('DAY');
   const [videoFile, setVideoFile] = useState(null);
   const [vttFile, setVttFile] = useState(null);
   const [savingAsset, setSavingAsset] = useState(false);
@@ -47,15 +48,6 @@ const SurveyLibraryPage = () => {
   useEffect(() => {
     fetchProjects();
   }, []);
-
-  // Live polling every 5 seconds to update asset statuses (Ready / Processing / Completed)
-  useEffect(() => {
-    if (!selectedProject) return;
-    const interval = setInterval(() => {
-      loadLibraryForProject(selectedProject);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [selectedProject]);
 
   const fetchProjects = async () => {
     try {
@@ -102,7 +94,6 @@ const SurveyLibraryPage = () => {
     setAssetName('');
     setRoadDirection('LHS');
     setRoadType('All Types');
-    setSurveyType('DAY');
     setVideoFile(null);
     setVttFile(null);
     setModalError('');
@@ -115,7 +106,6 @@ const SurveyLibraryPage = () => {
     setAssetName(asset.assetName);
     setRoadDirection(asset.roadDirection || 'LHS');
     setRoadType(asset.roadType || 'All Types');
-    setSurveyType(asset.surveyType || 'DAY');
     setVideoFile(null); // Clear file selection on edit, meaning keep existing if not changed
     setVttFile(null);
     setModalError('');
@@ -143,10 +133,10 @@ const SurveyLibraryPage = () => {
     setSavingAsset(true);
     try {
       if (modalMode === 'CREATE') {
-        const res = await surveyLibraryService.createAsset(selectedProject, assetName, roadDirection, roadType, surveyType, videoFile, vttFile);
+        const res = await surveyLibraryService.createAsset(selectedProject, assetName, roadDirection, roadType, videoFile, vttFile);
         setAssets(res.data);
       } else {
-        const res = await surveyLibraryService.updateAsset(selectedProject, editingAssetId, assetName, roadDirection, roadType, surveyType, videoFile, vttFile);
+        const res = await surveyLibraryService.updateAsset(selectedProject, editingAssetId, assetName, roadDirection, roadType, videoFile, vttFile);
         setAssets(res.data);
       }
       closeModal();
@@ -203,15 +193,14 @@ const SurveyLibraryPage = () => {
 
   const selectedProjectDisplay = selectedProject ? selectedProject : 'Select a Project...';
   
-  // Extraction button is enabled if at least one asset is READY or COMPLETED and NONE are PROCESSING
-  const isExtractingAny = assets.some(a => a.status === 'PROCESSING');
-  const canExtract = !isExtractingAny && assets.some(a => a.status === 'READY' || a.status === 'COMPLETED');
+  // Extraction button is enabled if at least one asset is READY or COMPLETED
+  const canExtract = assets.some(a => a.status === 'READY' || a.status === 'COMPLETED');
 
   return (
-    <div className="flex h-screen bg-gray-50 font-sans">
-      <Sidebar />
-      <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
-        <Navbar />
+    <div className="flex flex-col h-screen bg-gray-50 font-sans">
+      <Navbar />
+      <div className="flex flex-1 overflow-hidden relative">
+        <Sidebar />
         <main className="flex-1 overflow-y-auto p-6 scrollbar-hide">
           <div className="max-w-6xl mx-auto space-y-6">
             
@@ -263,12 +252,12 @@ const SurveyLibraryPage = () => {
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-sm font-bold text-textColor">2. Survey Assets</h2>
-                    <button 
+                    <Premium3DButton 
                       onClick={openCreateModal}
-                      className="text-xs font-bold text-white bg-primary hover:bg-green-700 px-4 py-2 rounded-lg flex items-center gap-1 transition-colors shadow-sm"
+                      className="!w-auto !py-2 !h-auto min-h-[38px] text-xs"
                     >
                       <MdAdd className="text-base"/> Add Survey Asset
-                    </button>
+                    </Premium3DButton>
                   </div>
                   
                   <div className="overflow-x-auto">
@@ -370,29 +359,19 @@ const SurveyLibraryPage = () => {
                         Extraction requires at least one Survey Asset to be fully uploaded, parsed, and READY.
                       </p>
                       
-                      {!canExtract && !isExtractingAny && (
+                      {!canExtract && (
                         <div className="mb-4 text-xs font-medium text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200 w-full text-center">
                           ⚠️ Extraction is currently locked. No READY assets found.
                         </div>
                       )}
                       
-                      {isExtractingAny && (
-                        <div className="mb-4 text-xs font-medium text-blue-700 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200 w-full text-center">
-                          ℹ️ Extraction is currently in progress. Please wait for it to complete.
-                        </div>
-                      )}
-                      
-                      <button 
+                      <Premium3DButton 
                         onClick={handleExtract}
                         disabled={!canExtract}
-                        className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm transition-all ${
-                          !canExtract
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                            : 'bg-primary text-white hover:bg-green-700 hover:shadow'
-                        }`}
+                        className="w-full !py-3 !h-auto rounded-xl shadow-sm text-base"
                       >
                         <LuPlay className="text-lg" /> Extract Images
-                      </button>
+                      </Premium3DButton>
                     </div>
                   )}
                 </div>
@@ -442,49 +421,25 @@ const SurveyLibraryPage = () => {
 
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">Road Direction *</label>
-                <div className="relative">
-                  <select
-                    value={roadDirection}
-                    onChange={(e) => setRoadDirection(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-textColor focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 appearance-none bg-white"
-                  >
-                    <option value="LHS">LHS (Left Hand Side)</option>
-                    <option value="RHS">RHS (Right Hand Side)</option>
-                  </select>
-                  <MdKeyboardArrowDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                </div>
+                <CustomDropdown
+                  options={[
+                    { label: 'LHS (Left Hand Side)', value: 'LHS' },
+                    { label: 'RHS (Right Hand Side)', value: 'RHS' }
+                  ]}
+                  value={roadDirection}
+                  onChange={(val) => setRoadDirection(val)}
+                  className="w-full"
+                />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">Road Type</label>
-                <div className="relative">
-                  <select
-                    value={roadType}
-                    onChange={(e) => setRoadType(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-textColor focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 appearance-none bg-white"
-                  >
-                    <option value="All Types">All Types</option>
-                    {roadTypes.map((rt) => (
-                      <option key={rt} value={rt}>{rt}</option>
-                    ))}
-                  </select>
-                  <MdKeyboardArrowDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Survey Type *</label>
-                <div className="relative">
-                  <select
-                    value={surveyType}
-                    onChange={(e) => setSurveyType(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-textColor focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 appearance-none bg-white"
-                  >
-                    <option value="DAY">DAY (Standard)</option>
-                    <option value="NIGHT">NIGHT</option>
-                  </select>
-                  <MdKeyboardArrowDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                </div>
+                <CustomDropdown
+                  options={['All Types', ...roadTypes]}
+                  value={roadType}
+                  onChange={(val) => setRoadType(val)}
+                  className="w-full"
+                />
               </div>
 
               <div>
@@ -523,11 +478,11 @@ const SurveyLibraryPage = () => {
                 <button 
                   onClick={() => vttInputRef.current?.click()}
                   className={`w-full flex items-center justify-between px-3 py-2 border rounded-lg text-sm transition-colors ${
-                    vttFile ? 'border-blue-300 bg-blue-50 text-blue-700 font-medium' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                    vttFile ? 'border-green-300 bg-green-50 text-green-700 font-medium' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
                   }`}
                 >
                   <span className="truncate">{vttFile ? vttFile.name : 'Choose VTT'}</span>
-                  {vttFile && <span className="text-blue-600 font-bold ml-2">✓</span>}
+                  {vttFile && <span className="text-green-600 font-bold ml-2">✓</span>}
                 </button>
               </div>
 
@@ -541,14 +496,14 @@ const SurveyLibraryPage = () => {
               >
                 Cancel
               </button>
-              <button 
+              <Premium3DButton 
                 onClick={handleSaveAsset}
                 disabled={savingAsset}
-                className="px-5 py-2 text-xs font-bold text-white bg-primary hover:bg-green-700 rounded-lg transition-colors shadow-sm flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                className="!w-auto !py-2 !h-auto min-h-[36px] text-xs"
               >
-                {savingAsset && <LuLoader className="animate-spin text-sm" />}
+                {savingAsset && <LuLoader className="animate-spin text-sm mr-2 inline" />}
                 {modalMode === 'CREATE' ? 'Save Survey Asset' : 'Update Survey Asset'}
-              </button>
+              </Premium3DButton>
             </div>
           </div>
         </div>

@@ -13,17 +13,16 @@ const RoadSummaryPage = () => {
   const { roadId } = useParams();
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedCategory, setSelectedCategory] = useState('Roadway');
   const [direction, setDirection] = useState('Choose Direction');
   const [roadType, setRoadType] = useState('Choose Road Type');
   const [paramType, setParamType] = useState('Choose');
   const [minChainage, setMinChainage] = useState('');
   const [maxChainage, setMaxChainage] = useState('');
   const [concernedItems, setConcernedItems] = useState(false);
-  const [goToPageInput, setGoToPageInput] = useState('');
   
   const [appliedFilters, setAppliedFilters] = useState({
-    category: 'All',
+    category: 'Roadway',
     minChainage: '',
     maxChainage: '',
     direction: 'Choose Direction',
@@ -44,121 +43,130 @@ const RoadSummaryPage = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [navigate]);
+  
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeBatchId, setActiveBatchId] = useState(null);
-  const [loadingProgress, setLoadingProgress] = useState({ loaded: 0, total: 0 });
-
-  const [serverTotalPages, setServerTotalPages] = useState(1);
-  const [totalRecords, setTotalRecords] = useState(0);
-
-  // Fetch a single page from the API based on current filters and page
-  const fetchPageData = async (batchId, page, filters, signal) => {
-    try {
-      setLoading(true);
-      const PAGE_SIZE = 10;
-      
-      const options = {
-        page,
-        limit: PAGE_SIZE,
-        ...filters
-      };
-
-      const result = await ratingService.getBatchTasks(batchId, options);
-      if (signal && signal.aborted) return;
-      
-      const paginatedData = result?.data || result;
-      const fetchedTasks = paginatedData?.tasks || (Array.isArray(paginatedData) ? paginatedData : []);
-      const total = paginatedData?.total || 0;
-      const totalPages = paginatedData?.totalPages || 1;
-
-      setTotalRecords(total);
-      setServerTotalPages(totalPages);
-
-      const tasksAsAssets = fetchedTasks.map((task, localIndex) => {
-        const firstParam = task.parameters?.[0] || {};
-        return {
-          _id: task._id,
-          assetId: (task._id || '').toString().slice(-6).toUpperCase(),
-          project: task.project || firstParam.project,
-          category: task.category || firstParam.category || '-',
-          assetType: task.assetSubType ? `${task.assetType} (${task.assetSubType})` : (task.assetType || firstParam.assetType || '-'),
-          chainage: task.chainage,
-          parameterCount: (task.category === 'Roadway' || task.category === 'Structures' || task.category === 'Project Facilities' || task.category === 'ATMS') ? (task.ratings?.length || 0) : (task.parameters?.length || 0),
-          taskGlobalIndex: ((page - 1) * PAGE_SIZE) + localIndex,
-          status: task.status,
-          createdAt: task.createdAt,
-          direction: task.direction || firstParam.direction || '-',
-          roadType: task.roadType || firstParam.roadType || '-',
-          parameterCategories: (task.parameters || []).map(p => p.category)
-        };
-      });
-      setQuestions(tasksAsAssets);
-    } catch (err) {
-      if (err.name !== 'CanceledError' && err.name !== 'AbortError') {
-        console.error(err);
-      }
-    } finally {
-      if (!signal || !signal.aborted) {
-        setLoading(false);
-      }
-    }
-  };
-
+  
   useEffect(() => {
-    const fetchBatches = async () => {
+    const fetchTasks = async () => {
       try {
         setLoading(true);
         const batchesRes = await ratingService.getReadyBatches();
         const batches = Array.isArray(batchesRes) ? batchesRes : (batchesRes?.data || []);
         
-        const projectBatches = batches.filter(b => b.project === roadId && (b.status === 'READY_FOR_RATING' || b.status === 'IN_PROGRESS' || b.status === 'COMPLETED'));
+        const projectBatches = batches.filter(b => b.project === roadId && (b.status === 'READY_FOR_RATING' || b.status === 'IN_PROGRESS'));
         if (projectBatches.length > 0) {
           projectBatches.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
           setProjectBatches(projectBatches);
           
           const latestBatch = projectBatches[0];
           setActiveBatchId(latestBatch._id);
-          const dateStr = new Date(latestBatch.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-          setVersion(`${dateStr} - ${latestBatch.name || 'Unnamed'}`);
+          setVersion(new Date(latestBatch.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }));
+          
+          const data = await ratingService.getBatchTasks(latestBatch._id);
+          const fetchedTasks = Array.isArray(data) ? data : (data?.data || []);
+          
+          const tasksAsAssets = fetchedTasks.map((task, globalIndex) => {
+            const firstParam = task.parameters?.[0] || {};
+            return {
+              _id: task._id,
+              assetId: (task._id || '').toString().slice(-6).toUpperCase(),
+              project: task.project || firstParam.project,
+              category: firstParam.category || '-',
+              assetType: task.assetSubType ? `${task.assetType} (${task.assetSubType})` : (task.assetType || firstParam.assetType || '-'),
+              chainage: task.chainage,
+              parameterCount: task.parameters?.length || 0,
+              taskGlobalIndex: globalIndex,
+              status: task.status,
+              createdAt: task.createdAt,
+              direction: firstParam.direction || '-',
+              roadType: firstParam.roadType || '-'
+            };
+          });
+          setQuestions(tasksAsAssets);
         } else {
           setQuestions([]);
-          setLoading(false);
         }
       } catch (err) {
         console.error(err);
+      } finally {
         setLoading(false);
       }
     };
     if (roadId) {
-      fetchBatches();
+      fetchTasks();
     }
   }, [roadId]);
 
   useEffect(() => {
     if (version !== 'Choose' && projectBatches.length > 0) {
-      const selectedBatch = projectBatches.find(b => {
-        const dateStr = new Date(b.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-        return `${dateStr} - ${b.name || 'Unnamed'}` === version;
-      }) || projectBatches[0];
+      const selectedBatch = projectBatches.find(b => 
+        new Date(b.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) === version
+      ) || projectBatches[0];
       
       if (selectedBatch && selectedBatch._id !== activeBatchId) {
         setActiveBatchId(selectedBatch._id);
-        setCurrentPage(1); // Reset page on version change
+        setLoading(true);
+        ratingService.getBatchTasks(selectedBatch._id)
+          .then(data => {
+            const fetchedTasks = Array.isArray(data) ? data : (data?.data || []);
+            const tasksAsAssets = fetchedTasks.map((task, globalIndex) => {
+              const firstParam = task.parameters?.[0] || {};
+              return {
+                _id: task._id,
+                assetId: (task._id || '').toString().slice(-6).toUpperCase(),
+                project: task.project || firstParam.project,
+                category: firstParam.category || '-',
+                assetType: task.assetSubType ? `${task.assetType} (${task.assetSubType})` : (task.assetType || firstParam.assetType || '-'),
+                chainage: task.chainage,
+                parameterCount: task.parameters?.length || 0,
+                taskGlobalIndex: globalIndex,
+                status: task.status,
+                createdAt: task.createdAt,
+                direction: firstParam.direction || '-',
+                roadType: firstParam.roadType || '-'
+              };
+            });
+            setQuestions(tasksAsAssets);
+          })
+          .catch(console.error)
+          .finally(() => setLoading(false));
       }
     }
-  }, [version, projectBatches]);
+  }, [version, projectBatches, activeBatchId]);
 
-  useEffect(() => {
-    if (activeBatchId) {
-      const ctrl = new AbortController();
-      fetchPageData(activeBatchId, currentPage, appliedFilters, ctrl.signal);
-      return () => ctrl.abort();
+  let currentData = questions;
+  
+  // Apply filters based on appliedFilters state
+  if (appliedFilters.category && appliedFilters.category !== 'All') {
+    currentData = currentData.filter(q => q.category === appliedFilters.category);
+  }
+  if (appliedFilters.direction && appliedFilters.direction !== 'Choose Direction' && appliedFilters.direction !== 'All') {
+    currentData = currentData.filter(q => q.direction === appliedFilters.direction);
+  }
+  if (appliedFilters.roadType && appliedFilters.roadType !== 'Choose Road Type' && appliedFilters.roadType !== 'All') {
+    currentData = currentData.filter(q => q.roadType === appliedFilters.roadType);
+  }
+  if (appliedFilters.minChainage) {
+    const min = parseFloat(appliedFilters.minChainage);
+    if (!isNaN(min)) {
+      currentData = currentData.filter(q => parseFloat(q.chainage) >= min);
     }
-  }, [activeBatchId, currentPage, appliedFilters]);
-
-  let currentItems = questions;
-  let totalPages = serverTotalPages;
+  }
+  if (appliedFilters.maxChainage) {
+    const max = parseFloat(appliedFilters.maxChainage);
+    if (!isNaN(max)) {
+      currentData = currentData.filter(q => parseFloat(q.chainage) <= max);
+    }
+  }
+  
+  let totalPages = Math.ceil(currentData.length / 10) || 1;
+  
+  // Apply Pagination
+  const indexOfLastItem = currentPage * 10;
+  const indexOfFirstItem = indexOfLastItem - 10;
+  const currentItems = currentData.slice(indexOfFirstItem, indexOfLastItem);
   
   const handleGetRatings = () => {
     setAppliedFilters({
@@ -172,21 +180,10 @@ const RoadSummaryPage = () => {
     });
     setCurrentPage(1);
   };
-
-  const handleGoToPage = (e) => {
-    e.preventDefault();
-    const pageNum = parseInt(goToPageInput, 10);
-    if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= totalPages) {
-      setCurrentPage(pageNum);
-      setGoToPageInput('');
-    } else if (goToPageInput.trim() !== '') {
-      alert(`Please enter a valid page number between 1 and ${totalPages}`);
-    }
-  };
   
   const handleExportCSV = async () => {
     try {
-      const response = await ratingService.exportRatingsCSV(roadId, activeBatchId);
+      const response = await ratingService.exportRatingsCSV(roadId);
       const blob = new Blob([response], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -233,7 +230,7 @@ const RoadSummaryPage = () => {
 
       <div className="p-6 flex flex-col flex-1 overflow-hidden">
         {/* Filters */}
-        <div className="grid grid-cols-7 gap-4 mb-6 shrink-0">
+        <div className="grid grid-cols-6 gap-4 mb-6 shrink-0">
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Category :</label>
             <CustomDropdown
@@ -290,23 +287,6 @@ const RoadSummaryPage = () => {
               placeholder="Parameter Type"
             />
           </div>
-          <div>
-            <label className="block text-[11px] font-medium text-gray-700 mb-1">Go to Page :</label>
-            <form onSubmit={handleGoToPage} className="flex gap-2">
-              <input 
-                type="number" 
-                min="1" 
-                max={totalPages}
-                value={goToPageInput} 
-                onChange={(e) => setGoToPageInput(e.target.value)} 
-                placeholder="Page #" 
-                className="w-full border border-[#5cb85c] rounded px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-[#5cb85c] focus:ring-1 focus:ring-[#5cb85c]/50 transition-all" 
-              />
-              <button type="submit" className="bg-gray-100 border border-gray-300 hover:bg-gray-200 text-gray-700 font-medium py-1.5 px-3 rounded text-sm transition-colors">
-                Go
-              </button>
-            </form>
-          </div>
         </div>
 
         {/* Actions */}
@@ -316,13 +296,10 @@ const RoadSummaryPage = () => {
             <label htmlFor="concerned" className="text-sm font-medium text-gray-700">Concerned Items</label>
           </div>
           
-          <div className="min-w-[150px] max-w-[300px]">
+          <div className="w-[120px]">
             <label className="block text-xs font-medium text-gray-700 mb-1 text-center">Version:</label>
             <CustomDropdown
-              options={projectBatches.length > 0 ? projectBatches.map(b => {
-                const dateStr = new Date(b.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-                return `${dateStr} - ${b.name || 'Unnamed'}`;
-              }) : ['Choose']}
+              options={projectBatches.length > 0 ? projectBatches.map(b => new Date(b.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })) : ['Choose']}
               value={version}
               onChange={setVersion}
               placeholder="Version"
@@ -356,18 +333,7 @@ const RoadSummaryPage = () => {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="8" className="text-center py-10">
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="w-7 h-7 border-4 border-[#5cb85c] border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-sm text-gray-500">
-                      Loading tasks...
-                    </span>
-                  </div>
-                </td></tr>
-              ) : currentItems.length === 0 ? (
-                <tr><td colSpan="8" className="text-center py-10">
-                  <span className="text-sm text-gray-500">No tasks found.</span>
-                </td></tr>
+                <tr><td colSpan="8" className="text-center py-8">Loading...</td></tr>
               ) : currentItems.map((q, index) => {
                 return (
                 <tr 
@@ -387,11 +353,7 @@ const RoadSummaryPage = () => {
                 >
                   <td className="px-4 py-3 text-gray-900 font-medium">{q.assetId}</td>
                   <td className="px-4 py-3 text-gray-600">{q.project}</td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {appliedFilters.category !== 'All' && q.parameterCategories?.includes(appliedFilters.category) 
-                      ? appliedFilters.category 
-                      : q.category}
-                  </td>
+                  <td className="px-4 py-3 text-gray-600">{q.category}</td>
                   <td className="px-4 py-3 text-gray-600">{q.assetType}</td>
                   <td className="px-4 py-3 text-gray-600">{q.chainage}</td>
                   <td className="px-4 py-3 text-gray-600">{q.parameterCount} Params</td>

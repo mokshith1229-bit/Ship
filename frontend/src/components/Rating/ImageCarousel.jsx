@@ -9,9 +9,10 @@ const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode
   
   // Fullscreen specific states
   const [rotation, setRotation] = useState(0);
-  
-  // Magnifier specific states
-  const [zoomState, setZoomState] = useState({ show: false, x: 0, y: 0, imgUrl: '' });
+
+  // Zoom Magnifier states
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [backgroundPos, setBackgroundPos] = useState('50% 50%');
 
   const nextImage = useCallback(() => {
     if (onIndexChange) {
@@ -155,54 +156,44 @@ const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode
                   </div>
 
                   <div 
-                    className="w-full h-full overflow-hidden rounded-[24px] cursor-pointer relative"
-                    onClick={() => {
+                    className={`w-full h-full overflow-hidden rounded-[24px] relative ${distance === 0 ? 'cursor-crosshair' : 'cursor-pointer'}`}
+                    onClick={(e) => {
+                      if (distance !== 0) return;
+                      // Only allow full screen if clicking the button? No, allow full screen on click too.
+                      // Wait, previous code allowed click to fullscreen.
                       setFullScreenIndex(index);
                       setRotation(0);
                     }}
-                    onMouseEnter={(e) => {
-                      if (distance === 0 && window.innerWidth >= 768) {
-                        setZoomState(prev => ({ ...prev, show: true, imgUrl: img.url || img }));
-                      }
-                    }}
-                    onMouseLeave={() => {
-                      if (distance === 0) {
-                        setZoomState(prev => ({ ...prev, show: false }));
-                      }
-                    }}
+                    onMouseEnter={() => { if (distance === 0) setIsZoomed(true); }}
+                    onMouseLeave={() => { if (distance === 0) setIsZoomed(false); }}
                     onMouseMove={(e) => {
-                      if (distance === 0 && window.innerWidth >= 768) {
+                      if (distance === 0) {
                         const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
-                        const x = (e.clientX - left) / width;
-                        const y = (e.clientY - top) / height;
-                        setZoomState({ 
-                          show: true, 
-                          x: Math.max(0, Math.min(1, x)), 
-                          y: Math.max(0, Math.min(1, y)), 
-                          imgUrl: img.url || img 
-                        });
+                        const x = ((e.clientX - left) / width) * 100;
+                        const y = ((e.clientY - top) / height) * 100;
+                        setBackgroundPos(`${x}% ${y}%`);
                       }
                     }}
                   >
                     <motion.img 
                       src={img.url || img} 
                       alt={`Road view ${index + 1}`} 
-                      className="w-full h-full object-cover"
-                      style={
-                        distance === 0 && zoomState.show
-                          ? {
-                              transform: 'scale(3.5)',
-                              transformOrigin: `${zoomState.x * 100}% ${zoomState.y * 100}%`,
-                              transition: 'transform 0.2s ease-out'
-                            }
-                          : {
-                              transform: 'scale(1)',
-                              transformOrigin: 'center center',
-                              transition: 'transform 0.4s ease-out'
-                            }
-                      }
+                      className={`w-full h-full object-cover transition-opacity duration-300 ease-out group-hover:scale-[1.03] ${distance === 0 && isZoomed ? 'opacity-0' : 'opacity-100'}`}
                       draggable={false}
                     />
+
+                    {/* Zoomed Magnifier Overlay */}
+                    {distance === 0 && (
+                      <div 
+                        className={`absolute inset-0 z-20 pointer-events-none transition-opacity duration-300 ${isZoomed ? 'opacity-100' : 'opacity-0'}`}
+                        style={{
+                          backgroundImage: `url(${img.url || img})`,
+                          backgroundPosition: backgroundPos,
+                          backgroundSize: '250%',
+                          backgroundRepeat: 'no-repeat'
+                        }}
+                      />
+                    )}
                     
                     {/* Fullscreen Button */}
                     <button
@@ -221,7 +212,6 @@ const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode
             })}
           </div>
         </div>
-        
       </div>
 
       {/* Fullscreen Modal */}
