@@ -3,12 +3,8 @@ import { motion } from 'framer-motion';
 import { ResponsiveContainer, LineChart, Line, AreaChart, Area } from 'recharts';
 import { 
   MdMap, MdStarRate, MdCheckCircle, MdPendingActions, 
-  MdWarning, MdHealthAndSafety, MdTrendingUp, MdUpdate 
+  MdWarning, MdHealthAndSafety, MdTrendingUp, MdUpdate, MdCalendarToday
 } from 'react-icons/md';
-
-const sparklineData1 = [{v: 10},{v: 15},{v: 13},{v: 18},{v: 25},{v: 22},{v: 30}];
-const sparklineData2 = [{v: 30},{v: 25},{v: 35},{v: 28},{v: 40},{v: 45},{v: 50}];
-const sparklineData3 = [{v: 50},{v: 45},{v: 30},{v: 20},{v: 15},{v: 10},{v: 5}]; // going down
 
 const KPICard = ({ item, index }) => {
   return (
@@ -59,49 +55,65 @@ const KPICards = ({ selectedProject }) => {
       });
     }
   }, [selectedProject]);
-
-  if (!data) return null;
-
+  if (!data) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {[...Array(8)].map((_, i) => (
+          <div key={i} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm h-[142px] animate-pulse flex flex-col justify-between">
+            <div className="flex justify-between items-start">
+              <div className="w-10 h-10 rounded-lg bg-gray-200"></div>
+              <div className="w-12 h-5 rounded-full bg-gray-200"></div>
+            </div>
+            <div className="w-24 h-3 bg-gray-200 rounded mt-2"></div>
+            <div className="flex items-end justify-between mt-1">
+              <div className="w-16 h-8 bg-gray-300 rounded"></div>
+            </div>
+            <div className="h-10 w-full mt-2 bg-gray-100 rounded"></div>
+          </div>
+        ))}
+      </div>
+    );
+  }
   const kpiData = [
     { 
       title: 'Total Roads', value: data.totalRoads || 0, trend: 'N/A', isPositive: true, 
       icon: <MdMap className="text-blue-500" />, bg: 'bg-blue-50', 
-      sparkline: data.sparklines?.totalRatings || sparklineData1, color: '#3b82f6'
+      sparkline: data.sparklines?.totalRatings || [], color: '#3b82f6'
     },
     { 
       title: 'Total Inspections', value: data.totalRatings || 0, trend: 'Live', isPositive: true, 
       icon: <MdStarRate className="text-indigo-500" />, bg: 'bg-indigo-50', 
-      sparkline: data.sparklines?.totalRatings || sparklineData2, color: '#6366f1'
+      sparkline: data.sparklines?.totalRatings || [], color: '#6366f1'
     },
     { 
       title: 'Completed Inspections', value: data.completedRatings || 0, trend: 'Live', isPositive: true, 
       icon: <MdCheckCircle className="text-green-500" />, bg: 'bg-green-50', 
-      sparkline: data.sparklines?.completedRatings || sparklineData2, color: '#22c55e'
+      sparkline: data.sparklines?.completedRatings || [], color: '#22c55e'
     },
     { 
       title: 'Pending Inspections', value: data.pendingRatings || 0, trend: 'Live', isPositive: true, 
       icon: <MdPendingActions className="text-orange-500" />, bg: 'bg-orange-50', 
-      sparkline: data.sparklines?.pendingRatings || sparklineData3, color: '#f97316'
+      sparkline: data.sparklines?.pendingRatings || [], color: '#f97316'
     },
     { 
-      title: 'Critical Issues', value: data.criticalIssues || 0, trend: 'Alert', isPositive: false, 
+      title: 'Critical Issues', value: data.criticalIssues || 0, trend: 'Live', isPositive: false, 
       icon: <MdWarning className="text-red-500" />, bg: 'bg-red-50', 
-      sparkline: data.sparklines?.criticalIssues || sparklineData1, color: '#ef4444'
+      sparkline: data.sparklines?.criticalIssues || [], color: '#ef4444'
     },
     { 
-      title: 'Perfect 10 Ratings', value: `${data.perfect10Percentage || 0}%`, trend: 'Live', isPositive: true, 
-      icon: <MdHealthAndSafety className="text-teal-500" />, bg: 'bg-teal-50', 
-      sparkline: data.sparklines?.avgHealthScore || sparklineData2, color: '#14b8a6'
+      title: 'Perfect 10 Ratings', value: `${data.perfect10Percentage || 0}%`, trend: 'N/A', isPositive: true, 
+      icon: <MdTrendingUp className="text-teal-500" />, bg: 'bg-teal-50', 
+      sparkline: data.sparklines?.avgHealthScore || [], color: '#14b8a6'
     },
     { 
       title: 'Monthly Progress', value: `${data.monthlyProgress || 0}%`, trend: 'Live', isPositive: true, 
-      icon: <MdTrendingUp className="text-purple-500" />, bg: 'bg-purple-50', 
-      sparkline: data.sparklines?.monthlyProgress || sparklineData1, color: '#a855f7'
+      icon: <MdCalendarToday className="text-purple-500" />, bg: 'bg-purple-50', 
+      sparkline: data.sparklines?.monthlyProgress || [], color: '#a855f7'
     },
     { 
       title: 'Last Updated', value: data.lastUpdated ? new Date(data.lastUpdated).toLocaleDateString() : 'N/A', trend: 'Live', isPositive: true, 
       icon: <MdUpdate className="text-gray-500" />, bg: 'bg-gray-50', 
-      sparkline: data.sparklines?.totalRatings || sparklineData1, color: '#6b7280'
+      sparkline: data.sparklines?.totalRatings || [], color: '#6b7280'
     },
   ];
 

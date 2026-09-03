@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import Premium3DButton from '../../components/common/Premium3DButton';
 import { useNavigate } from 'react-router-dom';
 import { masterListService } from '../../services/masterList.service';
 import { structureEngineService } from '../../services/structureEngine.service';
 import Layout from '../../components/Layout';
 import { MdAddRoad, MdOutlinePrecisionManufacturing } from 'react-icons/md';
+import CustomDropdown from '../../components/common/CustomDropdown';
 
 export default function StructureSamplingPage() {
   const navigate = useNavigate();
@@ -149,8 +151,8 @@ export default function StructureSamplingPage() {
     <Layout>
       <div className="max-w-5xl mx-auto w-full">
         <div className="flex items-center gap-3 mb-6">
-          <div className="h-10 w-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center">
-            <MdAddRoad size={24} />
+          <div className="p-3 bg-green-50 text-green-600 rounded-xl">
+            <MdAddRoad className="text-2xl" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-800 tracking-tight">Structures Sampling</h1>
@@ -171,6 +173,19 @@ export default function StructureSamplingPage() {
           <div className="flex flex-col gap-5">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
+                <CustomDropdown
+                  options={projects}
+                  value={selectedProject}
+                  onChange={(val) => {
+                    setSelectedProject(val);
+                    setPreview(null);
+                  }}
+                  placeholder="Select Project"
+                />
+              </div>
+
+              <div className="flex-1">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Upload Structure Excel</label>
                 <div className="flex items-center gap-2">
                   <input
@@ -181,8 +196,8 @@ export default function StructureSamplingPage() {
                       file:mr-4 file:py-2 file:px-4
                       file:rounded-md file:border-0
                       file:text-sm file:font-semibold
-                      file:bg-indigo-50 file:text-indigo-700
-                      hover:file:bg-indigo-100
+                      file:bg-green-50 file:text-green-700
+                      hover:file:bg-green-100
                     "
                   />
                 </div>
@@ -199,7 +214,7 @@ export default function StructureSamplingPage() {
                     setPreview(null);
                   }}
                   placeholder="e.g. 20"
-                  className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                 />
               </div>
             </div>
@@ -208,23 +223,15 @@ export default function StructureSamplingPage() {
             <div className="flex flex-col md:flex-row gap-4 mt-2">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Structure Type Filter (Optional)</label>
-                <select
+                <CustomDropdown
+                  options={['All Structures', 'Major Bridge', 'Minor Bridge', 'Box Culvert', 'Pipe Culvert', 'PUP', 'VUP', 'LVUP']}
                   value={structureTypeFilter}
-                  onChange={(e) => {
-                    setStructureTypeFilter(e.target.value);
+                  onChange={(val) => {
+                    setStructureTypeFilter(val);
                     setPreview(null);
                   }}
-                  className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                >
-                  <option value="All Structures">All Structures</option>
-                  <option value="Major Bridge">Major Bridge</option>
-                  <option value="Minor Bridge">Minor Bridge</option>
-                  <option value="Box Culvert">Box Culvert</option>
-                  <option value="Pipe Culvert">Pipe Culvert</option>
-                  <option value="PUP">PUP</option>
-                  <option value="VUP">VUP</option>
-                  <option value="LVUP">LVUP</option>
-                </select>
+                  placeholder="Select Type"
+                />
               </div>
               <div className="flex-1">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Min Chainage (Optional)</label>
@@ -237,7 +244,7 @@ export default function StructureSamplingPage() {
                     setPreview(null);
                   }}
                   placeholder="e.g. 280.000"
-                  className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                 />
               </div>
               <div className="flex-1">
@@ -251,20 +258,20 @@ export default function StructureSamplingPage() {
                     setPreview(null);
                   }}
                   placeholder="e.g. 300.000"
-                  className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                 />
               </div>
             </div>
 
             {!detectedSheets && (
               <div className="mt-4 flex justify-end">
-                <button
+                <Premium3DButton
                   onClick={handleDetectSheets}
                   disabled={loading || !file}
-                  className="px-6 py-2 bg-gray-800 text-white font-medium rounded-lg hover:bg-gray-900 disabled:opacity-50 transition-colors"
+                  className="!w-auto flex items-center justify-center gap-2"
                 >
                   {loading ? 'Detecting Sheets...' : 'Detect Sheets'}
-                </button>
+                </Premium3DButton>
               </div>
             )}
           </div>
@@ -285,13 +292,13 @@ export default function StructureSamplingPage() {
                     <div 
                       key={idx}
                       onClick={() => toggleSheetSelection(sheet)}
-                      className={`p-3 rounded-lg border cursor-pointer flex items-center gap-3 transition-colors ${isSelected ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
+                      className={`p-3 rounded-lg border cursor-pointer flex items-center gap-3 transition-colors ${isSelected ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
                     >
                       <input 
                         type="checkbox" 
                         checked={isSelected}
                         onChange={() => {}}
-                        className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                        className="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
                       />
                       <div>
                         <div className="font-semibold text-gray-800 text-sm">{sheet.sheetName}</div>
@@ -304,28 +311,28 @@ export default function StructureSamplingPage() {
             )}
 
             <div className="mt-6 flex justify-end">
-              <button
+              <Premium3DButton
                 onClick={handlePreview}
                 disabled={loading || selectedSheets.length === 0}
-                className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                className="!w-auto flex items-center justify-center gap-2"
               >
                 {loading && !preview ? 'Parsing Sheets...' : 'Parse & Preview'}
-              </button>
+              </Premium3DButton>
             </div>
           </div>
         )}
 
         {preview && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center gap-2 mb-4 text-indigo-700 font-bold">
+            <div className="flex items-center gap-2 mb-4 text-green-700 font-bold">
               <MdOutlinePrecisionManufacturing size={20} />
               <h3>Validation Preview</h3>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                <div className="text-xs text-indigo-700 font-medium uppercase tracking-wider mb-1">Structures Found</div>
-                <div className="text-2xl font-bold text-indigo-700">{preview.validStructuresCount}</div>
+              <div className="bg-green-50 p-4 rounded-xl border border-green-100">
+                <div className="text-xs text-green-700 font-medium uppercase tracking-wider mb-1">Structures Found</div>
+                <div className="text-2xl font-bold text-green-700">{preview.validStructuresCount}</div>
               </div>
               
               <div className="bg-green-50 p-4 rounded-xl border border-green-100">
@@ -333,9 +340,9 @@ export default function StructureSamplingPage() {
                 <div className="text-2xl font-bold text-green-700">{preview.totalInspectionPoints}</div>
               </div>
 
-              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                <div className="text-xs text-blue-700 font-medium uppercase tracking-wider mb-1">Total Questions</div>
-                <div className="text-2xl font-bold text-blue-700">{preview.totalQuestionsGenerated !== undefined ? preview.totalQuestionsGenerated : '?'}</div>
+              <div className="bg-green-50 p-4 rounded-xl border border-green-100">
+                <div className="text-xs text-green-700 font-medium uppercase tracking-wider mb-1">Total Questions</div>
+                <div className="text-2xl font-bold text-green-700">{preview.totalQuestionsGenerated !== undefined ? preview.totalQuestionsGenerated : '?'}</div>
               </div>
 
               <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
@@ -370,7 +377,7 @@ export default function StructureSamplingPage() {
                       <td className="px-4 py-2">{s.side}</td>
                       <td className="px-4 py-2">{s.type || '-'}</td>
                       <td className="px-4 py-2 font-semibold">{s.generatedChainages?.length}</td>
-                      <td className="px-4 py-2 text-indigo-600 font-semibold">{s.questionsMatrix?.totalGenerated}</td>
+                      <td className="px-4 py-2 text-green-600 font-semibold">{s.questionsMatrix?.totalGenerated}</td>
                     </tr>
                   ))}
                   {preview.validStructures.length === 0 && (
@@ -387,7 +394,7 @@ export default function StructureSamplingPage() {
               <div className="mb-6 overflow-x-auto">
                 <h4 className="text-md font-bold text-gray-800 mb-2">Question Validation</h4>
                 <table className="w-full text-sm text-left text-gray-500 border">
-                  <thead className="text-xs text-gray-700 uppercase bg-indigo-50 border-b">
+                  <thead className="text-xs text-gray-700 uppercase bg-green-50 border-b">
                     <tr>
                       <th className="px-4 py-3">Structure Type</th>
                       <th className="px-4 py-3">Normalized Type</th>
@@ -419,7 +426,7 @@ export default function StructureSamplingPage() {
                           <td className="px-4 py-2">{s.normalizedType || 'Unknown'}</td>
                           <td className="px-4 py-2 text-center">{s.applicable}</td>
                           <td className="px-4 py-2 text-center font-semibold text-green-600">{s.points}</td>
-                          <td className="px-4 py-2 text-center font-semibold text-blue-600">{s.totalQuestions}</td>
+                          <td className="px-4 py-2 text-center font-semibold text-green-600">{s.totalQuestions}</td>
                         </tr>
                       ));
                     })()}
@@ -461,7 +468,7 @@ export default function StructureSamplingPage() {
                   <select
                     value={selectedProject}
                     onChange={(e) => setSelectedProject(e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                   >
                     <option value="">Select Project</option>
                     {projects.map(p => (
@@ -476,7 +483,7 @@ export default function StructureSamplingPage() {
                     value={batchName}
                     onChange={(e) => setBatchName(e.target.value)}
                     placeholder="e.g. Structure Inspection 2026"
-                    className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                   />
                 </div>
               </div>
@@ -486,13 +493,13 @@ export default function StructureSamplingPage() {
                   This will create <strong>{preview.totalInspectionPoints}</strong> independent Structure inspection tasks.
                 </div>
                 
-                <button
+                <Premium3DButton
                   onClick={handleGenerateBatch}
                   disabled={loading || preview.validStructuresCount === 0 || !selectedProject}
-                  className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                  className="!w-auto flex items-center justify-center gap-2"
                 >
                   {loading ? 'Creating Batch...' : 'Generate Structure Batch'}
-                </button>
+                </Premium3DButton>
               </div>
             </div>
           </div>

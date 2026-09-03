@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 
-const GenerateBatchButton = ({ loading, disabled, type = "submit" }) => {
+const GenerateBatchButton = ({ loading, disabled, type = "submit", onClick, children, text = "Generate Batch", loadingText = "Generating...", className = "" }) => {
   const buttonRef = useRef(null);
   
   useEffect(() => {
@@ -84,8 +84,9 @@ const GenerateBatchButton = ({ loading, disabled, type = "submit" }) => {
     <button
       ref={buttonRef}
       type={type}
+      onClick={onClick}
       disabled={disabled || loading}
-      className="generate-batch-btn relative px-6 py-2 text-white font-medium rounded-lg disabled:opacity-50 h-[38px] min-w-[140px] overflow-visible outline-none group border border-transparent transition-all duration-300"
+      className={`generate-batch-btn relative px-6 py-2 text-white font-medium rounded-lg disabled:opacity-50 h-[38px] min-w-[140px] overflow-visible outline-none group border border-transparent transition-all duration-300 ${className}`}
       style={{
         '--shadow-x': '0px',
         '--shadow-y': '0px',
@@ -142,7 +143,7 @@ const GenerateBatchButton = ({ loading, disabled, type = "submit" }) => {
         `}
       </style>
       <span className="relative z-10 pointer-events-none drop-shadow-sm tracking-wide">
-        {loading ? 'Generating...' : 'Generate Batch'}
+        {children || (loading ? loadingText : text)}
       </span>
     </button>
   );

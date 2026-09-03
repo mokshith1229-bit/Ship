@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Sector, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Sector } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useSocket } from '../context/SocketContext';
+import { dashboardService } from '../services/dashboard.service';
 
-const chartData = [
-  { id: 1, name: "HO Rated", value: 6, color: "#368c3f" }, // Logo Green
-  { id: 2, name: "Not Rated", value: 9, color: "#1a1a1a" }, // Logo Dark Gray/Black
-  { id: 3, name: "On Going", value: 12, color: "#1b5e20" }  // Dark Green
+const chartDataFallback = [
+  { id: 1, name: "HO Rated", value: 0, color: "#368c3f" }, // Logo Green
+  { id: 2, name: "Not Rated", value: 0, color: "#1a1a1a" }, // Logo Dark Gray/Black
+  { id: 3, name: "On Going", value: 0, color: "#1b5e20" }  // Dark Green
 ];
 
 const rechartsPolarToCartesian = (cx, cy, radius, angle) => {
@@ -92,51 +92,54 @@ const RoadIcon = ({ className }) => (
   </svg>
 );
 
-const DashboardChart = () => {
+const DashboardChart = ({ onTotalUpdate }) => {
   const [activeIndex, setActiveIndex] = useState(null);
   const [isEngineStarted, setIsEngineStarted] = useState(false);
   const [data, setData] = useState([]);
-  const socket = useSocket();
+  const [loading, setLoading] = useState(true);
 
-  const fetchChartData = () => {
-    import('../services/dashboard.service').then(({ dashboardService }) => {
-      dashboardService.getRoadsStatus().then(res => {
-        // Map backend data to chart format with colors
+  useEffect(() => {
+    let mounted = true;
+    dashboardService.getRoadsStatus().then(res => {
+      if (!mounted) return;
+      
+      const responseData = Array.isArray(res) ? res : (res.data || []);
+      if (responseData.length > 0) {
         const colors = {
-          'HO-RATED': '#368c3f', // Green
-          'SPV-RATED': '#368c3f', // Green
-          'ON-GOING': '#1b5e20', // Dark Green
-          'HO-PROCESS': '#1a1a1a', // Dark Gray
-          'NOT-RATED': '#1a1a1a'  // Dark Gray
+          'HO-RATED': '#368c3f',
+          'SPV-RATED': '#368c3f',
+          'ON-GOING': '#1b5e20',
+          'HO-PROCESS': '#1a1a1a',
+          'NOT-RATED': '#1a1a1a'
         };
-        const responseData = Array.isArray(res) ? res : (res.data || []);
         const mappedData = responseData.map(item => ({
           id: item._id,
           name: item._id ? item._id.replace('-', ' ') : 'UNKNOWN',
           value: item.count,
           color: colors[item._id] || '#8884d8'
         }));
-        setData(mappedData.length ? mappedData : [{ name: 'No Data', value: 1, color: '#ccc' }]);
-      }).catch(console.error);
+        setData(mappedData);
+        
+        if (onTotalUpdate) {
+          const total = mappedData.reduce((acc, curr) => acc + curr.value, 0);
+          onTotalUpdate(total);
+        }
+      } else {
+        setData(chartDataFallback);
+        if (onTotalUpdate) onTotalUpdate(0);
+      }
+      setLoading(false);
+    }).catch(err => {
+      console.error(err);
+      if (mounted) {
+        setData(chartDataFallback);
+        setLoading(false);
+        if (onTotalUpdate) onTotalUpdate(0);
+      }
     });
-  };
 
-  useEffect(() => {
-    fetchChartData();
-  }, []);
-
-  useEffect(() => {
-    if (!socket) return;
-    
-    const handleUpdate = () => {
-      fetchChartData();
-    };
-
-    socket.on('DASHBOARD_METRICS_UPDATED', handleUpdate);
-    return () => {
-      socket.off('DASHBOARD_METRICS_UPDATED', handleUpdate);
-    };
-  }, [socket]);
+    return () => { mounted = false; };
+  }, [onTotalUpdate]);
 
   const total = useMemo(() => data.reduce((acc, curr) => acc + curr.value, 0), [data]);
   const activeData = activeIndex !== null ? data[activeIndex] : null;
@@ -152,7 +155,11 @@ const DashboardChart = () => {
   return (
     <div className="w-full h-full flex flex-col items-center justify-center outline-none focus:outline-none min-h-[220px]">
       <AnimatePresence mode="wait">
-        {!isEngineStarted ? (
+        {loading ? (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center justify-center">
+            <div className="w-8 h-8 border-4 border-[#368c3f] border-t-transparent rounded-full animate-spin"></div>
+          </motion.div>
+        ) : !isEngineStarted ? (
           <motion.div 
             key="start-button"
             initial={{ opacity: 0, scale: 0.8 }}

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MdExpandMore, MdCheck } from 'react-icons/md';
 
 const CustomDropdown = ({ 
+  id,
   options, 
   value, 
   onChange, 
@@ -91,6 +92,7 @@ const CustomDropdown = ({
       aria-expanded={isOpen}
     >
       <button
+        id={id}
         type="button"
         className={`w-full flex items-center justify-between px-3 py-1.5 min-h-[34px] md:min-h-[38px] bg-white border border-[#5cb85c] rounded-md text-sm font-medium transition-all duration-200 outline-none
           ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-[0_2px_8px_rgba(92,184,92,0.15)] focus:ring-2 focus:ring-[#5cb85c]/20'}

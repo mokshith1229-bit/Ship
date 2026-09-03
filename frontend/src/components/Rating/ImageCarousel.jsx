@@ -177,6 +177,7 @@ const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode
                   >
                     <motion.img 
                       src={img.url || img} 
+                      crossOrigin="anonymous"
                       alt={`Road view ${index + 1}`} 
                       className={`w-full h-full object-cover transition-opacity duration-300 ease-out group-hover:scale-[1.03] ${distance === 0 && isZoomed ? 'opacity-0' : 'opacity-100'}`}
                       draggable={false}
@@ -282,6 +283,7 @@ const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode
                       <motion.img
                         key={`fs-${fullScreenIndex}`}
                         src={images[fullScreenIndex]?.url || images[fullScreenIndex]}
+                        crossOrigin="anonymous"
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ 
                           opacity: 1, 

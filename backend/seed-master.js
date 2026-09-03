@@ -7,7 +7,7 @@ const MasterQuestion = require('./src/models/MasterQuestion.model');
 const MasterImage = require('./src/models/MasterImage.model');
 const User = require('./src/models/User.model');
 
-const MONGO_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/hirate';
+const MONGO_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/hirate'; 
 
 async function seed() {
   try {

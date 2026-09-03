@@ -134,8 +134,18 @@ const InspectorApp = () => {
       if (signal && signal.aborted) return;
       
       const paginatedData = res?.data || res;
-      const fetchedTasks = paginatedData?.tasks || [];
-      const total = paginatedData?.total || 0;
+      let fetchedTasks = [];
+      let total = 0;
+
+      if (Array.isArray(paginatedData)) {
+        total = paginatedData.length;
+        const start = (page - 1) * PAGE_SIZE;
+        const end = start + PAGE_SIZE;
+        fetchedTasks = paginatedData.slice(start, end);
+      } else {
+        fetchedTasks = paginatedData?.tasks || [];
+        total = paginatedData?.total || 0;
+      }
 
       setTasks(fetchedTasks);
       setTotalTasks(total);
@@ -954,6 +964,7 @@ const InspectorApp = () => {
               ) : null}
             </div>
             <div className="ml-auto flex items-center gap-3">
+
               {currentTask.status === 'SKIPPED' ? (
                 <button
                   onClick={() => handleUnskip()}
@@ -963,13 +974,25 @@ const InspectorApp = () => {
                   Unskip Task
                 </button>
               ) : (
-                <button
-                  onClick={() => setSkipModalOpen(true)}
-                  disabled={saving || skipping || currentTask.status === 'COMPLETED'}
-                  className="px-4 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none transition-colors border border-gray-200"
-                >
-                  Skip Question
-                </button>
+                <>
+                  {(currentTask.status === 'COMPLETED' || currentTask.submittedBy?.userName) && (
+                    <span className="text-sm font-medium text-gray-700 bg-gray-100 px-3 py-1.5 rounded-md border border-gray-200">
+                      Submitted By: <span className="font-bold">{currentTask.submittedBy?.userName || 'Admin'}</span>
+                    </span>
+                  )}
+                  {currentTask.status !== 'SKIPPED' && (
+                    <button
+                      onClick={() => {
+                        setSkipGroup(null);
+                        setSkipModalOpen(true);
+                      }}
+                      disabled={saving || skipping || currentTask.status === 'COMPLETED'}
+                      className="px-4 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none transition-colors border border-gray-200"
+                    >
+                      Skip Question
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>

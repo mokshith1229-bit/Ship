@@ -23,7 +23,7 @@ import ExecutiveCharts from '../components/dashboard/ExecutiveCharts';
 import UserDashboard from '../components/dashboard/UserDashboard';
 import { useAuth } from '../context/AuthContext';
 import RollingLogo from '../components/common/RollingLogo';
-
+import InspectionComparison from '../components/dashboard/comparison/InspectionComparison';
 
 const DashboardPage = () => {
   const { user } = useAuth();
@@ -31,7 +31,16 @@ const DashboardPage = () => {
   
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedProject = searchParams.get('project');
+  const [selectedOverview, setSelectedOverview] = React.useState('');
+  const [totalRoads, setTotalRoads] = React.useState(0);
   const coordinates = selectedProject ? projectCoordinates[selectedProject] : null;
+  const scrollContainerRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
+  }, [selectedProject]);
 
   const setSelectedProject = (project) => {
     if (project) {
@@ -46,12 +55,14 @@ const DashboardPage = () => {
       <Navbar />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
-        <div className="flex-1 p-4 lg:p-6 overflow-y-auto flex flex-col custom-scrollbar">
+        <div ref={scrollContainerRef} className="flex-1 p-4 lg:p-6 overflow-y-auto flex flex-col custom-scrollbar">
           
           <div className="relative z-50">
             <GlobalFilters 
               selectedProject={selectedProject} 
-              setSelectedProject={setSelectedProject} 
+              setSelectedProject={setSelectedProject}
+              selectedOverview={selectedOverview}
+              setSelectedOverview={setSelectedOverview}
             />
           </div>
 
@@ -62,6 +73,14 @@ const DashboardPage = () => {
           >
             {!isAdmin ? (
               <UserDashboard />
+            ) : selectedOverview === 'skip' ? (
+              <div className="w-full">
+                <SkipAnalytics selectedProject={selectedProject} />
+              </div>
+            ) : selectedOverview === 'comparison' ? (
+              <div className="w-full">
+                <InspectionComparison selectedProject={selectedProject} />
+              </div>
             ) : !selectedProject ? (
               // GLOBAL VIEW - EXECUTIVE SUMMARY
               <div className="bg-white p-4 shadow-sm border border-gray-300 rounded mb-10">
@@ -108,9 +127,9 @@ const DashboardPage = () => {
                      <div className="w-full bg-white border border-gray-300 rounded shadow-sm flex flex-col p-6 mt-6">
                        <h2 className="text-gray-500 font-bold text-sm tracking-wide mb-8 uppercase">Roads Status</h2>
                        <div className="flex-1 flex flex-col items-center justify-center -mt-8">
-                         <DashboardChart />
+                         <DashboardChart onTotalUpdate={setTotalRoads} />
                          <div className="text-center mt-2">
-                           <span className="font-bold text-gray-700 text-lg">Total Roads : 27</span>
+                           <span className="font-bold text-gray-700 text-lg">Total Roads : {totalRoads}</span>
                          </div>
                        </div>
                      </div>
@@ -147,10 +166,6 @@ const DashboardPage = () => {
                   <div className="lg:col-span-1">
                     <InspectorLeaderboard selectedProject={selectedProject} />
                   </div>
-                </div>
-
-                <div className="mb-10">
-                  <SkipAnalytics selectedProject={selectedProject} />
                 </div>
               </>
             )}

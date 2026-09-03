@@ -8,41 +8,55 @@ import { useAuth } from '../hooks/useAuth';
 import CustomDropdown from './common/CustomDropdown';
 import RollingLogo from './common/RollingLogo';
 import api from '../services/api';
+import { projectService } from '../services/project.service';
+import { ratingService } from '../services/rating.service';
 
 const Navbar = () => {
   const [project, setProject] = React.useState('');
   const navigate = useNavigate();
   const location = useLocation();
   
-  const projectOptions = [
-    { label: 'ADTPL', value: 'ADTPL' },
-    { label: 'APEL', value: 'APEL' },
-    { label: 'BFHL', value: 'BFHL' },
-    { label: 'BWHPL', value: 'BWHPL' },
-    { label: 'DATL', value: 'DATL' },
-    { label: 'DHMEPL', value: 'DHMEPL' },
-    { label: 'FRHL', value: 'FRHL' },
-    { label: 'GAEPL', value: 'GAEPL' },
-    { label: 'JMTPL', value: 'JMTPL' },
-    { label: 'JUHPL', value: 'JUHPL' },
-    { label: 'KETPL', value: 'KETPL' },
-    { label: 'KHEPL', value: 'KHEPL' },
-    { label: 'KMTPL', value: 'KMTPL' },
-    { label: 'KTIPL', value: 'KTIPL' },
-    { label: 'MBEL', value: 'MBEL' },
-    { label: 'MHPL', value: 'MHPL' },
-    { label: 'MKTPL', value: 'MKTPL' },
-    { label: 'MSHP', value: 'MSHP' },
-    { label: 'NAM', value: 'NAM' },
-    { label: 'NDEPL', value: 'NDEPL' },
-    { label: 'NKTPL', value: 'NKTPL' },
-    { label: 'SIPL', value: 'SIPL' },
-    { label: 'SMTPL', value: 'SMTPL' },
-    { label: 'SPPL', value: 'SPPL' },
-    { label: 'WMPTL', value: 'WMPTL' },
-    { label: 'WUPTL', value: 'WUPTL' },
-    { label: 'WVEL', value: 'WVEL' },
-  ];
+  const [projectOptions, setProjectOptions] = useState([]);
+  const { user, logout } = useAuth();
+  const isAdmin = user && (user.role === 'Admin' || user.role === 'Administrator' || user.role === 'HO' || user.role === 'SPV');
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const [allProjectsRes, batches] = await Promise.all([
+          isAdmin ? projectService.getAllProjects().catch(() => []) : Promise.resolve([]),
+          ratingService.getReadyBatches().catch(() => [])
+        ]);
+
+        const allProjects = allProjectsRes.data || allProjectsRes || [];
+        const projectMap = {};
+
+        allProjects.forEach(p => {
+          const code = typeof p === 'string' ? p : (p.code || p.name || 'UNKNOWN');
+          if (code !== 'UNKNOWN') {
+            projectMap[code] = true;
+          }
+        });
+
+        const batchesList = Array.isArray(batches) ? batches : (batches?.data || []);
+        batchesList.forEach(batch => {
+          const pName = batch.project || 'UNKNOWN_BATCH_PROJECT';
+          if (pName !== 'UNKNOWN_BATCH_PROJECT') {
+            projectMap[pName] = true;
+          }
+        });
+
+        const options = Object.keys(projectMap).sort().map(code => ({
+          label: code,
+          value: code
+        }));
+        setProjectOptions(options);
+      } catch (err) {
+        console.error('Failed to fetch projects for navbar:', err);
+      }
+    };
+    fetchProjects();
+  }, [isAdmin]);
 
   useEffect(() => {
     const pathParts = location.pathname.split('/');
@@ -54,7 +68,7 @@ const Navbar = () => {
     } else {
       setProject('');
     }
-  }, [location.pathname]);
+  }, [location.pathname, projectOptions]);
 
   const handleProjectChange = (value) => {
     setProject(value);
@@ -62,8 +76,6 @@ const Navbar = () => {
       navigate(`/rating/${value}`);
     }
   };
-
-  const { user, logout } = useAuth();
   
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -225,12 +237,18 @@ const Navbar = () => {
         </button>
         
         {/* Profile and Logout */}
-        <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
-          <div className="flex flex-col items-end hidden sm:flex">
-            <span className="text-sm font-semibold text-gray-800">{user?.name || 'Admin User'}</span>
-            <span className="text-xs text-gray-500">{user?.role || 'Administrator'}</span>
+        <div className="flex items-center gap-2 pl-4 border-l border-gray-200">
+          <div 
+            onClick={() => navigate('/profile')}
+            className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 px-2 py-1.5 rounded-lg transition-colors"
+            title="Go to Profile"
+          >
+            <div className="flex flex-col items-end hidden sm:flex">
+              <span className="text-sm font-semibold text-gray-800">{user?.name || 'Admin User'}</span>
+              <span className="text-xs text-gray-500">{user?.role || 'Administrator'}</span>
+            </div>
+            <MdAccountCircle className="text-3xl text-green-800" />
           </div>
-          <MdAccountCircle className="text-3xl text-green-800" />
           
           <button 
             onClick={logout}

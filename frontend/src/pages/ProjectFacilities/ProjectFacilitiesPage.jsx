@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import Premium3DButton from '../../components/common/Premium3DButton';
 import { useNavigate } from 'react-router-dom';
 import { masterListService } from '../../services/masterList.service';
 import { projectFacilitiesService } from '../../services/projectFacilities.service';
 import Layout from '../../components/Layout';
 import { MdBusinessCenter, MdFactCheck } from 'react-icons/md';
+import CustomDropdown from '../../components/common/CustomDropdown';
 
 export default function ProjectFacilitiesPage() {
   const navigate = useNavigate();
@@ -100,8 +102,8 @@ export default function ProjectFacilitiesPage() {
     <Layout>
       <div className="max-w-5xl mx-auto w-full">
         <div className="flex items-center gap-3 mb-6">
-          <div className="h-10 w-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center">
-            <MdBusinessCenter size={24} />
+          <div className="p-3 bg-green-50 text-green-600 rounded-xl">
+            <MdBusinessCenter className="text-2xl" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-800 tracking-tight">Project Facilities</h1>
@@ -123,16 +125,12 @@ export default function ProjectFacilitiesPage() {
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
-                <select
+                <CustomDropdown
+                  options={projects}
                   value={selectedProject}
-                  onChange={(e) => setSelectedProject(e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                >
-                  <option value="">Select Project</option>
-                  {projects.map(p => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
+                  onChange={(val) => setSelectedProject(val)}
+                  placeholder="Select Project"
+                />
               </div>
 
               <div className="flex-1">
@@ -146,8 +144,8 @@ export default function ProjectFacilitiesPage() {
                       file:mr-4 file:py-2 file:px-4
                       file:rounded-md file:border-0
                       file:text-sm file:font-semibold
-                      file:bg-indigo-50 file:text-indigo-700
-                      hover:file:bg-indigo-100
+                      file:bg-green-50 file:text-green-700
+                      hover:file:bg-green-100
                     "
                   />
                 </div>
@@ -156,28 +154,28 @@ export default function ProjectFacilitiesPage() {
             </div>
 
             <div className="mt-4 flex justify-end">
-              <button
+              <Premium3DButton
                 onClick={handlePreview}
                 disabled={loading || !file || !selectedProject}
-                className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                className="!w-auto flex items-center justify-center gap-2"
               >
                 {loading && !preview ? 'Parsing Sheets...' : 'Parse & Preview'}
-              </button>
+              </Premium3DButton>
             </div>
           </div>
         </div>
 
         {preview && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center gap-2 mb-4 text-indigo-700 font-bold">
+            <div className="flex items-center gap-2 mb-4 text-green-700 font-bold">
               <MdFactCheck size={20} />
               <h3>Validation Preview</h3>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                <div className="text-xs text-indigo-700 font-medium uppercase tracking-wider mb-1">Facilities Found</div>
-                <div className="text-2xl font-bold text-indigo-700">{preview.summary.facilitiesFound}</div>
+              <div className="bg-green-50 p-4 rounded-xl border border-green-100">
+                <div className="text-xs text-green-700 font-medium uppercase tracking-wider mb-1">Facilities Found</div>
+                <div className="text-2xl font-bold text-green-700">{preview.summary.facilitiesFound}</div>
               </div>
               
               <div className="bg-green-50 p-4 rounded-xl border border-green-100">
@@ -185,9 +183,9 @@ export default function ProjectFacilitiesPage() {
                 <div className="text-2xl font-bold text-green-700">{preview.summary.facilitiesFound}</div>
               </div>
 
-              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                <div className="text-xs text-blue-700 font-medium uppercase tracking-wider mb-1">Total Questions</div>
-                <div className="text-2xl font-bold text-blue-700">{preview.summary.totalQuestionsGenerated}</div>
+              <div className="bg-green-50 p-4 rounded-xl border border-green-100">
+                <div className="text-xs text-green-700 font-medium uppercase tracking-wider mb-1">Total Questions</div>
+                <div className="text-2xl font-bold text-green-700">{preview.summary.totalQuestionsGenerated}</div>
               </div>
 
               <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
@@ -217,7 +215,7 @@ export default function ProjectFacilitiesPage() {
                       <td className="px-4 py-2">{f.originalType}</td>
                       <td className="px-4 py-2">{f.chainage?.toFixed(3)}</td>
                       <td className="px-4 py-2">{f.side}</td>
-                      <td className="px-4 py-2 text-indigo-600 font-semibold">{f.questionsMatrix?.totalGenerated}</td>
+                      <td className="px-4 py-2 text-green-600 font-semibold">{f.questionsMatrix?.totalGenerated}</td>
                       <td className="px-4 py-2 text-green-600 font-semibold">Ready</td>
                     </tr>
                   ))}
@@ -267,7 +265,7 @@ export default function ProjectFacilitiesPage() {
                     value={batchName}
                     onChange={(e) => setBatchName(e.target.value)}
                     placeholder="e.g. Project Facilities 2026"
-                    className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                   />
                 </div>
               </div>
@@ -277,13 +275,13 @@ export default function ProjectFacilitiesPage() {
                   This will create <strong>{preview.summary.facilitiesFound}</strong> independent Project Facility inspection tasks.
                 </div>
                 
-                <button
+                <Premium3DButton
                   onClick={handleGenerateBatch}
                   disabled={loading || preview.summary.facilitiesFound === 0 || !selectedProject}
-                  className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                  className="!w-auto flex items-center justify-center gap-2"
                 >
                   {loading ? 'Creating Batch...' : 'Generate Inspection'}
-                </button>
+                </Premium3DButton>
               </div>
             </div>
           </div>

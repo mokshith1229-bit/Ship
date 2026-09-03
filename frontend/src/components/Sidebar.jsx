@@ -1,18 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { cn } from '../utils/cn';
-import { MdStarRate, MdPerson, MdChevronLeft, MdChevronRight, MdClose, MdDashboard, MdContentCopy, MdCheck, MdNotifications, MdGroup, MdList, MdOutlinePrecisionManufacturing, MdOutlineVideoCameraFront, MdImageSearch, MdVideoLibrary, MdInsights } from 'react-icons/md';
+import { MdStarRate, MdPerson, MdChevronLeft, MdChevronRight, MdClose, MdDashboard, MdContentCopy, MdCheck, MdNotifications, MdGroup, MdList, MdOutlinePrecisionManufacturing, MdOutlineVideoCameraFront, MdImageSearch, MdVideoLibrary, MdInsights, MdAddRoad, MdConstruction, MdBusiness, MdCameraAlt, MdPhotoLibrary, MdInsertChart } from 'react-icons/md';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
+import { projectService } from '../services/project.service';
+import { ratingService } from '../services/rating.service';
 
-const allProjects = [
-  'ADTPL', 'APEL', 'BFHL', 'BWHPL', 'DATL', 'DHMEPL', 'FRHL', 'GAEPL',
-  'JMTPL', 'JUHPL', 'KETPL', 'KHEPL', 'KMTPL', 'KTIPL', 'MBEL', 'MHPL',
-  'MKTPL', 'MSHP', 'NAM', 'NDEPL', 'NKTPL', 'SIPL', 'SMTPL', 'SPPL',
-  'WMPTL', 'WUPTL', 'WVEL'
-];
-
-const SidebarHoverButton = ({ isActive, onClick, children }) => {
+const SidebarHoverButton = ({ isActive, onClick, onDoubleClick, children }) => {
   const buttonRef = useRef(null);
 
   useEffect(() => {
@@ -78,6 +73,7 @@ const SidebarHoverButton = ({ isActive, onClick, children }) => {
     <button
       ref={buttonRef}
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
       className={cn(
         "sidebar-3d-btn relative w-full rounded-[12px] text-sm font-medium transition-all duration-300 border overflow-hidden group outline-none",
         isActive 
@@ -125,6 +121,42 @@ const Sidebar = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const selectedProject = searchParams.get('project');
+  const [allProjects, setAllProjects] = useState([]);
+
+  useEffect(() => {
+    const fetchSidebarProjects = async () => {
+      try {
+        const [allProjectsRes, batches] = await Promise.all([
+          projectService.getAllProjects().catch(() => []),
+          ratingService.getReadyBatches().catch(() => [])
+        ]);
+        
+        const fetchedProjects = allProjectsRes.data || allProjectsRes || [];
+        const projectMap = {};
+        
+        fetchedProjects.forEach(p => {
+          const code = typeof p === 'string' ? p : (p.code || p.name || 'UNKNOWN');
+          if (code !== 'UNKNOWN') {
+            projectMap[code] = true;
+          }
+        });
+        
+        const batchesList = Array.isArray(batches) ? batches : (batches?.data || []);
+        batchesList.forEach(batch => {
+          if (batch.project) {
+            projectMap[batch.project] = true;
+          }
+        });
+        
+        const uniqueProjects = Object.keys(projectMap).sort();
+        setAllProjects(uniqueProjects);
+      } catch (err) {
+        console.error('Failed to fetch projects for sidebar', err);
+      }
+    };
+    
+    fetchSidebarProjects();
+  }, []);
 
   const projectOptions = useMemo(() => {
     if (!user) return allProjects;
@@ -136,7 +168,7 @@ const Sidebar = () => {
         .filter(p => p);
     }
     return [];
-  }, [user]);
+  }, [user, allProjects]);
 
   
   // Sidebar collapsed by default on desktop, but persist user preference
@@ -177,6 +209,10 @@ const Sidebar = () => {
     { name: 'Dashboard', icon: MdDashboard, path: '/dashboard', allowedRoles: ['Admin', 'Administrator', 'HO', 'SPV', 'User'] },
     { name: 'Master List', icon: MdList, path: '/master-list', allowedRoles: ['Admin', 'Administrator'] },
     { name: 'Inspection Engine', icon: MdOutlinePrecisionManufacturing, path: '/inspection-engine', allowedRoles: ['Admin', 'Administrator'] },
+    { name: 'Roadway Sampling', icon: MdAddRoad, path: '/roadway-sampling', allowedRoles: ['Admin', 'Administrator'] },
+    { name: 'Structure Sampling', icon: MdConstruction, path: '/structure-sampling', allowedRoles: ['Admin', 'Administrator'] },
+    { name: 'Project Facilities', icon: MdBusiness, path: '/project-facilities', allowedRoles: ['Admin', 'Administrator'] },
+    { name: 'ATMS', icon: MdCameraAlt, path: '/atms', allowedRoles: ['Admin', 'Administrator'] },
     { name: 'Survey Library', icon: MdVideoLibrary, path: '/survey-library', allowedRoles: ['Admin', 'Administrator'] },
     { name: 'Survey Processing', icon: MdOutlineVideoCameraFront, path: '/survey-processing', allowedRoles: ['Admin', 'Administrator'] },
     { name: 'Image Review', icon: MdImageSearch, path: '/image-review', allowedRoles: ['Admin', 'Administrator', 'HO'] },
@@ -186,6 +222,7 @@ const Sidebar = () => {
     { name: 'Reports', icon: MdList, path: '/reports', allowedRoles: ['Admin', 'Administrator', 'HO'] },
     { name: 'Notifications', icon: MdNotifications, path: '/notifications', allowedRoles: ['Admin', 'Administrator', 'HO', 'SPV', 'User'] },
     { name: 'Users', icon: MdGroup, path: '/users', allowedRoles: ['Admin', 'Administrator'] },
+    { name: 'User Insights', icon: MdInsertChart, path: '/user-insights', allowedRoles: ['Admin', 'Administrator'] },
     { name: 'Role', icon: MdPerson, path: '/role', allowedRoles: ['Admin', 'Administrator'] },
     { name: 'Clone Page', icon: MdContentCopy, path: '/demo', allowedRoles: ['Admin', 'Administrator'] },
     { name: 'Profile', icon: MdPerson, path: '/profile', allowedRoles: ['HO', 'SPV', 'User'] },
@@ -217,25 +254,47 @@ const Sidebar = () => {
   };
 
   const clickTimeout = useRef(null);
+  const [popupTop, setPopupTop] = useState(0);
 
-  const handleSidebarClick = (item) => {
+  const updatePopupPosition = (e) => {
+    if (e && e.currentTarget && sidebarRef.current) {
+      const btnRect = e.currentTarget.getBoundingClientRect();
+      const sidebarRect = sidebarRef.current.getBoundingClientRect();
+      setPopupTop(btnRect.top - sidebarRect.top);
+    }
+  };
+
+  const handleSidebarClick = (item, e) => {
     const isDashboard = item.name === 'Dashboard';
     
     if (isDashboard) {
       if (clickTimeout.current) {
-        // Double click detected
         clearTimeout(clickTimeout.current);
         clickTimeout.current = null;
-        setOpenMenu(prev => prev === item.name ? null : item.name);
+        updatePopupPosition(e);
+        setOpenMenu(item.name);
       } else {
-        // First click
         clickTimeout.current = setTimeout(() => {
           clickTimeout.current = null;
           handleNav(item.path);
-        }, 250); // 250ms delay to wait for second click
+          setOpenMenu(null);
+        }, 350);
       }
     } else {
       handleNav(item.path);
+      setOpenMenu(null);
+    }
+  };
+
+  const handleSidebarDoubleClick = (item, e) => {
+    const isDashboard = item.name === 'Dashboard';
+    if (isDashboard) {
+      if (clickTimeout.current) {
+        clearTimeout(clickTimeout.current);
+        clickTimeout.current = null;
+      }
+      updatePopupPosition(e);
+      setOpenMenu(item.name);
     }
   };
 
@@ -268,7 +327,7 @@ const Sidebar = () => {
         </div>
       )}
 
-      <div className="flex-1 py-6 px-3.5 relative z-50">
+      <div className="flex-1 py-6 px-3.5 relative z-50 overflow-y-auto custom-dropdown-scrollbar">
         <ul className="flex flex-col gap-3">
           {menuItems.filter(item => !item.allowedRoles || (user && item.allowedRoles.includes(user.role))).map((item) => {
             const Icon = item.icon;
@@ -281,7 +340,8 @@ const Sidebar = () => {
                 className="relative"
               >
                 <SidebarHoverButton
-                  onClick={() => handleSidebarClick(item)}
+                  onClick={(e) => handleSidebarClick(item, e)}
+                  onDoubleClick={(e) => handleSidebarDoubleClick(item, e)}
                   isActive={isActive}
                 >
                   <Icon className={cn(
@@ -299,57 +359,59 @@ const Sidebar = () => {
                   </span>
                 </SidebarHoverButton>
 
-                {/* Double-Click Sub-Menu for Dashboard */}
-                <AnimatePresence>
-                  {openMenu === 'Dashboard' && isDashboard && (
-                    <motion.div
-                      initial={{ opacity: 0, x: -10, scale: 0.95 }}
-                      animate={{ opacity: 1, x: 0, scale: 1 }}
-                      exit={{ opacity: 0, x: -10, scale: 0.95 }}
-                      transition={{ duration: 0.2 }}
-                      className={cn(
-                        "absolute z-[100] w-56 bg-white border border-gray-100 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.1)] overflow-hidden",
-                        isMobile ? "left-12 top-14" : "left-[calc(100%+16px)] top-0"
-                      )}
-                    >
-                      <div className="bg-gray-50/80 px-4 py-2.5 border-b border-gray-100 backdrop-blur-sm flex justify-between items-center">
-                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Select Project</span>
-                        <button onClick={() => setOpenMenu(null)} className="text-gray-400 hover:text-gray-600">
-                          <MdClose className="text-sm" />
-                        </button>
-                      </div>
-                      <div className="max-h-[300px] overflow-y-auto custom-dropdown-scrollbar py-1.5 flex flex-col px-2 gap-1">
-                        {projectOptions.map(proj => {
-                          const isSelected = activeProject === proj;
-                          return (
-                            <button 
-                              key={proj} 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleNav(item.path, proj);
-                                setOpenMenu(null);
-                              }}
-                              className={cn(
-                                "flex items-center justify-between px-3 py-2 text-sm transition-all duration-200 rounded-md relative group",
-                                isSelected 
-                                  ? "bg-[#5cb85c] text-[#fcefb4] font-medium shadow-sm" 
-                                  : "text-gray-800 hover:text-green-700 hover:bg-green-50 font-medium"
-                              )}
-                            >
-                              <span className="relative z-10">{proj}</span>
-                              {isSelected && <MdCheck className="text-lg text-[#fcefb4]" />}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
               </li>
             )
           })}
         </ul>
       </div>
+
+      {/* Double-Click Sub-Menu for Dashboard - Moved outside overflow container to prevent clipping */}
+      <AnimatePresence>
+        {openMenu === 'Dashboard' && (
+          <motion.div
+            initial={{ opacity: 0, x: -10, scale: 0.95 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: -10, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className={cn(
+              "absolute z-[100] w-56 bg-white border border-gray-100 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.1)] overflow-hidden",
+              isMobile ? "left-12" : "left-[calc(100%+16px)]"
+            )}
+            style={{ top: `${popupTop}px` }}
+          >
+            <div className="bg-gray-50/80 px-4 py-2.5 border-b border-gray-100 backdrop-blur-sm flex justify-between items-center">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Select Project</span>
+              <button onClick={() => setOpenMenu(null)} className="text-gray-400 hover:text-gray-600">
+                <MdClose className="text-sm" />
+              </button>
+            </div>
+            <div className="max-h-[300px] overflow-y-auto custom-dropdown-scrollbar py-1.5 flex flex-col px-2 gap-1">
+              {projectOptions.map(proj => {
+                const isSelected = activeProject === proj;
+                return (
+                  <button 
+                    key={proj} 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleNav('/dashboard', proj);
+                      setOpenMenu(null);
+                    }}
+                    className={cn(
+                      "flex items-center justify-between px-3 py-2 text-sm transition-all duration-200 rounded-md relative group",
+                      isSelected 
+                        ? "bg-[#5cb85c] text-[#fcefb4] font-medium shadow-sm" 
+                        : "text-gray-800 hover:text-green-700 hover:bg-green-50 font-medium"
+                    )}
+                  >
+                    <span className="relative z-10">{proj}</span>
+                    {isSelected && <MdCheck className="text-lg text-[#fcefb4]" />}
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 

@@ -27,6 +27,8 @@ import ShipDashboard from './pages/Ship/ShipDashboard';
 import SkipGalleryPage from './pages/SkipGalleryPage';
 import RatingV2Page from './pages/RatingV2/RatingV2Page';
 
+import UserInsightsPage from './pages/UserInsightsPage';
+
 function App() {
   return (
     <Routes>
@@ -36,31 +38,32 @@ function App() {
 
       {/* Protected Routes */}
       <Route path="/" element={<ProtectedRoute><Navigate to="/dashboard" replace /></ProtectedRoute>} />
-      <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><DashboardPage /></ProtectedRoute>} />
-      <Route path="/demo" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><ClonePage /></ProtectedRoute>} />
-      <Route path="/notifications" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><NotificationPage /></ProtectedRoute>} />
-      <Route path="/users" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><UserManagementPage /></ProtectedRoute>} />
-      <Route path="/master-list" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><MasterListPage /></ProtectedRoute>} />
-      <Route path="/inspection-engine" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><InspectionEnginePage /></ProtectedRoute>} />
+      <Route path="/dashboard" element={<ProtectedRoute moduleName="Dashboard"><DashboardPage /></ProtectedRoute>} />
+      <Route path="/demo" element={<ProtectedRoute moduleName="Clone Page" allowedRoles={['Admin', 'Administrator']}><ClonePage /></ProtectedRoute>} />
+      <Route path="/notifications" element={<ProtectedRoute moduleName="Notifications"><NotificationPage /></ProtectedRoute>} />
+      <Route path="/users" element={<ProtectedRoute moduleName="Users"><UserManagementPage /></ProtectedRoute>} />
+      <Route path="/user-insights" element={<ProtectedRoute moduleName="User Insights"><UserInsightsPage /></ProtectedRoute>} />
+      <Route path="/master-list" element={<ProtectedRoute moduleName="Master List"><MasterListPage /></ProtectedRoute>} />
+      <Route path="/inspection-engine" element={<ProtectedRoute moduleName="Inspection Engine"><InspectionEnginePage /></ProtectedRoute>} />
       <Route path="/roadway-sampling" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><RoadwaySamplingPage /></ProtectedRoute>} />
       <Route path="/structure-sampling" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><StructureSamplingPage /></ProtectedRoute>} />
       <Route path="/project-facilities" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><ProjectFacilitiesPage /></ProtectedRoute>} />
       <Route path="/atms" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><AtmsPage /></ProtectedRoute>} />
-      <Route path="/survey-library" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><SurveyLibraryPage /></ProtectedRoute>} />
-      <Route path="/survey-processing" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><SurveyProcessingPage /></ProtectedRoute>} />
+      <Route path="/survey-library" element={<ProtectedRoute moduleName="Survey Library"><SurveyLibraryPage /></ProtectedRoute>} />
+      <Route path="/survey-processing" element={<ProtectedRoute moduleName="Survey Processing"><SurveyProcessingPage /></ProtectedRoute>} />
       <Route path="/skip-gallery" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><SkipGalleryPage /></ProtectedRoute>} />
-      <Route path="/image-review" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO']}><ImageReviewPage /></ProtectedRoute>} />
-      <Route path="/rating" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><RatingPage /></ProtectedRoute>} />
-      <Route path="/rating/inspector/:batchId" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><InspectorApp /></ProtectedRoute>} />
+      <Route path="/image-review" element={<ProtectedRoute moduleName="Image Review"><ImageReviewPage /></ProtectedRoute>} />
+      <Route path="/rating" element={<ProtectedRoute moduleName="Rating"><RatingPage /></ProtectedRoute>} />
+      <Route path="/rating/inspector/:batchId" element={<ProtectedRoute moduleName="Rating"><InspectorApp /></ProtectedRoute>} />
       <Route path="/rating-v2" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><RatingPage /></ProtectedRoute>} />
       <Route path="/rating-v2/:roadId" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><RoadSummaryPage /></ProtectedRoute>} />
       <Route path="/rating-v2/inspector/:batchId" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><RatingV2Page /></ProtectedRoute>} />
-      <Route path="/role" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><RolePermissionPage /></ProtectedRoute>} />
-      <Route path="/rating/:roadId" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><RoadSummaryPage /></ProtectedRoute>} />
-      <Route path="/rating/:roadId/detail/:detailId" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><RatingDetailPage /></ProtectedRoute>} />
+      <Route path="/role" element={<ProtectedRoute moduleName="Role Management"><RolePermissionPage /></ProtectedRoute>} />
+      <Route path="/rating/:roadId" element={<ProtectedRoute moduleName="Rating"><RoadSummaryPage /></ProtectedRoute>} />
+      <Route path="/rating/:roadId/detail/:detailId" element={<ProtectedRoute moduleName="Rating"><RatingDetailPage /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><ProfilePage /></ProtectedRoute>} />
-      <Route path="/reports" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO']}><ReportsPage /></ProtectedRoute>} />
-      <Route path="/ship" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO']}><ShipDashboard /></ProtectedRoute>} />
+      <Route path="/reports" element={<ProtectedRoute moduleName="Reports"><ReportsPage /></ProtectedRoute>} />
+      <Route path="/ship" element={<ProtectedRoute moduleName="SHIP"><ShipDashboard /></ProtectedRoute>} />
     </Routes>
   );
 }

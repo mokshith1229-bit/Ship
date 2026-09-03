@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
 import { workAssignmentService } from '../services/workAssignment.service';
@@ -17,6 +18,8 @@ import {
 } from 'react-icons/lu';
 
 const UserManagementPage = () => {
+  const navigate = useNavigate();
+
   const [activePageTab, setActivePageTab] = useState('all-users');
 
   // ── Live data state ────────────────────────────────────────────────────────
@@ -438,7 +441,17 @@ const UserManagementPage = () => {
                         filteredUsers.map((user, index) => (
                           <tr
                             key={index}
-                            className={`border-b border-gray-100 hover:bg-gray-50 transition-colors duration-200 ${
+                            onClick={(e) => {
+                              if (e.target.closest('button')) return;
+                              localStorage.setItem('hirate-selected-user', JSON.stringify({
+                                name: user.name,
+                                role: user.role,
+                                manager: user.manager,
+                                status: user.isActive !== undefined ? (user.isActive ? 'Active' : 'Inactive') : user.status
+                              }));
+                              navigate('/user-insights');
+                            }}
+                            className={`cursor-pointer border-b border-gray-100 hover:bg-gray-50 transition-colors duration-200 ${
                               index % 2 === 0 ? 'bg-white' : 'bg-[#F4F8FB]'
                             }`}
                           >

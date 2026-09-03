@@ -233,8 +233,9 @@ const RoadSummaryPage = () => {
         {/* Filters */}
         <div className="grid grid-cols-6 gap-4 mb-6 shrink-0">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Category :</label>
+            <label htmlFor="filter-category" className="block text-xs font-medium text-gray-700 mb-1">Category :</label>
             <CustomDropdown
+              id="filter-category"
               options={[
                 'All',
                 'Roadway',
@@ -254,16 +255,17 @@ const RoadSummaryPage = () => {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Min Chainage :</label>
-            <input type="text" value={minChainage} onChange={(e) => setMinChainage(e.target.value)} placeholder="Enter Chainage" className="w-full border border-[#5cb85c] rounded px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-[#5cb85c] focus:ring-2 focus:ring-[#5cb85c]/20 transition-all" />
+            <label htmlFor="filter-min-chainage" className="block text-xs font-medium text-gray-700 mb-1">Min Chainage :</label>
+            <input id="filter-min-chainage" name="minChainage" type="text" value={minChainage} onChange={(e) => setMinChainage(e.target.value)} placeholder="Enter Chainage" className="w-full border border-[#5cb85c] rounded px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-[#5cb85c] focus:ring-2 focus:ring-[#5cb85c]/20 transition-all" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Max Chainage :</label>
-            <input type="text" value={maxChainage} onChange={(e) => setMaxChainage(e.target.value)} placeholder="Enter Chainage" className="w-full border border-[#5cb85c] rounded px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-[#5cb85c] focus:ring-2 focus:ring-[#5cb85c]/20 transition-all" />
+            <label htmlFor="filter-max-chainage" className="block text-xs font-medium text-gray-700 mb-1">Max Chainage :</label>
+            <input id="filter-max-chainage" name="maxChainage" type="text" value={maxChainage} onChange={(e) => setMaxChainage(e.target.value)} placeholder="Enter Chainage" className="w-full border border-[#5cb85c] rounded px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-[#5cb85c] focus:ring-2 focus:ring-[#5cb85c]/20 transition-all" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Direction :</label>
+            <label htmlFor="filter-direction" className="block text-xs font-medium text-gray-700 mb-1">Direction :</label>
             <CustomDropdown
+              id="filter-direction"
               options={['Choose Direction', 'All', 'LHS', 'RHS']}
               value={direction}
               onChange={setDirection}
@@ -271,8 +273,9 @@ const RoadSummaryPage = () => {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Road Type :</label>
+            <label htmlFor="filter-road-type" className="block text-xs font-medium text-gray-700 mb-1">Road Type :</label>
             <CustomDropdown
+              id="filter-road-type"
               options={['Choose Road Type', 'All', 'SR', 'MCW']}
               value={roadType}
               onChange={setRoadType}
@@ -280,8 +283,9 @@ const RoadSummaryPage = () => {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Parameter Type :</label>
+            <label htmlFor="filter-param-type" className="block text-xs font-medium text-gray-700 mb-1">Parameter Type :</label>
             <CustomDropdown
+              id="filter-param-type"
               options={['Choose', 'Conventional', 'Digital', 'Both']}
               value={paramType}
               onChange={setParamType}
@@ -298,8 +302,9 @@ const RoadSummaryPage = () => {
           </div>
           
           <div className="w-[120px]">
-            <label className="block text-xs font-medium text-gray-700 mb-1 text-center">Version:</label>
+            <label htmlFor="filter-version" className="block text-xs font-medium text-gray-700 mb-1 text-center">Version:</label>
             <CustomDropdown
+              id="filter-version"
               options={projectBatches.length > 0 ? projectBatches.map(b => new Date(b.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })) : ['Choose']}
               value={version}
               onChange={setVersion}

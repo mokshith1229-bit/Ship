@@ -1,7 +1,7 @@
 import React from 'react';
 import { MdOutlineTableChart } from 'react-icons/md';
 
-const MasterListEmptyState = () => {
+const MasterListEmptyState = ({ onImport }) => {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center p-16 min-h-[400px]">
       <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-6 border-4 border-gray-100">
@@ -15,11 +15,10 @@ const MasterListEmptyState = () => {
       </p>
       
       <button 
-        disabled
-        className="px-6 py-2.5 bg-green-600/50 text-white font-medium rounded-lg cursor-not-allowed flex flex-col items-center justify-center"
+        onClick={onImport}
+        className="px-6 py-2.5 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors flex flex-col items-center justify-center shadow-sm"
       >
         <span>Import Master List</span>
-        <span className="text-[10px] uppercase tracking-widest mt-0.5 opacity-80">Coming Soon</span>
       </button>
     </div>
   );

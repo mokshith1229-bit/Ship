@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import Premium3DButton from '../../components/common/Premium3DButton';
 import { useNavigate } from 'react-router-dom';
 import { masterListService } from '../../services/masterList.service';
 import { surveyLibraryService } from '../../services/surveyLibrary.service';
 import { inspectionEngineService } from '../../services/inspectionEngine.service';
 import Layout from '../../components/Layout';
 import { MdAddRoad, MdOutlinePrecisionManufacturing } from 'react-icons/md';
+import CustomDropdown from '../../components/common/CustomDropdown';
 
 export default function RoadwaySamplingPage() {
   const navigate = useNavigate();
@@ -149,8 +151,8 @@ export default function RoadwaySamplingPage() {
     <Layout>
       <div className="max-w-4xl mx-auto w-full">
         <div className="flex items-center gap-3 mb-6">
-          <div className="h-10 w-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
-            <MdAddRoad size={24} />
+          <div className="p-3 bg-green-50 text-green-600 rounded-xl">
+            <MdAddRoad className="text-2xl" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-800 tracking-tight">Roadway Sampling</h1>
@@ -172,20 +174,15 @@ export default function RoadwaySamplingPage() {
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
-                <select
+                <CustomDropdown
+                  options={projects}
                   value={selectedProject}
-                  onChange={(e) => {
-                    setSelectedProject(e.target.value);
+                  onChange={(val) => {
+                    setSelectedProject(val);
                     setPreview(null);
                   }}
-                  required
-                  className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                >
-                  <option value="">Select Project</option>
-                  {projects.map(p => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
+                  placeholder="Select Project"
+                />
               </div>
             </div>
 
@@ -198,7 +195,7 @@ export default function RoadwaySamplingPage() {
                       type="checkbox"
                       checked={selectedStreams.includes(stream)}
                       onChange={() => handleStreamToggle(stream)}
-                      className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                      className="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
                     />
                     <span className="text-sm font-medium text-gray-700">{stream}</span>
                   </label>
@@ -219,7 +216,7 @@ export default function RoadwaySamplingPage() {
                   }}
                   placeholder="e.g. 180.000"
                   required
-                  className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                 />
               </div>
 
@@ -235,7 +232,7 @@ export default function RoadwaySamplingPage() {
                   }}
                   placeholder="e.g. 185.000"
                   required
-                  className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                 />
               </div>
 
@@ -250,26 +247,26 @@ export default function RoadwaySamplingPage() {
                   }}
                   placeholder="e.g. 10"
                   required
-                  className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                 />
               </div>
             </div>
 
             <div className="mt-2 flex justify-end">
-              <button
+              <Premium3DButton
                 type="submit"
                 disabled={loading || selectedStreams.length === 0}
-                className="px-6 py-2 bg-gray-800 text-white font-medium rounded-lg hover:bg-gray-900 disabled:opacity-50 transition-colors"
+                className="!w-auto flex items-center justify-center gap-2"
               >
                 {loading && !preview ? 'Calculating...' : 'Preview Validation'}
-              </button>
+              </Premium3DButton>
             </div>
           </form>
         </div>
 
         {preview && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center gap-2 mb-4 text-blue-700 font-bold">
+            <div className="flex items-center gap-2 mb-4 text-green-700 font-bold">
               <MdOutlinePrecisionManufacturing size={20} />
               <h3>Validation Preview</h3>
             </div>
@@ -323,9 +320,9 @@ export default function RoadwaySamplingPage() {
                 <div className="text-2xl font-bold text-orange-700">{preview.missingExtractionImages}</div>
               </div>
 
-              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                <div className="text-xs text-blue-700 font-medium uppercase tracking-wider mb-1">Total Tasks</div>
-                <div className="text-2xl font-bold text-blue-700">{preview.totalQuestionInstances}</div>
+              <div className="bg-green-50 p-4 rounded-xl border border-green-100">
+                <div className="text-xs text-green-700 font-medium uppercase tracking-wider mb-1">Total Tasks</div>
+                <div className="text-2xl font-bold text-green-700">{preview.totalQuestionInstances}</div>
               </div>
             </div>
 
@@ -335,13 +332,13 @@ export default function RoadwaySamplingPage() {
                 {preview.existingImages > 0 && <span> <strong>{preview.existingImages}</strong> existing images will be directly reused.</span>}
               </div>
               
-              <button
+              <Premium3DButton
                 onClick={handleGenerateBatch}
                 disabled={loading}
-                className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                className="!w-auto flex items-center justify-center gap-2"
               >
                 {loading ? 'Creating Batch...' : 'Generate Roadway Batch'}
-              </button>
+              </Premium3DButton>
             </div>
           </div>
         )}

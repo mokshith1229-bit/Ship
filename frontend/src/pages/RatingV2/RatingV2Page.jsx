@@ -87,8 +87,18 @@ const RatingV2Page = () => {
       if (signal && signal.aborted) return;
       
       const paginatedData = res?.data || res;
-      const fetchedTasks = paginatedData?.tasks || [];
-      const total = paginatedData?.total || 0;
+      let fetchedTasks = [];
+      let total = 0;
+
+      if (Array.isArray(paginatedData)) {
+        total = paginatedData.length;
+        const start = (page - 1) * PAGE_SIZE;
+        const end = start + PAGE_SIZE;
+        fetchedTasks = paginatedData.slice(start, end);
+      } else {
+        fetchedTasks = paginatedData?.tasks || [];
+        total = paginatedData?.total || 0;
+      }
 
       setTasks(fetchedTasks);
       setTotalTasks(total);

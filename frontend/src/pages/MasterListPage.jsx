@@ -32,16 +32,31 @@ const MasterListPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const [listResponse, statsResponse, projectsResponse] = await Promise.all([
-        masterListService.getMasterList(viewMode === 'table' && selectedProject ? { ...filters, project: selectedProject } : filters),
+      const promises = [
         masterListService.getStats(),
         masterListService.getProjects()
-      ]);
+      ];
 
-      if (listResponse.success && statsResponse.success) {
-        setData(listResponse.data || []);
+      if (viewMode === 'table') {
+        promises.push(masterListService.getMasterList(selectedProject ? { ...filters, project: selectedProject } : filters));
+      }
+
+      const results = await Promise.all(promises);
+      const statsResponse = results[0];
+      const projectsResponse = results[1];
+
+      if (statsResponse.success) {
         setStats(statsResponse.data);
         setProjects(projectsResponse.data || []);
+        
+        if (viewMode === 'table') {
+          const listResponse = results[2];
+          if (listResponse.success) {
+            setData(listResponse.data || []);
+          }
+        } else {
+          setData([]);
+        }
       } else {
         throw new Error('Failed to fetch master list data');
       }
@@ -130,14 +145,14 @@ const MasterListPage = () => {
               Try Again
             </button>
           </div>
+        ) : !loading && projects.length === 0 && Object.keys(filters).length === 0 ? (
+          <MasterListEmptyState onImport={() => setShowImportModal(true)} />
         ) : viewMode === 'folders' ? (
           <MasterListProjectFolders 
             projects={projects} 
             onSelectProject={handleSelectProject} 
             onProjectDeleted={fetchDashboardData} 
           />
-        ) : !loading && data.length === 0 && Object.keys(filters).length === 0 ? (
-          <MasterListEmptyState />
         ) : (
           <MasterListTable data={data} loading={loading} onRefresh={fetchDashboardData} />
         )}

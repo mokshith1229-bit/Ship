@@ -218,30 +218,12 @@ const SurveyLibraryPage = () => {
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
               <h2 className="text-sm font-bold text-textColor mb-3">1. Select Project</h2>
               <div className="relative w-full max-w-md" style={{ zIndex: 50 }}>
-                <button
-                  type="button"
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 text-textColor font-medium flex items-center justify-between cursor-pointer"
-                >
-                  <span className="truncate">{selectedProjectDisplay}</span>
-                  <MdKeyboardArrowDown className="text-gray-400 text-base" />
-                </button>
-                {isDropdownOpen && (
-                  <div className="absolute top-11 left-0 w-full bg-white border border-gray-200 rounded-lg shadow-lg flex flex-col overflow-hidden max-h-60">
-                    <div className="overflow-y-auto divide-y divide-gray-50">
-                      {projects.map((p, index) => (
-                        <button
-                          key={`proj-${p}-${index}`}
-                          type="button"
-                          onClick={() => handleProjectSelect(p)}
-                          className="w-full text-left px-3 py-2.5 text-xs hover:bg-green-50 transition-colors font-medium text-textColor"
-                        >
-                          {p}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <CustomDropdown
+                  options={projects}
+                  value={selectedProject}
+                  onChange={(val) => handleProjectSelect(val)}
+                  placeholder="Select a Project..."
+                />
               </div>
             </div>
 

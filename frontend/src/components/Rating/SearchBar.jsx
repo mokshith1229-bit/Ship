@@ -8,6 +8,8 @@ const SearchBar = ({ value, onChange }) => {
         <MdSearch className="h-5 w-5 text-gray-400" />
       </div>
       <input
+        id="rating-search-input"
+        name="ratingSearch"
         type="text"
         className="block w-full pl-11 pr-4 py-3 bg-white/80 backdrop-blur-md border border-white/20 rounded-2xl leading-5 bg-transparent placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#5cb85c]/50 focus:border-[#5cb85c] focus:bg-white transition-all duration-300 sm:text-sm shadow-[0_4px_20px_rgb(0,0,0,0.03)]"
         placeholder="Search roads by name or SPV..."

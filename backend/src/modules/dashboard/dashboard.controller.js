@@ -74,7 +74,8 @@ const getRoadsStatus = asyncHandler(async (req, res) => {
  *         description: Category distribution
  */
 const getCategoryDistribution = asyncHandler(async (req, res) => {
-  const data = await dashboardService.getCategoryDistribution(req.query.projectId);
+  const projectId = !req.query.projectId || req.query.projectId === 'null' || req.query.projectId === 'undefined' ? null : req.query.projectId;
+  const data = await dashboardService.getCategoryDistribution(projectId);
   return successResponse(res, data, 'Category distribution retrieved');
 });
 
@@ -96,7 +97,8 @@ const getCategoryDistribution = asyncHandler(async (req, res) => {
  *         description: Daily ratings data
  */
 const getDailyRatings = asyncHandler(async (req, res) => {
-  const data = await dashboardService.getDailyRatings(req.query.projectId, req.query.days);
+  const projectId = !req.query.projectId || req.query.projectId === 'null' || req.query.projectId === 'undefined' ? null : req.query.projectId;
+  const data = await dashboardService.getDailyRatings(projectId, req.query.days);
   return successResponse(res, data, 'Daily ratings retrieved');
 });
 
@@ -118,7 +120,8 @@ const getDailyRatings = asyncHandler(async (req, res) => {
  *         description: Inspector leaderboard
  */
 const getInspectorLeaderboard = asyncHandler(async (req, res) => {
-  const data = await dashboardService.getInspectorLeaderboard(req.query.projectId, req.query.limit);
+  const projectId = !req.query.projectId || req.query.projectId === 'null' || req.query.projectId === 'undefined' ? null : req.query.projectId;
+  const data = await dashboardService.getInspectorLeaderboard(projectId, req.query.limit);
   return successResponse(res, data, 'Inspector leaderboard retrieved');
 });
 
@@ -140,7 +143,8 @@ const getInspectorLeaderboard = asyncHandler(async (req, res) => {
  *         description: Recent activity list
  */
 const getRecentActivity = asyncHandler(async (req, res) => {
-  const data = await dashboardService.getRecentActivity(req.query.projectId, req.query.limit);
+  const projectId = !req.query.projectId || req.query.projectId === 'null' || req.query.projectId === 'undefined' ? null : req.query.projectId;
+  const data = await dashboardService.getRecentActivity(projectId, req.query.limit);
   return successResponse(res, data, 'Recent activity retrieved');
 });
 
@@ -178,7 +182,8 @@ const getAllProjectsMapData = asyncHandler(async (req, res) => {
  *         description: Charts data
  */
 const getChartsData = asyncHandler(async (req, res) => {
-  const data = await dashboardService.getChartsData(req.query.projectId);
+  const projectId = !req.query.projectId || req.query.projectId === 'null' || req.query.projectId === 'undefined' ? null : req.query.projectId;
+  const data = await dashboardService.getChartsData(projectId);
   return successResponse(res, data, 'Charts data retrieved');
 });
 
@@ -192,7 +197,8 @@ const getSkipGalleryTree = async (req, res) => {
 };
 
 const getSkipAnalytics = asyncHandler(async (req, res) => {
-  const data = await dashboardService.getSkipAnalytics(req.query.projectId, null, req.query);
+  const projectId = !req.query.projectId || req.query.projectId === 'null' || req.query.projectId === 'undefined' ? null : req.query.projectId;
+  const data = await dashboardService.getSkipAnalytics(projectId, null, req.query);
   return successResponse(res, data, 'Skip analytics retrieved');
 });
 

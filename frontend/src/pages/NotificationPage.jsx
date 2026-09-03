@@ -28,6 +28,7 @@ import {
 import AnimatedAssignButton from '../components/common/AnimatedAssignButton';
 import AnimatedDeliveryButton from '../components/common/AnimatedDeliveryButton';
 import DynamicGlowButton from '../components/common/DynamicGlowButton';
+import GenerateBatchButton from './InspectionEngine/components/GenerateBatchButton';
 
 // Helper to format date into "DD MMM YYYY"
 const formatDate = (dateStr) => {
@@ -411,8 +412,8 @@ const NotificationPage = () => {
   const handleBulkAssign = async (e) => {
     e.preventDefault();
 
-    if (!bulkFormData.routeSection) {
-      alert("Please select a valid Project and Route Section.");
+    if (!bulkFormData.routeSection || bulkFormData.routeSection.startsWith('no-batch-')) {
+      alert("Please select a valid Project that has an active in-progress batch.");
       return;
     }
     if (selectedBulkUsers.length === 0) {
@@ -643,11 +644,12 @@ const NotificationPage = () => {
             </div>
             
             {isAdmin && (
-              <DynamicGlowButton
+              <GenerateBatchButton
                 onClick={() => setIsBulkOpen(true)}
+                type="button"
               >
                 Bulk Assignment
-              </DynamicGlowButton>
+              </GenerateBatchButton>
             )}
           </div>
 
@@ -1625,20 +1627,24 @@ const NotificationPage = () => {
                               key={p.id}
                               id={`bulk-route-opt-${index}`}
                               type="button"
+                              disabled={!p.hasBatch}
                               onClick={() => {
                                 setBulkFormData(prev => ({ ...prev, routeSection: p.id }));
                                 setIsBulkRouteOpen(false);
                                 setBulkRouteSearch('');
                               }}
-                              className={`w-full text-left px-3 py-2 text-xs hover:bg-green-50/50 transition-colors font-medium ${
-                                bulkFormData.routeSection === p.id 
-                                  ? 'bg-green-50 text-green-600 font-bold' 
-                                  : bulkRouteActiveIndex === index 
-                                    ? 'bg-gray-50 text-textColor'
-                                    : 'text-textColor'
+                              className={`w-full text-left px-3 py-2 text-xs transition-colors font-medium flex items-center justify-between ${
+                                !p.hasBatch 
+                                  ? 'opacity-50 cursor-not-allowed bg-gray-50 text-gray-400'
+                                  : bulkFormData.routeSection === p.id 
+                                    ? 'bg-green-50 text-green-600 font-bold hover:bg-green-100' 
+                                    : bulkRouteActiveIndex === index 
+                                      ? 'bg-gray-50 text-textColor hover:bg-green-50/50'
+                                      : 'text-textColor hover:bg-green-50/50'
                               }`}
                             >
-                              {p.displayName}
+                              <span className="truncate">{p.displayName}</span>
+                              {!p.hasBatch && <span className="text-[9px] px-1.5 py-0.5 bg-gray-200 text-gray-500 rounded shrink-0 ml-2">No Batch</span>}
                             </button>
                           ))}
                         </div>

@@ -1,12 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MdSearch, MdFilterList } from 'react-icons/md';
 import CustomDropdown from '../common/CustomDropdown';
+import { projectService } from '../../services/project.service';
+import { ratingService } from '../../services/rating.service';
+import { useAuth } from '../../hooks/useAuth';
 
-const GlobalFilters = ({ selectedProject, setSelectedProject }) => {
+const GlobalFilters = ({ selectedProject, setSelectedProject, selectedOverview, setSelectedOverview }) => {
   const [selectedState, setSelectedState] = useState('');
   const [selectedAsset, setSelectedAsset] = useState('');
   const [selectedRating, setSelectedRating] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
+
+  const overviewOptions = [
+    { label: 'Executive Overview', value: '' },
+    { label: 'Skip Analytics', value: 'skip' },
+    { label: 'Inspection Comparison', value: 'comparison' }
+  ];
 
   const stateOptions = [
     { label: 'All States', value: '' },
@@ -16,13 +25,47 @@ const GlobalFilters = ({ selectedProject, setSelectedProject }) => {
     { label: 'Uttar Pradesh', value: 'UP' }
   ];
 
-  const projectOptions = [
-    { label: 'All Projects', value: '' },
-    { label: 'MKTPL', value: 'MKTPL' },
-    { label: 'NKTPL', value: 'NKTPL' },
-    { label: 'MSHP', value: 'MSHP' }
-  ];
+  const { user } = useAuth();
+  const isAdmin = user && (user.role === 'Admin' || user.role === 'Administrator' || user.role === 'HO' || user.role === 'SPV');
+  const [projectOptions, setProjectOptions] = useState([{ label: 'All Projects', value: '' }]);
 
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const [allProjectsRes, batches] = await Promise.all([
+          isAdmin ? projectService.getAllProjects().catch(() => []) : Promise.resolve([]),
+          ratingService.getReadyBatches().catch(() => [])
+        ]);
+
+        const allProjects = allProjectsRes.data || allProjectsRes || [];
+        const projectMap = {};
+
+        allProjects.forEach(p => {
+          const code = typeof p === 'string' ? p : (p.code || p.name || 'UNKNOWN');
+          if (code !== 'UNKNOWN') {
+            projectMap[code] = true;
+          }
+        });
+
+        const batchesList = Array.isArray(batches) ? batches : (batches?.data || []);
+        batchesList.forEach(batch => {
+          const pName = batch.project || 'UNKNOWN_BATCH_PROJECT';
+          if (pName !== 'UNKNOWN_BATCH_PROJECT') {
+            projectMap[pName] = true;
+          }
+        });
+
+        const options = [
+          { label: 'All Projects', value: '' },
+          ...Object.keys(projectMap).sort().map(code => ({ label: code, value: code }))
+        ];
+        setProjectOptions(options);
+      } catch (err) {
+        console.error('Failed to fetch projects for global filters:', err);
+      }
+    };
+    fetchProjects();
+  }, [isAdmin]);
   const assetOptions = [
     { label: 'Asset Type', value: '' },
     { label: 'Flexible Pavement', value: 'Flexible' },
@@ -54,9 +97,20 @@ const GlobalFilters = ({ selectedProject, setSelectedProject }) => {
       <div className="flex-1 min-w-[200px] relative">
         <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg" />
         <input 
+          id="global-search-input"
+          name="globalSearch"
           type="text" 
           placeholder="Search projects, roads, or assets..." 
           className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#5cb85c]/20 focus:border-[#5cb85c] transition-all"
+        />
+      </div>
+
+      <div className="w-[150px] shrink-0">
+        <CustomDropdown
+          options={overviewOptions}
+          value={selectedOverview}
+          onChange={setSelectedOverview}
+          placeholder="Executive Overview"
         />
       </div>
 
