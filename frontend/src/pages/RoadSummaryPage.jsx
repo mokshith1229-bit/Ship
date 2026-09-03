@@ -21,6 +21,16 @@ const RoadSummaryPage = () => {
   const [minChainage, setMinChainage] = useState('');
   const [maxChainage, setMaxChainage] = useState('');
   const [concernedItems, setConcernedItems] = useState(false);
+  const [activeTab, setActiveTab] = useState('RATING POINTS');
+
+  const tabsFilters = [
+    { id: 'RATING POINTS', label: 'RATING POINTS' },
+    { id: 'RATING SUMMARY', label: 'RATING SUMMARY' },
+    { id: 'RATING VERSION HISTORY', label: 'RATING VERSION HISTORY' },
+    { id: 'RATING CHAINAGES', label: 'RATING CHAINAGES' },
+    { id: 'ROAD DETAILS', label: 'ROAD DETAILS' },
+    { id: 'ROAD HISTORY', label: 'ROAD HISTORY' }
+  ];
   
   const [appliedFilters, setAppliedFilters] = useState({
     category: 'Roadway',
@@ -210,17 +220,6 @@ const RoadSummaryPage = () => {
     }
   };
 
-  
-  const tabsFilters = [
-    { id: 'RATING POINTS', label: 'RATING POINTS' },
-    { id: 'RATING SUMMARY', label: 'RATING SUMMARY' },
-    { id: 'RATING VERSION HISTORY', label: 'RATING VERSION HISTORY' },
-    { id: 'RATING CHAINAGES', label: 'RATING CHAINAGES' },
-    { id: 'ROAD DETAILS', label: 'ROAD DETAILS' },
-    { id: 'ROAD HISTORY', label: 'ROAD HISTORY' }
-  ];
-
-  const [activeTab, setActiveTab] = useState('RATING POINTS');
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[#F8FAFC]">
