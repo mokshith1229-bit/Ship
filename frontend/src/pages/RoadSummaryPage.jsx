@@ -137,6 +137,16 @@ const RoadSummaryPage = () => {
     }
   }, [version, projectBatches, activeBatchId]);
 
+  useEffect(() => {
+    if (activeTab !== 'RATING VERSION HISTORY' && projectBatches.length > 0) {
+       const latestBatch = projectBatches[0];
+       const dateStr = new Date(latestBatch.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+       if (version !== dateStr) {
+           setVersion(dateStr);
+       }
+    }
+  }, [activeTab, projectBatches, version]);
+
   let currentData = questions;
   
   // Apply filters based on appliedFilters state
@@ -301,20 +311,28 @@ const RoadSummaryPage = () => {
             <label htmlFor="concerned" className="text-sm font-medium text-gray-700">Concerned Items</label>
           </div>
           
-          <div className="w-[120px]">
-            <label htmlFor="filter-version" className="block text-xs font-medium text-gray-700 mb-1 text-center">Version:</label>
-            <CustomDropdown
-              id="filter-version"
-              options={projectBatches.length > 0 ? projectBatches.map(b => new Date(b.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })) : ['Choose']}
-              value={version}
-              onChange={setVersion}
-              placeholder="Version"
-            />
-          </div>
-          
-          <button onClick={handleGetRatings} className="bg-[#5cb85c] hover:bg-green-600 text-white font-medium py-1.5 px-6 rounded text-sm transition-colors mb-0.5">
-            Get Ratings
-          </button>
+          {activeTab === 'RATING VERSION HISTORY' ? (
+            <>
+              <div className="w-[120px]">
+                <label htmlFor="filter-version" className="block text-xs font-medium text-gray-700 mb-1 text-center">Version:</label>
+                <CustomDropdown
+                  id="filter-version"
+                  options={projectBatches.length > 0 ? projectBatches.map(b => new Date(b.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })) : ['Choose']}
+                  value={version}
+                  onChange={setVersion}
+                  placeholder="Version"
+                />
+              </div>
+              
+              <button onClick={handleGetRatings} className="bg-[#5cb85c] hover:bg-green-600 text-white font-medium py-1.5 px-6 rounded text-sm transition-colors mb-0.5">
+                Get Ratings
+              </button>
+            </>
+          ) : (
+            <button onClick={handleGetRatings} className="bg-[#5cb85c] hover:bg-green-600 text-white font-medium py-1.5 px-6 rounded text-sm transition-colors mb-0.5">
+              Apply Filters
+            </button>
+          )}
           
           <button onClick={handleExportCSV} className="flex items-center gap-2 border-2 border-[#5cb85c] text-[#5cb85c] hover:bg-green-50 font-medium py-1.5 px-4 rounded text-sm transition-colors mb-0.5">
             <MdOutlineFileDownload className="text-lg" />
