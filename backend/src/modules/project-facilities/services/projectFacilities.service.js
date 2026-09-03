@@ -9,8 +9,8 @@ const { PROJECT_FACILITY_QUESTION_CONFIG } = require('../projectFacilities.confi
 const normalizeFacilityType = (type) => {
   if (!type) return null;
   const lower = String(type).trim().toLowerCase();
-  if (lower.includes('bus bay')) return 'BUS_BAY';
-  if (lower.includes('truck lay by') || lower.includes('truck lay-by') || lower.includes('truck layby')) return 'TRUCK_LAY_BY';
+  if (lower.includes('bus bay') || lower.includes('busbay')) return 'BUS_BAY';
+  if (lower.includes('truck lay by') || lower.includes('truck lay-by') || lower.includes('truck layby') || lower.includes('trucklaybye') || lower.includes('truck laybye')) return 'TRUCK_LAY_BY';
   return null;
 };
 
@@ -123,12 +123,13 @@ class ProjectFacilitiesService {
           continue;
         }
 
+          const sideVal = sideRaw === 'RHS' || sideRaw === 'LHS' ? sideRaw : 'N/A';
         validFacilities.push({
-          id: `${normalizedType}-${chainageNum.toFixed(3)}`, // Unique ID for duplicate detection
+          id: `${normalizedType}-${chainageNum.toFixed(3)}-${sideVal}`, // Unique ID for duplicate detection
           originalType: facilityTypeRaw,
           normalizedType,
           chainage: chainageNum,
-          side: sideRaw === 'RHS' || sideRaw === 'LHS' ? sideRaw : 'N/A',
+          side: sideVal,
           questionsMatrix: {
             applicable: questions.length,
             totalGenerated: questions.length

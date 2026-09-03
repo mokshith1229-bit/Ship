@@ -181,6 +181,7 @@ const Sidebar = () => {
     { name: 'Survey Processing', icon: MdOutlineVideoCameraFront, path: '/survey-processing', allowedRoles: ['Admin', 'Administrator'] },
     { name: 'Image Review', icon: MdImageSearch, path: '/image-review', allowedRoles: ['Admin', 'Administrator', 'HO'] },
     { name: 'Rating', icon: MdStarRate, path: '/rating', allowedRoles: ['Admin', 'Administrator', 'HO', 'SPV', 'User'] },
+    { name: 'Rating V2', icon: MdStarRate, path: '/rating-v2', allowedRoles: ['Admin', 'Administrator', 'HO', 'SPV', 'User'] },
     { name: 'SHIP', icon: MdInsights, path: '/ship', allowedRoles: ['Admin', 'Administrator', 'HO'] },
     { name: 'Reports', icon: MdList, path: '/reports', allowedRoles: ['Admin', 'Administrator', 'HO'] },
     { name: 'Notifications', icon: MdNotifications, path: '/notifications', allowedRoles: ['Admin', 'Administrator', 'HO', 'SPV', 'User'] },

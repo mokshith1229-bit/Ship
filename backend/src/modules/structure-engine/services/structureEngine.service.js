@@ -17,8 +17,13 @@ const STRUCTURE_QUESTION_DEFINITIONS = {
   'WC_CRACKS': { code: 'WC_CRACKS', question: 'Cracks (Alligator cracks)', category: 'Wearing coat on deck slab', placement: 'ALL_POINTS' },
   'WC_RUTTING': { code: 'WC_RUTTING', question: 'Rutting', category: 'Wearing coat on deck slab', placement: 'ALL_POINTS' },
 
+  // Non Buried Expansion Joint
+  'NBEJ_STRIP_SEAL': { code: 'NBEJ_STRIP_SEAL', question: 'Strip seal expansion joint buried under BC', category: 'Non Buried Expansion Joint', placement: 'ALL_POINTS' },
+  'NBEJ_PUNCTURE': { code: 'NBEJ_PUNCTURE', question: 'Puncturing/missing of expansion joint sealant', category: 'Non Buried Expansion Joint', placement: 'ALL_POINTS' },
+  'NBEJ_EDGE_ANGLES': { code: 'NBEJ_EDGE_ANGLES', question: 'Damages to edge angles', category: 'Non Buried Expansion Joint', placement: 'ALL_POINTS' },
+  'NBEJ_CONCRETE': { code: 'NBEJ_CONCRETE', question: 'Condition of concrete on either side of edge angles', category: 'Non Buried Expansion Joint', placement: 'ALL_POINTS' },
+
   // Other Structure Questions
-  'NON_BURIED_EXPANSION_JOINT': { code: 'NON_BURIED_EXPANSION_JOINT', question: 'Non buried expansion joint', category: 'Structures', placement: 'ALL_POINTS' },
   'DRAINAGE_SPOUTS': { code: 'DRAINAGE_SPOUTS', question: 'Drainage spouts', category: 'Structures', placement: 'ALL_POINTS' },
   'APPROACH_SETTLEMENTS': { code: 'APPROACH_SETTLEMENTS', question: 'Approach settlements', category: 'Structures', placement: 'START_END' },
   'STAGNATION_OF_RAIN_WATER': { code: 'STAGNATION_OF_RAIN_WATER', question: 'Stagnation of rain water', category: 'Structures', placement: 'ALL_POINTS' },
@@ -84,7 +89,10 @@ const STRUCTURE_QUESTION_CONFIG = {
     STRUCTURE_QUESTION_DEFINITIONS['WC_POTHOLES'],
     STRUCTURE_QUESTION_DEFINITIONS['WC_CRACKS'],
     STRUCTURE_QUESTION_DEFINITIONS['WC_RUTTING'],
-    STRUCTURE_QUESTION_DEFINITIONS['NON_BURIED_EXPANSION_JOINT'],
+    STRUCTURE_QUESTION_DEFINITIONS['NBEJ_STRIP_SEAL'],
+    STRUCTURE_QUESTION_DEFINITIONS['NBEJ_PUNCTURE'],
+    STRUCTURE_QUESTION_DEFINITIONS['NBEJ_EDGE_ANGLES'],
+    STRUCTURE_QUESTION_DEFINITIONS['NBEJ_CONCRETE'],
     STRUCTURE_QUESTION_DEFINITIONS['DRAINAGE_SPOUTS'],
     STRUCTURE_QUESTION_DEFINITIONS['RCB_HAND_RAIL'],
     STRUCTURE_QUESTION_DEFINITIONS['RCB_PAINTING'],
@@ -112,15 +120,24 @@ class StructureEngineService {
   async detectSheets(fileBuffer) {
     const workbook = xlsx.read(fileBuffer, { type: 'buffer' });
     const structureSheetNames = [];
-    const knownTypes = ['major bridge', 'minor bridge', 'box culvert', 'pipe culvert', 'pup', 'vup'];
+    const knownTypesMap = {
+      'major bridge': 'Major Bridge',
+      'minor bridge': 'Minor Bridge',
+      'box culvert': 'Box Culvert',
+      'pipe culvert': 'Pipe Culvert',
+      'lvup': 'LVUP',
+      'vup': 'VUP',
+      'pup': 'PUP',
+      'underpass': 'Underpass'
+    };
     
     workbook.SheetNames.forEach(sheetName => {
       const lower = sheetName.toLowerCase();
       
       let detectedType = null;
-      for (const type of knownTypes) {
+      for (const type of Object.keys(knownTypesMap)) {
         if (lower.includes(type)) {
-          detectedType = type;
+          detectedType = knownTypesMap[type];
           break;
         }
       }
@@ -128,19 +145,18 @@ class StructureEngineService {
       if (!detectedType) {
         const rawData = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
         const flatData = rawData.flat().map(c => String(c).toLowerCase());
-        for (const type of knownTypes) {
+        for (const type of Object.keys(knownTypesMap)) {
           if (flatData.some(cell => cell.includes(type))) {
-            detectedType = type;
+            detectedType = knownTypesMap[type];
             break;
           }
         }
       }
       
       if (detectedType) {
-        const typeTitle = detectedType.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
         structureSheetNames.push({
           sheetName,
-          type: typeTitle
+          type: detectedType
         });
       }
     });
@@ -149,7 +165,7 @@ class StructureEngineService {
 
   _findHeaderRowAndData(sheet) {
     const rawData = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' }); 
-    const expectedKeywords = ['sl', 'km', 'chainage', 'side', 'length', 'span', 'width', 'structure', 'type', 'remarks'];
+    const expectedKeywords = ['sl', 'km', 'chainage', 'side', 'length', 'span', 'width', 'structure', 'type', 'remarks', 'from', 'to', 'end'];
     
     let bestRowIndex = 0;
     let maxMatches = 0;
@@ -227,7 +243,7 @@ class StructureEngineService {
           slNo = parentValues.slNo;
         }
 
-        let existingKmStr = normalizedRow['existing_km'] || normalizedRow['chainage'] || normalizedRow['existing_chainage'] || normalizedRow['start_chainage'];
+        let existingKmStr = normalizedRow['existing_km'] || normalizedRow['chainage'] || normalizedRow['existing_chainage'] || normalizedRow['start_chainage'] || normalizedRow['from'];
         if (existingKmStr !== '' && existingKmStr !== undefined) {
           parentValues.existingKm = existingKmStr;
         } else {
@@ -262,8 +278,22 @@ class StructureEngineService {
           return;
         }
 
-        const isRange = structType !== 'Box Culvert' && structType !== 'Pipe Culvert';
+        const isRange = structType.toLowerCase().includes('major bridge') || structType.toLowerCase().includes('minor bridge');
         let length = parseFloat(lengthStr);
+        let explicitEndChainage = null;
+
+        let endKmStr = normalizedRow['to'] || normalizedRow['end_ch'] || normalizedRow['end_chainage'] || normalizedRow['end'];
+        if (endKmStr !== undefined && endKmStr !== '') {
+          const parsedEnd = parseFloat(endKmStr);
+          if (!isNaN(parsedEnd)) {
+            explicitEndChainage = parsedEnd;
+          }
+        }
+        
+        // Fallback: Calculate length if explicit end chainage is provided but length is missing/invalid
+        if ((isNaN(length) || length <= 0) && explicitEndChainage !== null) {
+          length = parseFloat((explicitEndChainage - startChainage).toFixed(3));
+        }
         
         if (isRange) {
           if (isNaN(length) || length <= 0) {
@@ -281,6 +311,7 @@ class StructureEngineService {
             type: structType,
             sheet: sheetName,
             startChainage,
+            explicitEndChainage,
             length,
             sides: new Set(),
             spanArrangement,
@@ -305,7 +336,7 @@ class StructureEngineService {
       });
 
       for (const [key, structObj] of groupedStructures.entries()) {
-        const isRange = structObj.type !== 'Box Culvert' && structObj.type !== 'Pipe Culvert';
+        const isRange = structObj.type.toLowerCase().includes('major bridge') || structObj.type.toLowerCase().includes('minor bridge');
         
         if (isRange && (structObj.length === null || structObj.length === undefined || isNaN(structObj.length) || structObj.length <= 0)) {
           invalidStructures.push({ rowNumber: structObj._originalRow || 'Multiple', sheet: sheetName, reason: `Missing or invalid length for range structure (Start: ${structObj.startChainage})` });
@@ -320,7 +351,15 @@ class StructureEngineService {
 
         let endChainage = null;
         if (isRange) {
-          endChainage = structObj.startChainage + (structObj.length / 1000);
+          if (structObj.explicitEndChainage !== null) {
+            endChainage = structObj.explicitEndChainage;
+          } else if (structObj.length && !isNaN(structObj.length)) {
+            // Assume length < 50 is in KM, otherwise it's in meters
+            const lengthKm = structObj.length < 50 ? structObj.length : (structObj.length / 1000);
+            endChainage = structObj.startChainage + lengthKm;
+          } else {
+            endChainage = structObj.startChainage; // Fallback to start if no length provided
+          }
         }
 
         // Apply Optional Structure Type Filter
@@ -478,18 +517,21 @@ class StructureEngineService {
             score: 10
           }));
 
-          tasksToInsert.push({
-            batchId: batch._id,
-            project: projectId,
-            category: 'Structures',
-            direction: struct.side,
-            assetType: struct.type, 
-            assetSubType: struct.typeOfSuperstructure,
-            chainage: chainageStr,
-            status: 'PENDING_IMAGE',
-            parameters: [], // Must be empty to satisfy ObjectId ref validation
-            ratings: mappedRatings,
-            assetMetadata: {
+          const sidesToGenerate = struct.side === 'BHS' ? ['LHS', 'RHS'] : [struct.side];
+
+          for (const dir of sidesToGenerate) {
+            tasksToInsert.push({
+              batchId: batch._id,
+              project: projectId,
+              category: 'Structures',
+              direction: dir,
+              assetType: struct.type, 
+              assetSubType: struct.typeOfSuperstructure,
+              chainage: chainageStr,
+              status: 'PENDING_IMAGE',
+              parameters: [], // Must be empty to satisfy ObjectId ref validation
+              ratings: mappedRatings,
+              assetMetadata: {
               structureId: struct.structureId,
               typeOfStructure: struct.type,
               sourceSheet: struct.sheet,
@@ -509,6 +551,7 @@ class StructureEngineService {
               remarks: struct.remarks
             }
           });
+          }
         }
       }
 

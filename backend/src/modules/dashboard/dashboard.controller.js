@@ -182,6 +182,15 @@ const getChartsData = asyncHandler(async (req, res) => {
   return successResponse(res, data, 'Charts data retrieved');
 });
 
+const getSkipGalleryTree = async (req, res) => {
+  try {
+    const tree = await dashboardService.getSkipGalleryTree(req.query.projectId);
+    res.json({ success: true, data: tree });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message, stack: err.stack });
+  }
+};
+
 const getSkipAnalytics = asyncHandler(async (req, res) => {
   const data = await dashboardService.getSkipAnalytics(req.query.projectId, null, req.query);
   return successResponse(res, data, 'Skip analytics retrieved');
@@ -198,5 +207,6 @@ module.exports = {
   getRecentActivity,
   getAllProjectsMapData,
   getChartsData,
-  getSkipAnalytics
+  getSkipAnalytics,
+  getSkipGalleryTree
 };

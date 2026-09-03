@@ -155,4 +155,9 @@ const skipTask = asyncHandler(async (req, res) => {
   return successResponse(res, data, 'Task skipped successfully');
 });
 
-module.exports = { getProjectRatings, getRatingSummary, getVersionHistory, getOverallRating, getReadyBatches, getBatchTasks, saveTaskRatings, skipTask, exportRatingsCSV };
+const unskipTask = asyncHandler(async (req, res) => {
+  const data = await ratingService.unskipTask(req.params.taskId, req.body, req.user);
+  return successResponse(res, data, 'Task unskipped successfully');
+});
+
+module.exports = { getProjectRatings, getRatingSummary, getVersionHistory, getOverallRating, getReadyBatches, getBatchTasks, saveTaskRatings, skipTask, unskipTask, exportRatingsCSV };

@@ -1,28 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { MdUndo, MdEdit, MdHome, MdClose } from 'react-icons/md';
+import { MdUndo, MdEdit, MdHome, MdClose, MdArrowBack } from 'react-icons/md';
 import { motion, AnimatePresence } from 'framer-motion';
 import ImageCarousel from '../components/Rating/ImageCarousel';
 import CustomDropdown from '../components/common/CustomDropdown';
 import { ratingService } from '../services/rating.service';
-import { projectService } from '../services/project.service';
+import { resolveRemarkRating } from '../utils/remarkRatingResolver';
 import leftArrowImg from '../assets/leftarrow.PNG';
 import rightArrowImg from '../assets/rightarrow.PNG';
+import MasterListEditModal from '../pages/MasterList/components/MasterListEditModal';
 
-const REMARK_OPTIONS = [
-  'Rectified',
-  'Not Rectified',
-  'Due to crack',
-  'Due to rutting',
-  'Due to pothole',
-  'Minor Damage',
-  'Major Damage',
-  'Needs Cleaning',
-  'Missing',
-  'Requires Replacement',
-  'Good Condition'
-];
-
+// REMARK_OPTIONS removed in favor of dynamic JSON config
 const SKIP_REASONS = [
   'Image does not match Chainage',
   'Wrong Survey Image',
@@ -43,7 +31,8 @@ const buildInitialRatings = (task) => {
   if (task.ratings && task.ratings.length > 0) {
     const map = {};
     task.ratings.forEach(r => {
-      map[r.masterListId] = { score: String(r.score ?? 10), remark: r.remark || '' };
+      const key = (task.category === 'Roadway' || task.category === 'Structures' || task.category === 'Project Facilities' || task.category === 'ATMS') ? r.parameterKey : r.masterListId;
+      map[key] = { score: String(r.score ?? 10), remark: r.remark || '' };
     });
     return map;
   }
@@ -57,50 +46,122 @@ const buildInitialRatings = (task) => {
 const InspectorApp = () => {
   const { batchId } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const startIndex = parseInt(searchParams.get('startIndex'), 10) || 0;
   
+  const [globalIndex, setGlobalIndex] = useState(startIndex);
+  const [loadedPage, setLoadedPage] = useState(null);
   const [tasks, setTasks] = useState([]);
-  const [currentIndex, setCurrentIndex] = useState(startIndex);
+  const [totalTasks, setTotalTasks] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [allRatings, setAllRatings] = useState({});
   const [isEditMode, setIsEditMode] = useState(false);
   const [expandedCard, setExpandedCard] = useState(null);
   const [headerRemarks, setHeaderRemarks] = useState({});
+  const [editingMasterListParam, setEditingMasterListParam] = useState(null);
   const [activeImageIndex, setActiveImageIndex] = useState(1);
   const [customRemarkMode, setCustomRemarkMode] = useState({});
   const [skipModalOpen, setSkipModalOpen] = useState(false);
   const [skipReason, setSkipReason] = useState('');
   const [skipRemarks, setSkipRemarks] = useState('');
+  const [skipGroup, setSkipGroup] = useState(null); // Tracks which Asset Type is being skipped for Roadway
   const [skipping, setSkipping] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
+  const [remarkMasterConfig, setRemarkMasterConfig] = useState({});
+  const [userCustomRemarks, setUserCustomRemarks] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('userCustomRemarks')) || {};
+    } catch {
+      return {};
+    }
+  });
+
+  const PAGE_SIZE = 100;
+  const targetPage = Math.floor(globalIndex / PAGE_SIZE) + 1;
+  const localIndex = globalIndex % PAGE_SIZE;
 
   useEffect(() => {
-    fetchTasks();
-    // In case startIndex changes while mounted
-    setCurrentIndex(startIndex);
-  }, [batchId, startIndex]);
+    const handleStorageChange = () => {
+      try {
+        setUserCustomRemarks(JSON.parse(localStorage.getItem('userCustomRemarks')) || {});
+      } catch(e) {}
+    };
+    window.addEventListener('customRemarksUpdated', handleStorageChange);
+    window.addEventListener('storage', handleStorageChange); // To sync across tabs
+    return () => {
+      window.removeEventListener('customRemarksUpdated', handleStorageChange);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
-  const fetchTasks = async () => {
+  useEffect(() => {
+    fetch('/remarkMaster.json')
+      .then(res => res.json())
+      .then(data => setRemarkMasterConfig(data))
+      .catch(err => console.error('Failed to load remarkMaster.json', err));
+  }, []);
+
+  useEffect(() => {
+    setGlobalIndex((prev) => prev !== startIndex ? startIndex : prev);
+  }, [startIndex]);
+
+  useEffect(() => {
+    setLoadedPage(null); // Force reload ONLY if batchId changes
+  }, [batchId]);
+
+  useEffect(() => {
+    // Reset custom remark inputs when navigating to a new task
+    setCustomRemarkMode({});
+    setValidationErrors({});
+    
+    // Sync URL with globalIndex so refreshing preserves the state
+    setSearchParams({ startIndex: globalIndex }, { replace: true });
+  }, [globalIndex, setSearchParams]);
+
+  useEffect(() => {
+    if (loadedPage !== targetPage && batchId) {
+      const controller = new AbortController();
+      fetchTasksForPage(targetPage, controller.signal);
+      return () => controller.abort();
+    }
+  }, [targetPage, loadedPage, batchId]);
+
+  const fetchTasksForPage = async (page, signal) => {
     try {
       setLoading(true);
-      const res = await ratingService.getBatchTasks(batchId);
-      const fetchedTasks = res.data || [];
+      const res = await ratingService.getBatchTasks(batchId, { page, limit: PAGE_SIZE });
+      if (signal && signal.aborted) return;
+      
+      const paginatedData = res?.data || res;
+      const fetchedTasks = paginatedData?.tasks || [];
+      const total = paginatedData?.total || 0;
+
       setTasks(fetchedTasks);
-      const initialAllRatings = {};
-      fetchedTasks.forEach(t => {
-        initialAllRatings[t._id] = buildInitialRatings(t);
+      setTotalTasks(total);
+      setLoadedPage(page);
+
+      setAllRatings(prev => {
+        const updated = { ...prev };
+        fetchedTasks.forEach(t => {
+          if (!updated[t._id]) {
+            updated[t._id] = buildInitialRatings(t);
+          }
+        });
+        return updated;
       });
-      setAllRatings(initialAllRatings);
     } catch (err) {
+      if (err.name === 'CanceledError' || err.name === 'AbortError') return;
       console.error(err);
       alert('Failed to load inspection tasks.');
     } finally {
-      setLoading(false);
+      if (!signal || !signal.aborted) {
+        setLoading(false);
+      }
     }
   };
 
-  const currentTask = tasks[currentIndex] || null;
+  const currentTask = tasks[localIndex] || null;
   const taskRatings = currentTask ? (allRatings[currentTask._id] || {}) : {};
 
   const getRating = (masterListId) => taskRatings[masterListId] || { score: '10', remark: '' };
@@ -136,35 +197,149 @@ const InspectorApp = () => {
     return subType ? `${aType} (${subType})` : aType;
   };
 
-  const metaHeaders = currentTask ? [
-    { key: 'category',  label: 'Category',   value: firstParam.category  || '-' },
-    { key: 'assetType', label: 'Asset type', value: displayAssetType() },
-    { key: 'direction', label: 'Direction',  value: firstParam.direction || '-' },
-    { key: 'roadType',  label: 'Road Type',  value: firstParam.roadType  || '-' },
-    { key: 'placement', label: 'Placement',  value: firstParam.placement || '-' },
-    { key: 'chainage',  label: 'Chainage',   value: currentTask.chainage || '-' }
-  ] : [];
+  const metaHeaders = currentTask ? (
+    currentTask.category === 'Structures' ? [
+      { key: 'category',  label: 'Category',   value: currentTask.category || '-' },
+      { key: 'structureId', label: 'Structure ID', value: currentTask.assetMetadata?.structureId || '-' },
+      { key: 'type', label: 'Structure Type', value: currentTask.assetType || currentTask.assetMetadata?.typeOfStructure || '-' },
+      { key: 'direction', label: 'Direction',  value: currentTask.direction || '-' },
+      { key: 'range', label: 'Structure Range', value: currentTask.assetMetadata?.startChainage !== undefined ? (currentTask.assetMetadata?.endChainage ? `${currentTask.assetMetadata?.startChainage?.toFixed(3)} - ${currentTask.assetMetadata?.endChainage?.toFixed(3)}` : `${currentTask.assetMetadata?.startChainage?.toFixed(3)}`) : '-' },
+      { key: 'chainage',  label: 'Inspection Chainage',   value: currentTask.chainage || '-' }
+    ] : [
+      { key: 'category',  label: 'Category',   value: currentTask.category || firstParam.category  || '-' },
+      { key: 'assetType', label: 'Asset type', value: displayAssetType() },
+      { key: 'direction', label: 'Direction',  value: currentTask.direction || firstParam.direction || '-' },
+      { key: 'roadType',  label: 'Road Type',  value: currentTask.roadType || firstParam.roadType  || '-' },
+      { key: 'placement', label: 'Placement',  value: currentTask.placement || firstParam.placement || '-' },
+      { key: 'chainage',  label: 'Chainage',   value: currentTask.chainage || '-' }
+    ]
+  ) : [];
 
   const saveCurrentTask = async () => {
     if (!currentTask) return true;
     try {
       setSaving(true);
-      const ratingsPayload = (currentTask.parameters || []).map(p => ({
-        masterListId: p._id,
-        score: Number(taskRatings[p._id]?.score ?? 10),
-        remark: taskRatings[p._id]?.remark || ''
-      }));
+      let ratingsPayload = [];
+      if (currentTask.category === 'Roadway') {
+        const skippedGroups = new Set((currentTask.skippedAssetTypes || []).map(s => s.assetType));
+        
+        // 1. Add Roadway fixed parameters
+        const roadwayRatings = (currentTask.ratings || [])
+          .filter(p => !skippedGroups.has(p.group))
+          .map(p => ({
+            parameterKey: p.parameterKey,
+            parameterName: p.parameterName,
+            group: p.group,
+            score: Number(taskRatings[p.parameterKey]?.score ?? 10),
+            remark: taskRatings[p.parameterKey]?.remark || ''
+          }));
+          
+        // 2. Add RSF parameters (if any)
+        const rsfRatings = (currentTask.parameters || [])
+          .filter(p => !skippedGroups.has(p.assetType)) // Skip if the RSF asset type was skipped
+          .map(p => ({
+            masterListId: p._id,
+            score: Number(taskRatings[p._id]?.score ?? 10),
+            remark: taskRatings[p._id]?.remark || ''
+          }));
+          
+        ratingsPayload = [...roadwayRatings, ...rsfRatings];
+      } else if (currentTask.category === 'Structures' || currentTask.category === 'Project Facilities' || currentTask.category === 'ATMS') {
+        ratingsPayload = (currentTask.ratings || []).map(p => ({
+          parameterKey: p.parameterKey,
+          parameterName: p.parameterName,
+          group: p.group,
+          score: Number(taskRatings[p.parameterKey]?.score ?? 10),
+          remark: taskRatings[p.parameterKey]?.remark || ''
+        }));
+      } else {
+        ratingsPayload = (currentTask.parameters || []).map(p => ({
+          masterListId: p._id,
+          score: Number(taskRatings[p._id]?.score ?? 10),
+          remark: taskRatings[p._id]?.remark || ''
+        }));
+      }
       
+      const errors = {};
+      let firstErrorPId = null;
+      
+      for (const r of ratingsPayload) {
+        const score = Number(r.score);
+        const remark = (r.remark || '').trim();
+        if ([0, 1, 5].includes(score) && (!remark || remark === 'Other')) {
+          const pId = r.parameterKey || r.masterListId;
+          errors[pId] = "Please enter remark";
+          if (!firstErrorPId) firstErrorPId = pId;
+        }
+      }
+      
+      if (Object.keys(errors).length > 0) {
+        setValidationErrors(errors);
+        setCustomRemarkMode(prev => {
+          const next = { ...prev };
+          Object.keys(errors).forEach(pId => {
+             next[pId] = true; 
+          });
+          return next;
+        });
+        
+        setTimeout(() => {
+          const errorEl = document.getElementById(`remark-input-${firstErrorPId}`);
+          if (errorEl) {
+            errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            errorEl.focus();
+          }
+        }, 100);
+        
+        setSaving(false);
+        return false;
+      }
+      
+      setValidationErrors({});
+      
+      // Save custom remarks to localStorage
+      const currentCat = currentTask.category || 'N/A';
+      const existingOptions = remarkMasterConfig[currentCat] || [];
+      const newCustomRemarks = [];
+      
+      ratingsPayload.forEach(r => {
+        const remark = r.remark?.trim();
+        if (remark && remark !== 'Other' && !existingOptions.includes(remark)) {
+          newCustomRemarks.push(remark);
+        }
+      });
+      
+      if (newCustomRemarks.length > 0) {
+        try {
+          const stored = JSON.parse(localStorage.getItem('userCustomRemarks')) || {};
+          const catStored = stored[currentCat] || [];
+          let updated = false;
+          newCustomRemarks.forEach(r => {
+            if (!catStored.includes(r)) {
+              catStored.push(r);
+              updated = true;
+            }
+          });
+          if (updated) {
+            stored[currentCat] = catStored;
+            localStorage.setItem('userCustomRemarks', JSON.stringify(stored));
+            window.dispatchEvent(new Event('customRemarksUpdated'));
+          }
+        } catch(e) {
+          console.error("Error saving custom remarks", e);
+        }
+      }
+
       const selectedImageUrl = images[activeImageIndex]?.url;
       
       await ratingService.saveTaskRatings(currentTask._id, ratingsPayload, selectedImageUrl);
       setTasks(prev => {
         const updated = [...prev];
-        const taskToUpdate = { ...updated[currentIndex], status: 'COMPLETED', ratings: ratingsPayload };
+        const taskToUpdate = { ...updated[localIndex], status: 'COMPLETED', ratings: ratingsPayload };
         if (selectedImageUrl) {
           taskToUpdate.image = { ...taskToUpdate.image, cloudinaryUrl: selectedImageUrl };
         }
-        updated[currentIndex] = taskToUpdate;
+        updated[localIndex] = taskToUpdate;
         return updated;
       });
       return true;
@@ -180,27 +355,21 @@ const InspectorApp = () => {
   const handleNext = async () => {
     const ok = await saveCurrentTask();
     if (!ok) return;
-    if (currentIndex < tasks.length - 1) {
-      setCurrentIndex(prev => prev + 1);
+    if (globalIndex < totalTasks - 1) {
+      setGlobalIndex(prev => prev + 1);
       setActiveImageIndex(1);
       setExpandedCard(null);
     } else {
-      try {
-        if (currentTask && currentTask.project) {
-          await projectService.completeProject(currentTask.project);
-        }
-      } catch (err) {
-        console.error("Failed to mark project as completed:", err);
-      }
       alert('All tasks completed! Great job.');
       navigate('/rating');
     }
   };
 
   const handlePrevious = async () => {
-    await saveCurrentTask();
-    if (currentIndex > 0) {
-      setCurrentIndex(prev => prev - 1);
+    const ok = await saveCurrentTask();
+    if (!ok) return;
+    if (globalIndex > 0) {
+      setGlobalIndex(prev => prev - 1);
       setActiveImageIndex(1);
       setExpandedCard(null);
     }
@@ -218,35 +387,64 @@ const InspectorApp = () => {
 
     try {
       setSkipping(true);
-      await ratingService.skipTask(currentTask._id, skipReason, skipRemarks);
+      const payload = {
+        category: currentTask.category,
+        assetType: skipGroup ? skipGroup : currentTask.assetType,
+        skipReason: skipReason,
+        remarks: skipRemarks
+      };
+      
+      const updatedTaskResponse = await ratingService.skipTask(currentTask._id, payload);
+      const returnedTask = updatedTaskResponse.data || updatedTaskResponse;
+      
       setTasks(prev => {
         const updated = [...prev];
-        updated[currentIndex] = { ...updated[currentIndex], status: 'SKIPPED' };
+        updated[localIndex] = { ...updated[localIndex], status: returnedTask.status, skippedAssetTypes: returnedTask.skippedAssetTypes };
         return updated;
       });
       
+      const wasAssetSkip = !!skipGroup;
       setSkipModalOpen(false);
       setSkipReason('');
       setSkipRemarks('');
+      setSkipGroup(null);
       
-      if (currentIndex < tasks.length - 1) {
-        setCurrentIndex(prev => prev + 1);
-        setActiveImageIndex(1);
-        setExpandedCard(null);
-      } else {
-        try {
-          if (currentTask && currentTask.project) {
-            await projectService.completeProject(currentTask.project);
-          }
-        } catch (err) {
-          console.error("Failed to mark project as completed:", err);
+      // If task is fully skipped or completed, move to next ONLY if it was a full task skip
+      if (!wasAssetSkip && (returnedTask.status === 'SKIPPED' || returnedTask.status === 'COMPLETED')) {
+        if (globalIndex < totalTasks - 1) {
+          setGlobalIndex(prev => prev + 1);
+          setActiveImageIndex(1);
+          setExpandedCard(null);
+        } else {
+          alert('All tasks completed! Great job.');
+          navigate('/rating');
         }
-        alert('All tasks completed! Great job.');
-        navigate('/rating');
       }
     } catch (err) {
       console.error(err);
       alert('Failed to skip task. Please try again.');
+    } finally {
+      setSkipping(false);
+    }
+  };
+
+  const handleUnskip = async (assetType = null) => {
+    try {
+      setSkipping(true); // Re-using skipping state for loading UI
+      const payload = assetType ? { assetType } : {};
+      
+      const updatedTaskResponse = await ratingService.unskipTask(currentTask._id, payload);
+      const returnedTask = updatedTaskResponse.data || updatedTaskResponse;
+      
+      setTasks(prev => {
+        const updated = [...prev];
+        updated[localIndex] = { ...updated[localIndex], status: returnedTask.status, skippedAssetTypes: returnedTask.skippedAssetTypes, skipMetadata: returnedTask.skipMetadata };
+        return updated;
+      });
+      
+    } catch (err) {
+      console.error(err);
+      alert('Failed to unskip task. Please try again.');
     } finally {
       setSkipping(false);
     }
@@ -262,6 +460,16 @@ const InspectorApp = () => {
     setExpandedCard(prev => (prev === cardKey ? null : cardKey));
   };
 
+  // Dynamic Remarks Calculation
+  const currentCategory = currentTask?.category || firstParam.category || 'N/A';
+  const categoryRemarks = remarkMasterConfig[currentCategory] || [];
+  
+  // Flatten all custom remarks across all categories so manually typed remarks are forwarded everywhere
+  const allCustomRemarks = Object.values(userCustomRemarks).flat();
+  
+  // Guarantee any currently saved remark for this task is in the dropdown options
+  const currentTaskRemarks = Object.values(taskRatings || {}).map(r => r.remark).filter(r => r && r !== 'Other');
+
   const images = [];
   if (currentTask?.image?.cloudinaryUrl) {
     const c = parseFloat(currentTask.chainage);
@@ -271,11 +479,156 @@ const InspectorApp = () => {
     images.push(prevImg, currentImg, nextImg);
   }
 
+  const renderParamCard = (param) => {
+    const pId = param.parameterKey || param._id;
+    const rating = getRating(pId);
+    
+    // Determine category for this parameter (useful for RSF embedded in Roadway)
+    // For RSF parameters, param.assetType might be 'Road Signage and Furniture' or 'Landscaping'
+    const paramCategory = param.category || param.assetType || currentCategory;
+    const paramMasterRemarks = remarkMasterConfig[paramCategory] || [];
+    
+    // Combine master remarks for the main task category AND the specific parameter category
+    const combinedMasterRemarks = [...new Set([...categoryRemarks, ...paramMasterRemarks])];
+    
+    // Ensure unique values using Set
+    const dynamicRemarkOptions = [...new Set([...combinedMasterRemarks, ...allCustomRemarks, ...currentTaskRemarks]), 'Other'];
+    
+    return (
+      <div
+        key={pId}
+        className="flex flex-col border border-borderColor p-4 rounded bg-gray-50/30 shadow-sm flex-1 min-w-[300px]"
+      >
+        <div className="flex items-center justify-between mb-3 border-b border-gray-100 pb-2">
+          <div className="flex items-center gap-2">
+            <h3 className="font-medium text-lg text-gray-800">{param.parameterName || param.parameter}</h3>
+            {isEditMode && param._id && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditingMasterListParam(param);
+                }}
+                className="w-8 h-8 rounded-full flex items-center justify-center bg-[#D4AF37] text-white hover:bg-yellow-600 shadow-sm transition-colors"
+                title="Edit Master List Item"
+              >
+                <MdEdit className="text-sm" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => handleUndo(pId)}
+              className="text-gray-400 hover:text-red-500 transition-colors p-1 ml-1 border-l border-gray-200 pl-3"
+              title="Undo changes"
+            >
+              <MdUndo className="text-lg" />
+            </button>
+          </div>
+        </div>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-auto">
+          <div className="flex gap-4 shrink-0">
+            {['0', '1', '5', '10'].map(val => {
+              const isRed = val === '0' || val === '1';
+              const colorClass = isRed
+                ? 'text-red-500 focus:ring-red-500 accent-red-500'
+                : 'text-[#5cb85c] focus:ring-[#5cb85c] accent-[#5cb85c]';
+              return (
+                <label key={val} className="flex items-center gap-1.5 sm:gap-2 cursor-pointer group">
+                  <input
+                    type="radio"
+                    name={`rating-${pId}`}
+                    value={val}
+                    checked={rating.score === val}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setRating(pId, 'score', val);
+                    }}
+                    onKeyDown={(e) => e.preventDefault()}
+                    onClick={(e) => e.target.blur()}
+                    className={`w-4 h-4 border-gray-300 ${colorClass}`}
+                  />
+                  <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">{val}</span>
+                </label>
+              );
+            })}
+          </div>
+          <div className="flex-1 w-full">
+            {customRemarkMode[pId] || (rating.remark && !dynamicRemarkOptions.includes(rating.remark) && rating.remark !== 'Other' && rating.remark !== 'Rectified' && rating.remark !== 'Not Rectified') ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  id={`remark-input-${pId}`}
+                  autoFocus
+                  value={rating.remark === 'Other' ? '' : rating.remark}
+                  onChange={(e) => {
+                    setRating(pId, 'remark', e.target.value);
+                    if (e.target.value.trim() && validationErrors[pId]) {
+                      setValidationErrors(prev => ({ ...prev, [pId]: null }));
+                    }
+                  }}
+                  placeholder="Enter custom remark..."
+                  className={`w-full px-3 py-1.5 md:min-h-[38px] bg-white border rounded-md text-sm text-gray-800 focus:outline-none focus:ring-2 shadow-sm ${validationErrors[pId] ? 'border-red-500 ring-1 ring-red-500 focus:ring-red-500/20' : 'border-[#5cb85c] focus:ring-[#5cb85c]/20'}`}
+                />
+                <button
+                  onClick={() => {
+                    setRating(pId, 'remark', '');
+                    setCustomRemarkMode(prev => ({ ...prev, [pId]: false }));
+                  }}
+                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                  title="Cancel custom remark"
+                >
+                  <MdClose className="text-xl" />
+                </button>
+              </div>
+            ) : (
+              <CustomDropdown
+                className={`remark-${pId}`}
+                options={dynamicRemarkOptions}
+                value={rating.remark}
+                error={!!validationErrors[pId]}
+                onChange={(val) => {
+                  if (validationErrors[pId]) {
+                    setValidationErrors(prev => ({ ...prev, [pId]: null }));
+                  }
+                  if (val === 'Other') {
+                    setCustomRemarkMode(prev => ({ ...prev, [pId]: true }));
+                    setRating(pId, 'remark', '');
+                    setRating(pId, 'score', '5');
+                  } else {
+                    setRating(pId, 'remark', val);
+                    if (val && val.toLowerCase() === 'rectified') {
+                      setRating(pId, 'score', '10');
+                    } else if (val && val.toLowerCase() === 'not rectified') {
+                      setRating(pId, 'score', '5');
+                    } else if (val && (val.toLowerCase() === 'not applicable' || val.toLowerCase() === 'na' || val.toLowerCase() === 'n/a')) {
+                      setRating(pId, 'score', '0');
+                    } else {
+                      const resolvedScore = resolveRemarkRating('', val);
+                      if (resolvedScore !== null) {
+                        setRating(pId, 'score', resolvedScore);
+                      }
+                    }
+                  }
+                }}
+                placeholder="Remark"
+                direction="up"
+                searchable={true}
+              />
+            )}
+            {validationErrors[pId] && (
+              <div className="text-red-500 text-[11px] mt-1.5 font-medium">{validationErrors[pId]}</div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col h-screen items-center justify-center bg-[#F8FAFC] gap-4">
         <div className="w-10 h-10 border-4 border-[#5cb85c] border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-gray-500 font-medium">Loading inspection data...</p>
+        <p className="text-gray-500 font-medium">Loading task data...</p>
       </div>
     );
   }
@@ -294,12 +647,28 @@ const InspectorApp = () => {
     );
   }
 
+  if (!currentTask) {
+    return (
+      <div className="flex flex-col h-screen items-center justify-center bg-[#F8FAFC] gap-4">
+        <p className="text-gray-500 font-medium">Task not found.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[#F8FAFC]">
 
       {/* Top Header */}
       <div className="bg-white border-b border-[#5cb85c]/30 shadow-sm px-6 py-2.5 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors border border-gray-200"
+            title="Go Back"
+          >
+            <MdArrowBack className="text-lg" />
+            Back
+          </button>
           <button
             onClick={() => navigate('/rating')}
             className="p-2 text-gray-500 hover:text-[#5cb85c] hover:bg-green-50 rounded-full transition-colors"
@@ -309,7 +678,7 @@ const InspectorApp = () => {
           </button>
           <div>
             <h1 className="text-base font-semibold text-gray-900">Rating Interface</h1>
-            <p className="text-xs text-gray-500">Task {currentIndex + 1} of {tasks.length}</p>
+            <p className="text-xs text-gray-500">Task {globalIndex + 1} of {totalTasks || '...'}</p>
           </div>
         </div>
         <div className="text-sm font-medium text-gray-500">
@@ -317,8 +686,8 @@ const InspectorApp = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="bg-white rounded shadow-sm border border-borderColor p-6 pb-24 flex flex-col min-h-full mx-0">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 overflow-y-auto bg-white rounded shadow-sm border border-borderColor p-6 pb-24 mx-0 scroll-smooth">
 
           {/* Metadata Header Cards */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-2">
@@ -369,12 +738,12 @@ const InspectorApp = () => {
               transition={{ duration: 0.2 }}
               className="z-40 w-14 h-20 sm:w-20 sm:h-32 md:w-24 md:h-40 bg-transparent border-none focus:outline-none flex items-center justify-center shrink-0 -ml-2 sm:-ml-3"
               onClick={handlePrevious}
-              disabled={currentIndex === 0 || saving}
+              disabled={globalIndex === 0 || saving}
               title="Previous Task"
             >
               <img
                 src={leftArrowImg}
-                className={`w-full h-full object-contain mix-blend-multiply drop-shadow-md transition-opacity ${currentIndex === 0 ? 'opacity-30' : 'opacity-100'}`}
+                className={`w-full h-full object-contain mix-blend-multiply drop-shadow-md transition-opacity ${globalIndex === 0 ? 'opacity-30' : 'opacity-100'}`}
                 alt="Previous Task"
                 draggable={false}
               />
@@ -397,8 +766,8 @@ const InspectorApp = () => {
               transition={{ duration: 0.2 }}
               className="z-40 w-14 h-20 sm:w-20 sm:h-32 md:w-24 md:h-40 bg-transparent border-none focus:outline-none flex items-center justify-center shrink-0 -mr-2 sm:-mr-3"
               onClick={handleNext}
-              disabled={saving}
-              title={currentIndex === tasks.length - 1 ? 'Finish' : 'Next Task'}
+              disabled={saving || (totalTasks > 0 && globalIndex >= totalTasks)}
+              title={globalIndex === totalTasks - 1 ? 'Finish' : 'Next Task'}
             >
               <img
                 src={rightArrowImg}
@@ -426,128 +795,139 @@ const InspectorApp = () => {
             Rating Parameters
           </h2>
 
-          <div className="flex flex-col xl:flex-row gap-6 w-full mb-0">
-            {(currentTask.parameters || []).map(param => {
-              const rating = getRating(param._id);
-              return (
-                <div
-                  key={param._id}
-                  className="flex flex-col border border-borderColor p-4 rounded bg-gray-50/30 shadow-sm flex-1"
-                >
-                  <div className="flex items-center justify-between mb-3 border-b border-gray-100 pb-2">
-                    <h3 className="font-medium text-lg text-gray-800">{param.parameter}</h3>
-                    <div className="flex items-center gap-4">
-                      <label className="flex items-center gap-1.5 cursor-pointer group">
-                        <input
-                          type="radio"
-                          name={`rectified-${param._id}`}
-                          value="Rectified"
-                          checked={rating.remark === 'Rectified'}
-                          onChange={() => {
-                            setRating(param._id, 'remark', 'Rectified');
-                            setRating(param._id, 'score', '10');
-                          }}
-                          className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-sm font-medium text-gray-700">Rectified</span>
-                      </label>
-                      <label className="flex items-center gap-1.5 cursor-pointer group">
-                        <input
-                          type="radio"
-                          name={`rectified-${param._id}`}
-                          value="Not Rectified"
-                          checked={rating.remark === 'Not Rectified'}
-                          onChange={() => {
-                            setRating(param._id, 'remark', 'Not Rectified');
-                            setRating(param._id, 'score', '5');
-                          }}
-                          className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-sm font-medium text-gray-700">Not Rectified</span>
-                      </label>
-                      <button
-                        onClick={() => handleUndo(param._id)}
-                        className="text-gray-400 hover:text-red-500 transition-colors p-1 ml-1 border-l border-gray-200 pl-3"
-                        title="Undo changes"
-                      >
-                        <MdUndo className="text-lg" />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-auto">
-                    <div className="flex gap-4 shrink-0">
-                      {['0', '1', '5', '10'].map(val => {
-                        const isRed = val === '0' || val === '1';
-                        const colorClass = isRed
-                          ? 'text-red-500 focus:ring-red-500 accent-red-500'
-                          : 'text-[#5cb85c] focus:ring-[#5cb85c] accent-[#5cb85c]';
-                        return (
-                          <label key={val} className="flex items-center gap-1.5 sm:gap-2 cursor-pointer group">
-                            <input
-                              type="radio"
-                              name={`rating-${param._id}`}
-                              value={val}
-                              checked={rating.score === val}
-                              onChange={(e) => setRating(param._id, 'score', e.target.value)}
-                              onKeyDown={(e) => e.preventDefault()}
-                              onClick={(e) => e.target.blur()}
-                              className={`w-4 h-4 border-gray-300 ${colorClass}`}
-                            />
-                            <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">{val}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                    <div className="flex-1 w-full">
-                      {customRemarkMode[param._id] || (rating.remark && !REMARK_OPTIONS.includes(rating.remark)) ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            autoFocus
-                            value={rating.remark === 'Other' ? '' : rating.remark}
-                            onChange={(e) => setRating(param._id, 'remark', e.target.value)}
-                            placeholder="Enter custom remark..."
-                            className="w-full px-3 py-1.5 md:min-h-[38px] bg-white border border-[#5cb85c] rounded-md text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#5cb85c]/20 shadow-sm"
-                          />
+          <div className="flex flex-col gap-6 w-full mb-0">
+            {currentTask.category === 'Roadway' ? (
+              <>
+                {['Pavement', 'Shoulder', 'Kerb', 'Pavement Markings', 'ROW', 'Median Plantation'].map(group => {
+                  const groupParams = (currentTask.ratings || []).filter(p => p.group === group && p.parameterKey !== 'rutting');
+                  if (groupParams.length === 0) return null;
+                  const isSkipped = (currentTask.skippedAssetTypes || []).some(s => s.assetType === group);
+                  return (
+                    <div key={group} className={`flex flex-col w-full ${isSkipped ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <div className="flex items-center justify-between mb-3 pb-1 border-b-2 border-gray-200">
+                        <h3 className="text-md font-bold text-gray-700">{group} {isSkipped && '(SKIPPED)'}</h3>
+                        {!isSkipped ? (
                           <button
                             onClick={() => {
-                              setRating(param._id, 'remark', '');
-                              setCustomRemarkMode(prev => ({ ...prev, [param._id]: false }));
+                              setSkipGroup(group);
+                              setSkipModalOpen(true);
                             }}
-                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                            title="Cancel custom remark"
+                            className="px-3 py-1 text-xs font-medium text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 rounded-md transition-colors"
                           >
-                            <MdClose className="text-xl" />
+                            Skip Asset
                           </button>
-                        </div>
-                      ) : (
-                        <CustomDropdown
-                          options={[...REMARK_OPTIONS, 'Other']}
-                          value={rating.remark}
-                          onChange={(val) => {
-                            if (val === 'Other') {
-                              setCustomRemarkMode(prev => ({ ...prev, [param._id]: true }));
-                              setRating(param._id, 'remark', '');
-                            } else {
-                              setRating(param._id, 'remark', val);
-                              if (val && val.toLowerCase() === 'rectified') {
-                                setRating(param._id, 'score', '10');
-                              } else if (val && val.toLowerCase() === 'not rectified') {
-                                setRating(param._id, 'score', '5');
-                              }
-                            }
-                          }}
-                          placeholder="Remark"
-                          direction="up"
-                        />
-                      )}
+                        ) : (
+                          <button
+                            onClick={() => handleUnskip(group)}
+                            disabled={skipping || saving}
+                            className="px-3 py-1 text-xs font-medium text-green-600 border border-green-200 bg-green-50 hover:bg-green-100 rounded-md transition-colors pointer-events-auto"
+                          >
+                            Unskip Asset
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 w-full">
+                         {groupParams.map(param => renderParamCard(param))}
+                      </div>
                     </div>
+                  );
+                })}
+                {/* Render RSF Additional Parameters if they exist */}
+                {currentTask.parameters && currentTask.parameters.length > 0 && (
+                  <div className="flex flex-col w-full mt-4">
+                    <h3 className="text-md font-bold text-gray-700 mb-3 pb-1 border-b-2 border-blue-200">RSF (Additional Features)</h3>
+                    {Object.entries(
+                      currentTask.parameters.reduce((acc, param) => {
+                        if (!acc[param.assetType]) acc[param.assetType] = [];
+                        acc[param.assetType].push(param);
+                        return acc;
+                      }, {})
+                    ).map(([rsfGroup, params]) => {
+                      const isSkipped = (currentTask.skippedAssetTypes || []).some(s => s.assetType === rsfGroup);
+                      return (
+                        <div key={rsfGroup} className={`flex flex-col w-full mb-4 ${isSkipped ? 'opacity-50 pointer-events-none' : ''}`}>
+                          <div className="flex items-center justify-between mb-3 pb-1 border-b border-gray-100">
+                            <h4 className="text-sm font-bold text-gray-600">{rsfGroup} {isSkipped && '(SKIPPED)'}</h4>
+                            {!isSkipped ? (
+                              <button
+                                onClick={() => {
+                                  setSkipGroup(rsfGroup);
+                                  setSkipModalOpen(true);
+                                }}
+                                className="px-3 py-1 text-xs font-medium text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 rounded-md transition-colors"
+                              >
+                                Skip {rsfGroup}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleUnskip(rsfGroup)}
+                                disabled={skipping || saving}
+                                className="px-3 py-1 text-xs font-medium text-green-600 border border-green-200 bg-green-50 hover:bg-green-100 rounded-md transition-colors pointer-events-auto"
+                              >
+                                Unskip {rsfGroup}
+                              </button>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 w-full">
+                             {params.map(param => renderParamCard(param))}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
-              );
-            })}
+                )}
+              </>
+            ) : (
+              <div className="flex flex-col w-full">
+                {Object.entries(
+                  (currentTask.category === 'Structures' || currentTask.category === 'Project Facilities' || currentTask.category === 'ATMS' ? currentTask.ratings || [] : currentTask.parameters || []).reduce((acc, param) => {
+                    const groupName = (currentTask.category === 'Structures' || currentTask.category === 'Project Facilities' || currentTask.category === 'ATMS') ? (param.group || currentTask.category) : param.assetType;
+                    if (!acc[groupName]) acc[groupName] = [];
+                    acc[groupName].push(param);
+                    return acc;
+                  }, {})
+                ).map(([group, params]) => {
+                  const isSkipped = (currentTask.skippedAssetTypes || []).some(s => s.assetType === group);
+                  return (
+                    <div key={group} className={`flex flex-col w-full mb-4 ${isSkipped ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <div className="flex items-center justify-between mb-3 pb-1 border-b-2 border-gray-200">
+                        <h3 className="text-md font-bold text-gray-700">{group} {isSkipped && '(SKIPPED)'}</h3>
+                        {!isSkipped ? (
+                          <button
+                            onClick={() => {
+                              setSkipGroup(group);
+                              setSkipModalOpen(true);
+                            }}
+                            className="px-3 py-1 text-xs font-medium text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 rounded-md transition-colors"
+                          >
+                            Skip {group}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleUnskip(group)}
+                            disabled={skipping || saving}
+                            className="px-3 py-1 text-xs font-medium text-green-600 border border-green-200 bg-green-50 hover:bg-green-100 rounded-md transition-colors pointer-events-auto"
+                          >
+                            Unskip {group}
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 w-full">
+                         {params.map(param => renderParamCard(param))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
-            {(!currentTask.parameters || currentTask.parameters.length === 0) && (
+            {currentTask.category !== 'Roadway' && currentTask.category !== 'Structures' && currentTask.category !== 'Project Facilities' && currentTask.category !== 'ATMS' && (!currentTask.parameters || currentTask.parameters.length === 0) && (
+              <div className="flex-1 flex items-center justify-center py-12 text-gray-400 border border-dashed border-gray-300 rounded-lg">
+                No rating parameters found for this task.
+              </div>
+            )}
+            
+            {(currentTask.category === 'Roadway' || currentTask.category === 'Structures' || currentTask.category === 'Project Facilities' || currentTask.category === 'ATMS') && (!currentTask.ratings || currentTask.ratings.length === 0) && (
               <div className="flex-1 flex items-center justify-center py-12 text-gray-400 border border-dashed border-gray-300 rounded-lg">
                 No rating parameters found for this task.
               </div>
@@ -557,7 +937,14 @@ const InspectorApp = () => {
           {/* Save / Navigation Footer */}
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-3 flex items-center justify-start z-30 shadow-lg">
             <div className="text-sm text-gray-500">
-              Task <span className="font-semibold text-gray-800">{currentIndex + 1}</span> of <span className="font-semibold text-gray-800">{tasks.length}</span>
+              <p className="text-sm font-medium text-gray-500 mb-1">Overall Progress</p>
+              <p className="text-xl font-bold text-gray-800">
+                Task <span className="font-semibold text-gray-800">{globalIndex + 1}</span> of <span className="font-semibold text-gray-800">{totalTasks || '...'}</span>
+              </p>
+            </div>
+            <div className="flex flex-col items-center flex-1 min-w-[200px]">
+            </div>
+            <div className="flex-1 flex justify-end items-center">
               {saving || skipping ? (
                 <span className="ml-3 px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium">Processing...</span>
               ) : currentTask.status === 'COMPLETED' ? (
@@ -567,13 +954,23 @@ const InspectorApp = () => {
               ) : null}
             </div>
             <div className="ml-auto flex items-center gap-3">
-              <button
-                onClick={() => setSkipModalOpen(true)}
-                disabled={saving || skipping}
-                className="px-4 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none transition-colors border border-gray-200"
-              >
-                Skip Question
-              </button>
+              {currentTask.status === 'SKIPPED' ? (
+                <button
+                  onClick={() => handleUnskip()}
+                  disabled={saving || skipping}
+                  className="px-4 py-1.5 text-sm font-medium text-green-700 bg-green-100 rounded-md hover:bg-green-200 focus:outline-none transition-colors border border-green-200"
+                >
+                  Unskip Task
+                </button>
+              ) : (
+                <button
+                  onClick={() => setSkipModalOpen(true)}
+                  disabled={saving || skipping || currentTask.status === 'COMPLETED'}
+                  className="px-4 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none transition-colors border border-gray-200"
+                >
+                  Skip Question
+                </button>
+              )}
             </div>
           </div>
 
@@ -593,12 +990,13 @@ const InspectorApp = () => {
                   className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden"
                 >
                   <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                    <h3 className="text-lg font-semibold text-gray-900">Skip Question</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Skip {skipGroup ? skipGroup : 'Question'}</h3>
                     <button
                       onClick={() => {
                         setSkipModalOpen(false);
                         setSkipReason('');
                         setSkipRemarks('');
+                        setSkipGroup(null);
                       }}
                       className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
                     >
@@ -651,6 +1049,7 @@ const InspectorApp = () => {
                         setSkipModalOpen(false);
                         setSkipReason('');
                         setSkipRemarks('');
+                        setSkipGroup(null);
                       }}
                       className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none transition-colors"
                     >
@@ -676,6 +1075,17 @@ const InspectorApp = () => {
             )}
           </AnimatePresence>
 
+
+      {editingMasterListParam && (
+        <MasterListEditModal
+          item={editingMasterListParam}
+          onClose={() => setEditingMasterListParam(null)}
+          onSuccess={() => {
+            setEditingMasterListParam(null);
+            window.location.reload();
+          }}
+        />
+      )}
         </div>
       </div>
     </div>
