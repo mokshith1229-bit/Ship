@@ -63,5 +63,10 @@ export const dashboardService = {
     
     const response = await api.get(url);
     return response.data?.data || response.data;
+  },
+
+  getSkipGalleryTree: async (projectId = '') => {
+    const response = await api.get(`/dashboard/skip-gallery-tree?projectId=${projectId}`);
+    return response.data?.data || response.data;
   }
 };

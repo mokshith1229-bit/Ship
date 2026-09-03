@@ -428,6 +428,28 @@ const InspectorApp = () => {
     }
   };
 
+  const handleUnskip = async (assetType = null) => {
+    try {
+      setSkipping(true); // Re-using skipping state for loading UI
+      const payload = assetType ? { assetType } : {};
+      
+      const updatedTaskResponse = await ratingService.unskipTask(currentTask._id, payload);
+      const returnedTask = updatedTaskResponse.data || updatedTaskResponse;
+      
+      setTasks(prev => {
+        const updated = [...prev];
+        updated[localIndex] = { ...updated[localIndex], status: returnedTask.status, skippedAssetTypes: returnedTask.skippedAssetTypes, skipMetadata: returnedTask.skipMetadata };
+        return updated;
+      });
+      
+    } catch (err) {
+      console.error(err);
+      alert('Failed to unskip task. Please try again.');
+    } finally {
+      setSkipping(false);
+    }
+  };
+
   const toggleEditMode = () => {
     setIsEditMode(e => !e);
     setExpandedCard(null);
@@ -494,34 +516,6 @@ const InspectorApp = () => {
             )}
           </div>
           <div className="flex items-center gap-4">
-            <label className="flex items-center gap-1.5 cursor-pointer group">
-              <input
-                type="radio"
-                name={`rectified-${pId}`}
-                value="Rectified"
-                checked={rating.remark === 'Rectified'}
-                onChange={() => {
-                  setRating(pId, 'remark', 'Rectified');
-                  setRating(pId, 'score', '10');
-                }}
-                className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm font-medium text-gray-700">Rectified</span>
-            </label>
-            <label className="flex items-center gap-1.5 cursor-pointer group">
-              <input
-                type="radio"
-                name={`rectified-${pId}`}
-                value="Not Rectified"
-                checked={rating.remark === 'Not Rectified'}
-                onChange={() => {
-                  setRating(pId, 'remark', 'Not Rectified');
-                  setRating(pId, 'score', '5');
-                }}
-                className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm font-medium text-gray-700">Not Rectified</span>
-            </label>
             <button
               onClick={() => handleUndo(pId)}
               className="text-gray-400 hover:text-red-500 transition-colors p-1 ml-1 border-l border-gray-200 pl-3"
@@ -812,7 +806,7 @@ const InspectorApp = () => {
                     <div key={group} className={`flex flex-col w-full ${isSkipped ? 'opacity-50 pointer-events-none' : ''}`}>
                       <div className="flex items-center justify-between mb-3 pb-1 border-b-2 border-gray-200">
                         <h3 className="text-md font-bold text-gray-700">{group} {isSkipped && '(SKIPPED)'}</h3>
-                        {!isSkipped && (
+                        {!isSkipped ? (
                           <button
                             onClick={() => {
                               setSkipGroup(group);
@@ -821,6 +815,14 @@ const InspectorApp = () => {
                             className="px-3 py-1 text-xs font-medium text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 rounded-md transition-colors"
                           >
                             Skip Asset
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleUnskip(group)}
+                            disabled={skipping || saving}
+                            className="px-3 py-1 text-xs font-medium text-green-600 border border-green-200 bg-green-50 hover:bg-green-100 rounded-md transition-colors pointer-events-auto"
+                          >
+                            Unskip Asset
                           </button>
                         )}
                       </div>
@@ -846,7 +848,7 @@ const InspectorApp = () => {
                         <div key={rsfGroup} className={`flex flex-col w-full mb-4 ${isSkipped ? 'opacity-50 pointer-events-none' : ''}`}>
                           <div className="flex items-center justify-between mb-3 pb-1 border-b border-gray-100">
                             <h4 className="text-sm font-bold text-gray-600">{rsfGroup} {isSkipped && '(SKIPPED)'}</h4>
-                            {!isSkipped && (
+                            {!isSkipped ? (
                               <button
                                 onClick={() => {
                                   setSkipGroup(rsfGroup);
@@ -855,6 +857,14 @@ const InspectorApp = () => {
                                 className="px-3 py-1 text-xs font-medium text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 rounded-md transition-colors"
                               >
                                 Skip {rsfGroup}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleUnskip(rsfGroup)}
+                                disabled={skipping || saving}
+                                className="px-3 py-1 text-xs font-medium text-green-600 border border-green-200 bg-green-50 hover:bg-green-100 rounded-md transition-colors pointer-events-auto"
+                              >
+                                Unskip {rsfGroup}
                               </button>
                             )}
                           </div>
@@ -882,7 +892,7 @@ const InspectorApp = () => {
                     <div key={group} className={`flex flex-col w-full mb-4 ${isSkipped ? 'opacity-50 pointer-events-none' : ''}`}>
                       <div className="flex items-center justify-between mb-3 pb-1 border-b-2 border-gray-200">
                         <h3 className="text-md font-bold text-gray-700">{group} {isSkipped && '(SKIPPED)'}</h3>
-                        {!isSkipped && (
+                        {!isSkipped ? (
                           <button
                             onClick={() => {
                               setSkipGroup(group);
@@ -891,6 +901,14 @@ const InspectorApp = () => {
                             className="px-3 py-1 text-xs font-medium text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 rounded-md transition-colors"
                           >
                             Skip {group}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleUnskip(group)}
+                            disabled={skipping || saving}
+                            className="px-3 py-1 text-xs font-medium text-green-600 border border-green-200 bg-green-50 hover:bg-green-100 rounded-md transition-colors pointer-events-auto"
+                          >
+                            Unskip {group}
                           </button>
                         )}
                       </div>
@@ -936,13 +954,23 @@ const InspectorApp = () => {
               ) : null}
             </div>
             <div className="ml-auto flex items-center gap-3">
-              <button
-                onClick={() => setSkipModalOpen(true)}
-                disabled={saving || skipping}
-                className="px-4 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none transition-colors border border-gray-200"
-              >
-                Skip Question
-              </button>
+              {currentTask.status === 'SKIPPED' ? (
+                <button
+                  onClick={() => handleUnskip()}
+                  disabled={saving || skipping}
+                  className="px-4 py-1.5 text-sm font-medium text-green-700 bg-green-100 rounded-md hover:bg-green-200 focus:outline-none transition-colors border border-green-200"
+                >
+                  Unskip Task
+                </button>
+              ) : (
+                <button
+                  onClick={() => setSkipModalOpen(true)}
+                  disabled={saving || skipping || currentTask.status === 'COMPLETED'}
+                  className="px-4 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none transition-colors border border-gray-200"
+                >
+                  Skip Question
+                </button>
+              )}
             </div>
           </div>
 

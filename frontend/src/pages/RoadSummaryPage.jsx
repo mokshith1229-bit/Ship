@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { MdClear, MdOutlineFileDownload } from 'react-icons/md';
 import Pagination from '../components/Pagination';
 import Navbar from '../components/Navbar';
@@ -12,6 +12,7 @@ import { masterListService } from '../services/masterList.service';
 const RoadSummaryPage = () => {
   const { roadId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [direction, setDirection] = useState('Choose Direction');
@@ -381,7 +382,8 @@ const RoadSummaryPage = () => {
                       alert('This asset is not part of the current active inspection batch.');
                       return;
                     }
-                    navigate(`/rating/inspector/${activeBatchId}?startIndex=${q.taskGlobalIndex}`);
+                    const basePath = location.pathname.startsWith('/rating-v2') ? '/rating-v2/inspector' : '/rating/inspector';
+                    navigate(`${basePath}/${activeBatchId}?startIndex=${q.taskGlobalIndex}`);
                   }}
                   className={`border-b border-[#5cb85c]/20 hover:bg-green-50/50 cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-[#5cb85c]/[0.02]'}`}
                 >

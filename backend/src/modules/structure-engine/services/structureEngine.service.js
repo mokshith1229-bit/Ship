@@ -17,8 +17,13 @@ const STRUCTURE_QUESTION_DEFINITIONS = {
   'WC_CRACKS': { code: 'WC_CRACKS', question: 'Cracks (Alligator cracks)', category: 'Wearing coat on deck slab', placement: 'ALL_POINTS' },
   'WC_RUTTING': { code: 'WC_RUTTING', question: 'Rutting', category: 'Wearing coat on deck slab', placement: 'ALL_POINTS' },
 
+  // Non Buried Expansion Joint
+  'NBEJ_STRIP_SEAL': { code: 'NBEJ_STRIP_SEAL', question: 'Strip seal expansion joint buried under BC', category: 'Non Buried Expansion Joint', placement: 'ALL_POINTS' },
+  'NBEJ_PUNCTURE': { code: 'NBEJ_PUNCTURE', question: 'Puncturing/missing of expansion joint sealant', category: 'Non Buried Expansion Joint', placement: 'ALL_POINTS' },
+  'NBEJ_EDGE_ANGLES': { code: 'NBEJ_EDGE_ANGLES', question: 'Damages to edge angles', category: 'Non Buried Expansion Joint', placement: 'ALL_POINTS' },
+  'NBEJ_CONCRETE': { code: 'NBEJ_CONCRETE', question: 'Condition of concrete on either side of edge angles', category: 'Non Buried Expansion Joint', placement: 'ALL_POINTS' },
+
   // Other Structure Questions
-  'NON_BURIED_EXPANSION_JOINT': { code: 'NON_BURIED_EXPANSION_JOINT', question: 'Non buried expansion joint', category: 'Structures', placement: 'ALL_POINTS' },
   'DRAINAGE_SPOUTS': { code: 'DRAINAGE_SPOUTS', question: 'Drainage spouts', category: 'Structures', placement: 'ALL_POINTS' },
   'APPROACH_SETTLEMENTS': { code: 'APPROACH_SETTLEMENTS', question: 'Approach settlements', category: 'Structures', placement: 'START_END' },
   'STAGNATION_OF_RAIN_WATER': { code: 'STAGNATION_OF_RAIN_WATER', question: 'Stagnation of rain water', category: 'Structures', placement: 'ALL_POINTS' },
@@ -84,7 +89,10 @@ const STRUCTURE_QUESTION_CONFIG = {
     STRUCTURE_QUESTION_DEFINITIONS['WC_POTHOLES'],
     STRUCTURE_QUESTION_DEFINITIONS['WC_CRACKS'],
     STRUCTURE_QUESTION_DEFINITIONS['WC_RUTTING'],
-    STRUCTURE_QUESTION_DEFINITIONS['NON_BURIED_EXPANSION_JOINT'],
+    STRUCTURE_QUESTION_DEFINITIONS['NBEJ_STRIP_SEAL'],
+    STRUCTURE_QUESTION_DEFINITIONS['NBEJ_PUNCTURE'],
+    STRUCTURE_QUESTION_DEFINITIONS['NBEJ_EDGE_ANGLES'],
+    STRUCTURE_QUESTION_DEFINITIONS['NBEJ_CONCRETE'],
     STRUCTURE_QUESTION_DEFINITIONS['DRAINAGE_SPOUTS'],
     STRUCTURE_QUESTION_DEFINITIONS['RCB_HAND_RAIL'],
     STRUCTURE_QUESTION_DEFINITIONS['RCB_PAINTING'],

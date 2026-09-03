@@ -565,4 +565,84 @@ const skipTask = async (taskId, skipData, user) => {
   return task;
 };
 
-module.exports = { getProjectRatings, computeOverallRating, getRatingSummary, getVersionHistory, getReadyBatches, getBatchTasks, saveTaskRatings, skipTask, exportRatingsCSV };
+const unskipTask = async (taskId, payload, user) => {
+  const task = await InspectionTask.findById(taskId);
+  if (!task) {
+    throw Object.assign(new Error('Task not found'), { statusCode: 404 });
+  }
+
+  if (user && user.role === 'User') {
+    const assignment = await WorkAssignment.findOne({
+      assignedTo: user._id,
+      batchId: task.batchId,
+      status: { $in: ['Assigned', 'In Progress'] }
+    });
+
+    if (!assignment) {
+      throw Object.assign(new Error('Forbidden: You do not have an active assignment for this batch'), { statusCode: 403 });
+    }
+
+    if (assignment.questionIds && assignment.questionIds.length > 0) {
+      const isAssigned = assignment.questionIds.some(qId => qId.toString() === taskId.toString());
+      if (!isAssigned) {
+        throw Object.assign(new Error('Forbidden: You are not assigned to rate this specific task'), { statusCode: 403 });
+      }
+    }
+  }
+
+  if (payload.assetType) {
+    // Asset-level unskip
+    if (task.skippedAssetTypes) {
+      task.skippedAssetTypes = task.skippedAssetTypes.filter(s => s.assetType !== payload.assetType);
+    }
+  } else {
+    // Full task unskip
+    task.skipMetadata = undefined;
+    task.skippedAssetTypes = []; // Clear all skipped groups if unskipping the whole task
+  }
+
+  // Determine status after unskip
+  if (task.ratings && task.ratings.length > 0) {
+    if (task.category === 'Roadway') {
+      const ratedRoadwayGroups = new Set((task.ratings || []).filter(r => r.group).map(r => r.group));
+      const skippedGroups = new Set((task.skippedAssetTypes || []).map(s => s.assetType));
+      const requiredRoadwayGroups = ['Pavement', 'Shoulder', 'Kerb', 'Pavement Markings', 'ROW', 'Median Plantation'];
+      const isRoadwayCompleted = requiredRoadwayGroups.every(g => ratedRoadwayGroups.has(g) || skippedGroups.has(g));
+      
+      task.status = isRoadwayCompleted ? 'COMPLETED' : 'IN_PROGRESS';
+    } else {
+      const totalAssetTypes = new Set((task.parameters || []).map(p => p.assetType)).size;
+      const ratedAssetTypes = new Set((task.ratings || []).map(r => r.assetType)).size;
+      const skippedCount = task.skippedAssetTypes ? task.skippedAssetTypes.length : 0;
+      
+      if (totalAssetTypes > 0 && (ratedAssetTypes + skippedCount) >= totalAssetTypes) {
+        task.status = 'COMPLETED';
+      } else {
+        task.status = 'IN_PROGRESS';
+      }
+    }
+  } else {
+    task.status = 'READY_FOR_RATING';
+  }
+
+  await task.save();
+
+  // Re-evaluate batch status
+  const batch = await InspectionBatch.findById(task.batchId);
+  if (batch && batch.status === 'COMPLETED') {
+    batch.status = 'IN_PROGRESS';
+    await batch.save();
+    
+    // Also mark assignment as In Progress if it was completed
+    if (user && user.role === 'User') {
+       await WorkAssignment.updateMany(
+         { batchId: task.batchId, status: 'Completed' },
+         { $set: { status: 'In Progress', completedTime: null } }
+       );
+    }
+  }
+
+  return task;
+};
+
+module.exports = { getProjectRatings, computeOverallRating, getRatingSummary, getVersionHistory, getReadyBatches, getBatchTasks, saveTaskRatings, skipTask, unskipTask, exportRatingsCSV };

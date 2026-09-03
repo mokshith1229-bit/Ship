@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MdOutlineMap, MdOutlineCheckCircle, MdOutlineHourglassEmpty, MdOutlineTrendingUp, MdStarRate } from 'react-icons/md';
 import Sidebar from '../components/Sidebar';
@@ -63,12 +63,13 @@ const filters = [
 ];
 
 const RatingPage = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const isAdmin = user && (user.role === 'Admin' || user.role === 'Administrator' || user.role === 'HO' || user.role === 'SPV');
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [projectsData, setProjectsData] = useState([]);
-  const navigate = useNavigate();
 
   // Hover state for the rich popup
   const [hoveredData, setHoveredData] = useState(null);
@@ -255,7 +256,10 @@ const RatingPage = () => {
                         data={road}
                         onHover={handleCardHover}
                         onLeave={handleCardLeave}
-                        onClick={(data) => navigate(`/rating/${data.roadName}`)}
+                        onClick={(data) => {
+                          const basePath = location.pathname.startsWith('/rating-v2') ? '/rating-v2' : '/rating';
+                          navigate(`${basePath}/${data.roadName}`);
+                        }}
                       />
                     </motion.div>
                   ))}

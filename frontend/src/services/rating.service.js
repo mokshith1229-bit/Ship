@@ -52,5 +52,13 @@ export const ratingService = {
   async skipTask(taskId, payload) {
     const response = await api.post(`/ratings/tasks/${taskId}/skip`, payload);
     return response.data;
+  },
+
+  /**
+   * Unskip a task
+   */
+  async unskipTask(taskId, payload) {
+    const response = await api.post(`/ratings/tasks/${taskId}/unskip`, payload);
+    return response.data;
   }
 };

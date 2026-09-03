@@ -25,6 +25,7 @@ import ProfilePage from './pages/ProfilePage';
 import ReportsPage from './pages/ReportsPage';
 import ShipDashboard from './pages/Ship/ShipDashboard';
 import SkipGalleryPage from './pages/SkipGalleryPage';
+import RatingV2Page from './pages/RatingV2/RatingV2Page';
 
 function App() {
   return (
@@ -51,6 +52,9 @@ function App() {
       <Route path="/image-review" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO']}><ImageReviewPage /></ProtectedRoute>} />
       <Route path="/rating" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><RatingPage /></ProtectedRoute>} />
       <Route path="/rating/inspector/:batchId" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><InspectorApp /></ProtectedRoute>} />
+      <Route path="/rating-v2" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><RatingPage /></ProtectedRoute>} />
+      <Route path="/rating-v2/:roadId" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><RoadSummaryPage /></ProtectedRoute>} />
+      <Route path="/rating-v2/inspector/:batchId" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><RatingV2Page /></ProtectedRoute>} />
       <Route path="/role" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><RolePermissionPage /></ProtectedRoute>} />
       <Route path="/rating/:roadId" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><RoadSummaryPage /></ProtectedRoute>} />
       <Route path="/rating/:roadId/detail/:detailId" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><RatingDetailPage /></ProtectedRoute>} />

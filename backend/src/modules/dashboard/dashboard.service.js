@@ -714,6 +714,121 @@ const getSkipAnalytics = async (projectId, batchId = null, filters = {}) => {
   };
 };
 
+/**
+ * Skip Gallery Tree
+ * Returns skipped images grouped by Category -> Batch
+ */
+const getSkipGalleryTree = async (projectId) => {
+  const matchFilter = {
+    $or: [
+      { status: 'SKIPPED' },
+      { 'skippedAssetTypes.0': { $exists: true } }
+    ]
+  };
+
+  if (projectId) {
+    matchFilter.project = projectId;
+  }
+
+  const pipeline = [
+    { $match: matchFilter },
+    {
+      $addFields: {
+        skips: {
+          $concatArrays: [
+            {
+              $cond: [
+                { $eq: ['$status', 'SKIPPED'] },
+                [{
+                  assetType: '$assetType',
+                  reason: '$skipMetadata.reason',
+                  remarks: '$skipMetadata.remarks',
+                  skippedBy: '$skipMetadata.skippedBy',
+                  skippedAt: { $ifNull: ['$skipMetadata.skippedAt', '$updatedAt'] },
+                  isLegacy: true
+                }],
+                []
+              ]
+            },
+            { $ifNull: ['$skippedAssetTypes', []] }
+          ]
+        }
+      }
+    },
+    { $unwind: '$skips' },
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'skips.skippedBy',
+        foreignField: '_id',
+        as: 'inspector'
+      }
+    },
+    { $unwind: { path: '$inspector', preserveNullAndEmptyArrays: true } },
+    {
+      $lookup: {
+        from: 'inspectionbatches',
+        localField: 'batchId',
+        foreignField: '_id',
+        as: 'batch'
+      }
+    },
+    { $unwind: { path: '$batch', preserveNullAndEmptyArrays: true } },
+    {
+      $group: {
+        _id: {
+          category: { $ifNull: ['$category', 'Unknown Category'] },
+          batchId: { $ifNull: ['$batchId', 'unknown-batch'] },
+          batchName: { $ifNull: ['$batch.name', 'Unknown Batch'] },
+          batchDate: { $ifNull: ['$batch.createdAt', '$createdAt'] }
+        },
+        images: {
+          $push: {
+            _id: '$_id',
+            project: '$project',
+            chainage: '$chainage',
+            assetType: { $ifNull: ['$skips.assetType', '$assetType'] },
+            reason: { $ifNull: ['$skips.reason', 'Unknown'] },
+            remarks: { $ifNull: ['$skips.remarks', ''] },
+            inspector: {
+              $cond: [
+                { $and: ['$inspector.firstName', '$inspector.lastName'] },
+                { $concat: ['$inspector.firstName', ' ', '$inspector.lastName'] },
+                'System'
+              ]
+            },
+            timestamp: { $ifNull: ['$skips.skippedAt', '$updatedAt'] },
+            imageUrl: '$image.cloudinaryUrl'
+          }
+        }
+      }
+    },
+    {
+      $group: {
+        _id: '$_id.category',
+        batches: {
+          $push: {
+            batchId: '$_id.batchId',
+            batchName: '$_id.batchName',
+            batchDate: '$_id.batchDate',
+            images: '$images'
+          }
+        }
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        category: '$_id',
+        batches: 1
+      }
+    },
+    { $sort: { category: 1 } }
+  ];
+
+  return await InspectionTask.aggregate(pipeline);
+};
+
 module.exports = {
   getExecutiveKPIs,
   getUserKPIs,
@@ -725,5 +840,6 @@ module.exports = {
   getRecentActivity,
   getAllProjectsMapData,
   getChartsData,
-  getSkipAnalytics
+  getSkipAnalytics,
+  getSkipGalleryTree
 };
