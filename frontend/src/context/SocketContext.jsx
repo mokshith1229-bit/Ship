@@ -17,6 +17,14 @@ export const SocketProvider = ({ children }) => {
       ? import.meta.env.VITE_API_URL.replace('/api/v1', '') 
       : 'http://localhost:5555';
 
+    // Vercel Serverless Functions do not support WebSockets.
+    // If the backend URL is on Vercel, we disable Socket.IO to prevent 404 polling spam.
+    if (backendUrl.includes('vercel.app')) {
+      console.warn('Socket.IO disabled: Vercel does not support WebSockets.');
+      setSocket({ on: () => {}, emit: () => {}, disconnect: () => {}, id: 'disabled' });
+      return;
+    }
+
     const newSocket = io(backendUrl, {
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
