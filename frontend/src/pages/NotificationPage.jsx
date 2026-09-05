@@ -60,7 +60,8 @@ const categories = [
 
 const NotificationPage = () => {
   const { user: authUser } = useAuth();
-  const isAdmin = authUser?.role === 'Administrator' || authUser?.role === 'Admin';
+  // Expanded role check to match backend update allowing User role to assign work
+  const isAdmin = authUser?.role === 'Admin' || authUser?.role === 'Administrator' || authUser?.role === 'HO' || authUser?.role === 'SPV' || authUser?.role === 'User';
   const navigate = useNavigate();
 
   // ── Live API States ──────────────────────────────────────────────────────

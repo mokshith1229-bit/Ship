@@ -24,9 +24,14 @@ const generateToken = (user) => {
  * Authenticates user with email and password
  * Returns user object and JWT token
  */
-const login = async (email, password) => {
+const login = async (emailOrUsername, password) => {
   // Find user and include passwordHash (excluded by default)
-  const user = await User.findOne({ email: email.toLowerCase() }).select('+passwordHash');
+  const user = await User.findOne({
+    $or: [
+      { email: emailOrUsername.toLowerCase() },
+      { username: emailOrUsername }
+    ]
+  }).select('+passwordHash');
 
   if (!user) {
     throw Object.assign(new Error('Invalid email or password'), { statusCode: 401 });

@@ -4,9 +4,32 @@ const inspectionEngineService = require('../services/inspectionEngine.service');
 const { successResponse } = require('../../../utils/response.util');
 const asyncHandler = require('../../../utils/asyncHandler.util');
 
-const createBatch = asyncHandler(async (req, res) => {
-  const batch = await inspectionEngineService.createBatch(req.user._id, req.body);
-  return successResponse(res, batch, 'Inspection batch created successfully', 201);
+const createBatch = asyncHandler(async (req, res, next) => {
+  try {
+    const batch = await inspectionEngineService.createBatch(req.user._id, req.body);
+    return successResponse(res, batch, 'Inspection batch created successfully', 201);
+  } catch (error) {
+    if (error.code === 'ALL_INSPECTED') {
+      return res.status(409).json({
+        success: false,
+        code: 'ALL_INSPECTED',
+        message: error.message
+      });
+    }
+    next(error);
+  }
+});
+
+const previewRoadwayBatch = asyncHandler(async (req, res) => {
+  const data = { surveyAssetId: 'all', ...req.body };
+  const preview = await inspectionEngineService.previewRoadwayBatch(req.user._id, data);
+  return successResponse(res, preview, 'Roadway batch preview generated successfully');
+});
+
+const createRoadwayBatch = asyncHandler(async (req, res) => {
+  const data = { surveyAssetId: 'all', ...req.body };
+  const batch = await inspectionEngineService.createRoadwayBatch(req.user._id, data);
+  return successResponse(res, batch, 'Roadway batch created successfully', 201);
 });
 
 const listBatches = asyncHandler(async (req, res) => {
@@ -36,6 +59,8 @@ const getExtractionReport = asyncHandler(async (req, res) => {
 
 module.exports = {
   createBatch,
+  previewRoadwayBatch,
+  createRoadwayBatch,
   listBatches,
   getBatchDetails,
   deleteBatch,

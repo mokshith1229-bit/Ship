@@ -22,8 +22,8 @@ const ProtectedRoute = ({ children, allowedRoles, moduleName }) => {
   
   if (user?.role === 'Admin' || user?.role === 'Administrator') {
     hasAccess = true;
-  } else if (moduleName) {
-    if (userPermissions && userPermissions[moduleName]) {
+  } else if (moduleName && userPermissions) {
+    if (userPermissions[moduleName]) {
       hasAccess = userPermissions[moduleName].view === true;
     } else {
       hasAccess = false;

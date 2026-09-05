@@ -13,14 +13,14 @@ const { requireRole } = require('../../middleware/role.middleware');
 
 router.use(authenticate);
 
-// Admin routes
-router.get('/batches-ready', requireRole('Admin', 'HO', 'SPV'), getBatchesReady);
-router.get('/stats', requireRole('Admin', 'HO', 'SPV'), getAssignmentStats);
-router.get('/', requireRole('Admin', 'HO', 'SPV'), getAssignments);
-router.post('/', requireRole('Admin', 'HO', 'SPV'), createAssignment);
-router.post('/bulk', requireRole('Admin', 'HO', 'SPV'), bulkAssign);
-router.put('/:id', requireRole('Admin', 'HO', 'SPV'), editAssignment);
-router.delete('/:id', requireRole('Admin', 'HO', 'SPV'), deleteAssignment);
+// Admin routes (expanded to include User role based on user request)
+router.get('/batches-ready', requireRole('Admin', 'HO', 'SPV', 'User'), getBatchesReady);
+router.get('/stats', requireRole('Admin', 'HO', 'SPV', 'User'), getAssignmentStats);
+router.get('/', requireRole('Admin', 'HO', 'SPV', 'User'), getAssignments);
+router.post('/', requireRole('Admin', 'HO', 'SPV', 'User'), createAssignment);
+router.post('/bulk', requireRole('Admin', 'HO', 'SPV', 'User'), bulkAssign);
+router.put('/:id', requireRole('Admin', 'HO', 'SPV', 'User'), editAssignment);
+router.delete('/:id', requireRole('Admin', 'HO', 'SPV', 'User'), deleteAssignment);
 router.get('/:id/timeline', getTimeline);
 
 // Inspector routes (any authenticated user can see their own + update status)

@@ -33,6 +33,9 @@ const imageReviewRoutes = require('./modules/image-review/routes/imageReview.rou
 const workAssignmentRoutes = require('./modules/work-assignment/workAssignment.routes');
 const shipRoutes = require('./modules/ship/ship.routes');
 const reportsRoutes = require('./modules/reports/reports.routes');
+const atmsRoutes = require('./modules/atms/routes/atms.routes');
+const projectFacilitiesRoutes = require('./modules/project-facilities/routes/projectFacilities.routes');
+const structureEngineRoutes = require('./modules/structure-engine/routes/structureEngine.routes');
 
 // ─── Due-date reminder cron (runs every hour) ─────────────────────────────────
 const { sendDueDateReminders, markOverdueAssignments } = require('./modules/work-assignment/workAssignment.service');
@@ -140,6 +143,9 @@ const createApp = () => {
   app.use('/api/v1/work-assignments', apiLimiter, workAssignmentRoutes);
   app.use('/api/v1/ship', apiLimiter, shipRoutes);
   app.use('/api/v1/reports', apiLimiter, reportsRoutes);
+  app.use('/api/v1/atms', apiLimiter, atmsRoutes);
+  app.use('/api/v1/project-facilities', apiLimiter, projectFacilitiesRoutes);
+  app.use('/api/v1/structure-engine', apiLimiter, structureEngineRoutes);
 
   // ─── 404 Handler ─────────────────────────────────────────────────────────────
   app.use(notFoundHandler);

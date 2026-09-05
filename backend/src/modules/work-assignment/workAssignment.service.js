@@ -163,7 +163,7 @@ const getAssignments = async (query) => {
     WorkAssignment.find(filter)
       .populate('assignedTo', 'name email username role')
       .populate('assignedBy', 'name')
-      .populate('batchId', 'name status uniqueChainagesCount selectedQuestionsCount')
+      .populate('batchId', 'name status project uniqueChainagesCount selectedQuestionsCount createdAt dateOfSurvey')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit),
@@ -176,7 +176,7 @@ const getAssignments = async (query) => {
 // ─── Get my assignments (Inspector) ──────────────────────────────────────────
 const getMyAssignments = async (userId) => {
   return WorkAssignment.find({ assignedTo: userId })
-    .populate('batchId', 'name status project uniqueChainagesCount selectedQuestionsCount')
+    .populate('batchId', 'name status project uniqueChainagesCount selectedQuestionsCount createdAt dateOfSurvey')
     .populate('assignedBy', 'name')
     .sort({ createdAt: -1 });
 };
