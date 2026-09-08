@@ -5,13 +5,34 @@ require('../../models/MasterList.model');
 require('../../models/User.model');
 const mongoose = require('mongoose');
 
-const toObjectId = (id) => mongoose.Types.ObjectId.createFromHexString(id);
+const toObjectId = (id) => {
+  if (!id) return null;
+  if (id instanceof mongoose.Types.ObjectId) return id;
+  if (typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id)) {
+    return new mongoose.Types.ObjectId(id);
+  }
+  return null;
+};
+
+const resolveProjectId = async (projectId) => {
+  if (!projectId) return null;
+  if (projectId instanceof mongoose.Types.ObjectId) return projectId;
+  if (typeof projectId === 'string' && /^[0-9a-fA-F]{24}$/.test(projectId)) {
+    return new mongoose.Types.ObjectId(projectId);
+  }
+  const Project = require('../../models/Project.model');
+  const project = await Project.findOne({ code: projectId }).select('_id').lean();
+  if (project) return project._id;
+  return null;
+};
 
 /**
  * Gets all ratings for a project with version filter
  */
 const getProjectRatings = async (projectId, query = {}) => {
-  const filter = { projectId: toObjectId(projectId) };
+  const pId = await resolveProjectId(projectId);
+  if (!pId) return [];
+  const filter = { projectId: pId };
   if (query.hoStatus) filter.hoStatus = query.hoStatus;
   if (query.category) filter.category = query.category;
 
@@ -53,8 +74,10 @@ const computeOverallRating = async (inspectionId) => {
  * Gets rating summary grouped by category for a project
  */
 const getRatingSummary = async (projectId) => {
+  const pId = await resolveProjectId(projectId);
+  if (!pId) return [];
   return Inspection.aggregate([
-    { $match: { projectId: toObjectId(projectId) } },
+    { $match: { projectId: pId } },
     { $unwind: { path: '$parameters', preserveNullAndEmptyArrays: true } },
     {
       $group: {
@@ -86,16 +109,17 @@ const InspectionTask = require('../../models/InspectionTask.model');
  * Gets rating version history for a project — returns batches from InspectionBatch collection
  */
 const getVersionHistory = async (projectId) => {
-  let queryFilter = { project: projectId };
-  if (mongoose.Types.ObjectId.isValid(projectId)) {
-    queryFilter = {
-      $or: [
-        { project: projectId },
-        { project: new mongoose.Types.ObjectId(projectId) }
-      ]
-    };
-  }
+  const pId = toObjectId(projectId);
+  const queryFilter = pId
+    ? {
+        $or: [
+          { project: projectId },
+          { project: pId }
+        ]
+      }
+    : { project: projectId };
 
+  require('../../models/User.model');
   const batches = await InspectionBatch.find(queryFilter)
     .sort({ createdAt: -1 })
     .populate('createdBy', 'firstName lastName email')

@@ -5,7 +5,14 @@ const User = require('../../models/User.model');
 const Project = require('../../models/Project.model');
 const Inspection = require('../../models/Inspection.model');
 
-const toObjectId = (id) => mongoose.Types.ObjectId.createFromHexString(id);
+const toObjectId = (id) => {
+  if (!id) return null;
+  if (id instanceof mongoose.Types.ObjectId) return id;
+  if (typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id)) {
+    return new mongoose.Types.ObjectId(id);
+  }
+  return null;
+};
 
 /**
  * Gets a leaderboard/list of all SPVs with basic aggregate stats

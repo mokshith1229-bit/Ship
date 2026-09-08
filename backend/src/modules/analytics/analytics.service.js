@@ -3,14 +3,24 @@
 const Inspection = require('../../models/Inspection.model');
 const mongoose = require('mongoose');
 
-const toObjectId = (id) => mongoose.Types.ObjectId.createFromHexString(id);
+const toObjectId = (id) => {
+  if (!id) return null;
+  if (id instanceof mongoose.Types.ObjectId) return id;
+  if (typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id)) {
+    return new mongoose.Types.ObjectId(id);
+  }
+  return null;
+};
 
 /**
  * Gets rating trends over time (monthly/weekly)
  */
 const getRatingTrends = async (projectId, period = 'monthly') => {
   const filter = {};
-  if (projectId) filter.projectId = toObjectId(projectId);
+  if (projectId) {
+    const pId = toObjectId(projectId);
+    filter.$or = pId ? [{ projectId: pId }, { projectId: projectId }] : [{ projectId: projectId }];
+  }
 
   const groupFormat = period === 'weekly' ? '%Y-W%V' : '%Y-%m';
 
@@ -35,7 +45,10 @@ const getRatingTrends = async (projectId, period = 'monthly') => {
  */
 const getAssetAnalysis = async (projectId) => {
   const filter = {};
-  if (projectId) filter.projectId = toObjectId(projectId);
+  if (projectId) {
+    const pId = toObjectId(projectId);
+    filter.$or = pId ? [{ projectId: pId }, { projectId: projectId }] : [{ projectId: projectId }];
+  }
 
   return Inspection.aggregate([
     { $match: filter },

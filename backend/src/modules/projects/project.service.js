@@ -93,12 +93,23 @@ const completeProject = async (code) => {
   return project;
 };
 
+const toObjectId = (id) => {
+  if (!id) return null;
+  if (id instanceof mongoose.Types.ObjectId) return id;
+  if (typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id)) {
+    return new mongoose.Types.ObjectId(id);
+  }
+  return null;
+};
+
 /**
  * Gets project inspection statistics
  */
 const getProjectStats = async (projectId) => {
+  const pId = toObjectId(projectId);
+  const matchFilter = pId ? { $or: [{ projectId: pId }, { projectId: projectId }] } : { projectId: projectId };
   const stats = await Inspection.aggregate([
-    { $match: { projectId: require('mongoose').Types.ObjectId.createFromHexString(projectId) } },
+    { $match: matchFilter },
     {
       $group: {
         _id: null,
@@ -112,7 +123,7 @@ const getProjectStats = async (projectId) => {
   ]);
 
   const categoryBreakdown = await Inspection.aggregate([
-    { $match: { projectId: require('mongoose').Types.ObjectId.createFromHexString(projectId) } },
+    { $match: matchFilter },
     { $group: { _id: '$category', count: { $sum: 1 } } },
     { $sort: { count: -1 } }
   ]);

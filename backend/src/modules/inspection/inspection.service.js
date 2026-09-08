@@ -5,10 +5,14 @@ const mongoose = require('mongoose');
 const { getPagination, buildPaginationMeta } = require('../../utils/pagination.util');
 const logger = require('../../config/logger');
 
-/**
- * Converts a string to ObjectId safely
- */
-const toObjectId = (id) => mongoose.Types.ObjectId.createFromHexString(id);
+const toObjectId = (id) => {
+  if (!id) return null;
+  if (id instanceof mongoose.Types.ObjectId) return id;
+  if (typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id)) {
+    return new mongoose.Types.ObjectId(id);
+  }
+  return null;
+};
 
 /**
  * Gets inspections for a project with rich filtering.
@@ -21,7 +25,8 @@ const getInspectionsByProject = async (query) => {
     throw Object.assign(new Error('projectId is required'), { statusCode: 400 });
   }
 
-  const filter = { projectId: toObjectId(query.projectId) };
+  const pId = toObjectId(query.projectId);
+  const filter = pId ? { $or: [{ projectId: pId }, { projectId: query.projectId }] } : { projectId: query.projectId };
 
   if (query.category) filter.category = query.category;
   if (query.assetType) filter.assetType = query.assetType;
