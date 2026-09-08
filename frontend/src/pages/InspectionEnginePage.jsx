@@ -16,9 +16,11 @@ const InspectionEnginePage = () => {
     setLoading(true);
     try {
       const res = await inspectionEngineService.listBatches();
-      setBatches(res.data || []);
+      const list = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
+      setBatches(list);
     } catch (err) {
       console.error(err);
+      setBatches([]);
     } finally {
       setLoading(false);
     }

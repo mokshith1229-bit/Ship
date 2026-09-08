@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { MdUndo, MdEdit, MdHome, MdClose, MdArrowBack } from 'react-icons/md';
 import { motion, AnimatePresence } from 'framer-motion';
 import ImageCarousel from '../components/Rating/ImageCarousel';
@@ -46,8 +46,19 @@ const buildInitialRatings = (task) => {
 const InspectorApp = () => {
   const { batchId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const startIndex = parseInt(searchParams.get('startIndex'), 10) || 0;
+
+  const handleGoBack = () => {
+    const road = location.state?.roadId || currentTask?.project || tasks[0]?.project;
+    const basePath = location.pathname.startsWith('/rating-v2') ? '/rating-v2' : '/rating';
+    if (road) {
+      navigate(`${basePath}/${road}`);
+    } else {
+      navigate(-1);
+    }
+  };
   
   const [globalIndex, setGlobalIndex] = useState(startIndex);
   const [loadedPage, setLoadedPage] = useState(null);
@@ -77,7 +88,7 @@ const InspectorApp = () => {
     }
   });
 
-  const PAGE_SIZE = 100;
+  const PAGE_SIZE = 10;
   const targetPage = Math.floor(globalIndex / PAGE_SIZE) + 1;
   const localIndex = globalIndex % PAGE_SIZE;
 
@@ -106,8 +117,12 @@ const InspectorApp = () => {
     setGlobalIndex((prev) => prev !== startIndex ? startIndex : prev);
   }, [startIndex]);
 
+  const prevBatchIdRef = React.useRef(batchId);
   useEffect(() => {
-    setLoadedPage(null); // Force reload ONLY if batchId changes
+    if (prevBatchIdRef.current !== batchId) {
+      prevBatchIdRef.current = batchId;
+      setLoadedPage(null);
+    }
   }, [batchId]);
 
   useEffect(() => {
@@ -115,9 +130,16 @@ const InspectorApp = () => {
     setCustomRemarkMode({});
     setValidationErrors({});
     
-    // Sync URL with globalIndex so refreshing preserves the state
-    setSearchParams({ startIndex: globalIndex }, { replace: true });
-  }, [globalIndex, setSearchParams]);
+    // Sync URL with globalIndex only if it changed
+    const currentParam = parseInt(searchParams.get('startIndex'), 10);
+    if (currentParam !== globalIndex && !isNaN(globalIndex)) {
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.set('startIndex', globalIndex);
+        return next;
+      }, { replace: true });
+    }
+  }, [globalIndex, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (loadedPage !== targetPage && batchId) {
@@ -131,7 +153,9 @@ const InspectorApp = () => {
     try {
       setLoading(true);
       const res = await ratingService.getBatchTasks(batchId, { page, limit: PAGE_SIZE });
-      if (signal && signal.aborted) return;
+      if (signal && signal.aborted) {
+        return;
+      }
       
       const paginatedData = res?.data || res;
       let fetchedTasks = [];
@@ -161,7 +185,7 @@ const InspectorApp = () => {
         return updated;
       });
     } catch (err) {
-      if (err.name === 'CanceledError' || err.name === 'AbortError') return;
+      if (err.name === 'CanceledError' || err.name === 'AbortError' || (signal && signal.aborted)) return;
       console.error(err);
       alert('Failed to load inspection tasks.');
     } finally {
@@ -484,8 +508,21 @@ const InspectorApp = () => {
   if (currentTask?.image?.cloudinaryUrl) {
     const c = parseFloat(currentTask.chainage);
     const currentImg = { url: currentTask.image.cloudinaryUrl, chainage: currentTask.chainage };
-    const prevImg = currentTask.image.previousUrl ? { url: currentTask.image.previousUrl, chainage: (c - 0.010).toFixed(3) } : currentImg;
-    const nextImg = currentTask.image.nextUrl ? { url: currentTask.image.nextUrl, chainage: (c + 0.010).toFixed(3) } : currentImg;
+    
+    let prevImg = currentImg;
+    if (currentTask.previousImage?.url) {
+      prevImg = { url: currentTask.previousImage.url, chainage: currentTask.previousImage.chainage || (c - 0.010).toFixed(3) };
+    } else if (currentTask.image?.previousUrl) {
+      prevImg = { url: currentTask.image.previousUrl, chainage: (c - 0.010).toFixed(3) };
+    }
+    
+    let nextImg = currentImg;
+    if (currentTask.nextImage?.url) {
+      nextImg = { url: currentTask.nextImage.url, chainage: currentTask.nextImage.chainage || (c + 0.010).toFixed(3) };
+    } else if (currentTask.image?.nextUrl) {
+      nextImg = { url: currentTask.image.nextUrl, chainage: (c + 0.010).toFixed(3) };
+    }
+    
     images.push(prevImg, currentImg, nextImg);
   }
 
@@ -634,7 +671,7 @@ const InspectorApp = () => {
     );
   };
 
-  if (loading) {
+  if (loading || loadedPage === null) {
     return (
       <div className="flex flex-col h-screen items-center justify-center bg-[#F8FAFC] gap-4">
         <div className="w-10 h-10 border-4 border-[#5cb85c] border-t-transparent rounded-full animate-spin"></div>
@@ -672,7 +709,7 @@ const InspectorApp = () => {
       <div className="bg-white border-b border-[#5cb85c]/30 shadow-sm px-6 py-2.5 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleGoBack}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors border border-gray-200"
             title="Go Back"
           >
@@ -680,7 +717,10 @@ const InspectorApp = () => {
             Back
           </button>
           <button
-            onClick={() => navigate('/rating')}
+            onClick={() => {
+              const basePath = location.pathname.startsWith('/rating-v2') ? '/rating-v2' : '/rating';
+              navigate(basePath);
+            }}
             className="p-2 text-gray-500 hover:text-[#5cb85c] hover:bg-green-50 rounded-full transition-colors"
             title="Back to Rating Dashboard"
           >
@@ -766,7 +806,7 @@ const InspectorApp = () => {
                 onIndexChange={setActiveImageIndex}
                 isEditMode={isEditMode}
                 baseChainage={currentTask.chainage}
-                onEscape={() => navigate('/rating')}
+                onEscape={handleGoBack}
               />
             </div>
 

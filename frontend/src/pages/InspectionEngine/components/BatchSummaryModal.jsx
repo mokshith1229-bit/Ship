@@ -14,7 +14,8 @@ const BatchSummaryModal = ({ batchId, onClose }) => {
   const fetchDetails = async () => {
     setLoading(true);
     try {
-      const data = await inspectionEngineService.getBatchDetails(batchId);
+      const res = await inspectionEngineService.getBatchDetails(batchId);
+      const data = res?.data || res;
       setBatch(data);
     } catch (err) {
       setError(err.message || 'Failed to load details');
@@ -53,26 +54,28 @@ const BatchSummaryModal = ({ batchId, onClose }) => {
             </div>
           ) : error ? (
             <div className="text-center text-red-500 p-8">{error}</div>
+          ) : !batch ? (
+            <div className="text-center text-gray-500 p-8">No batch details found.</div>
           ) : (
             <>
               {/* Summary Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Project</p>
-                  <p className="text-xl font-bold text-gray-800">{batch.project}</p>
+                  <p className="text-xl font-bold text-gray-800">{batch.project || '-'}</p>
                 </div>
                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Strategy</p>
-                  <p className="text-xl font-bold text-gray-800">{batch.samplingStrategy} ({batch.samplingPercentage}%)</p>
+                  <p className="text-xl font-bold text-gray-800">{batch.samplingStrategy || 'Random'} ({batch.samplingPercentage || 100}%)</p>
                 </div>
                 <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
                   <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-1">Sampled Qs</p>
-                  <p className="text-2xl font-bold text-blue-700">{batch.selectedQuestionsCount}</p>
-                  <p className="text-xs text-blue-500 mt-1">out of {batch.totalMasterQuestions} Master Qs</p>
+                  <p className="text-2xl font-bold text-blue-700">{batch.selectedQuestionsCount || batch.tasks?.length || 0}</p>
+                  <p className="text-xs text-blue-500 mt-1">out of {batch.totalMasterQuestions || batch.selectedQuestionsCount || 0} Master Qs</p>
                 </div>
                 <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
                   <p className="text-xs font-semibold text-purple-600 uppercase tracking-wider mb-1">Unique Chainages</p>
-                  <p className="text-2xl font-bold text-purple-700">{batch.uniqueChainagesCount}</p>
+                  <p className="text-2xl font-bold text-purple-700">{batch.uniqueChainagesCount || batch.tasks?.length || 0}</p>
                   <p className="text-xs text-purple-500 mt-1">Extracted for imaging</p>
                 </div>
               </div>
@@ -94,8 +97,8 @@ const BatchSummaryModal = ({ batchId, onClose }) => {
                     {batch.tasks?.slice(0, 50).map(task => (
                       <tr key={task._id}>
                         <td className="px-4 py-2 font-medium">{task.chainage}</td>
-                        <td className="px-4 py-2 text-gray-600">{task.parameters?.[0]?.category || 'N/A'}</td>
-                        <td className="px-4 py-2 text-gray-600">{task.parameters?.[0]?.assetType || 'N/A'}</td>
+                        <td className="px-4 py-2 text-gray-600">{task.category || task.parameters?.[0]?.category || 'N/A'}</td>
+                        <td className="px-4 py-2 text-gray-600">{task.assetSubType ? `${task.assetType} (${task.assetSubType})` : (task.assetType || task.parameters?.[0]?.assetType || 'N/A')}</td>
                         <td className="px-4 py-2 text-gray-600 font-bold">{task.parameters?.length || 0} Params</td>
                         <td className="px-4 py-2">
                           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-100 text-yellow-700">
@@ -104,7 +107,7 @@ const BatchSummaryModal = ({ batchId, onClose }) => {
                         </td>
                       </tr>
                     ))}
-                    {batch.tasks?.length === 0 && (
+                    {(!batch.tasks || batch.tasks.length === 0) && (
                       <tr><td colSpan="5" className="text-center py-4 text-gray-500">No tasks generated.</td></tr>
                     )}
                   </tbody>

@@ -111,6 +111,14 @@ const createApp = () => {
     swaggerOptions: { persistAuthorization: true }
   }));
 
+  // ─── Root Route ─────────────────────────────────────────────────────────────
+  app.get('/', (req, res) => {
+    res.json({
+      success: true,
+      message: 'Welcome to the HiRATE 3.0 API backend. System is online.'
+    });
+  });
+
   // ─── Health Check ─────────────────────────────────────────────────────────────
   app.get('/api/health', (req, res) => {
     res.json({

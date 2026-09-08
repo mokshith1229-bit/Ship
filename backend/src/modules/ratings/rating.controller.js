@@ -100,7 +100,7 @@ const getReadyBatches = asyncHandler(async (req, res) => {
 });
 
 const getBatchTasks = asyncHandler(async (req, res) => {
-  const data = await ratingService.getBatchTasks(req.params.batchId, req.user);
+  const data = await ratingService.getBatchTasks(req.params.batchId, req.user, req.query);
   return successResponse(res, data, 'Batch tasks retrieved');
 });
 
@@ -155,9 +155,4 @@ const skipTask = asyncHandler(async (req, res) => {
   return successResponse(res, data, 'Task skipped successfully');
 });
 
-const unskipTask = asyncHandler(async (req, res) => {
-  const data = await ratingService.unskipTask(req.params.taskId, req.body, req.user);
-  return successResponse(res, data, 'Task unskipped successfully');
-});
-
-module.exports = { getProjectRatings, getRatingSummary, getVersionHistory, getOverallRating, getReadyBatches, getBatchTasks, saveTaskRatings, skipTask, unskipTask, exportRatingsCSV };
+module.exports = { getProjectRatings, getRatingSummary, getVersionHistory, getOverallRating, getReadyBatches, getBatchTasks, saveTaskRatings, skipTask, exportRatingsCSV };

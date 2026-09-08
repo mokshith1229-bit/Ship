@@ -9,11 +9,25 @@ export const ratingService = {
     return response.data;
   },
 
+  async getProjectRatings(projectId, filters = {}) {
+    const params = new URLSearchParams(filters);
+    const response = await api.get(`/ratings?projectId=${projectId}&${params}`);
+    return response.data;
+  },
+
+  async getVersionHistory(projectId) {
+    const response = await api.get(`/ratings/version-history?projectId=${projectId}`);
+    return response.data;
+  },
+
+
   /**
    * Fetch all ratable tasks (with images) for a specific batch
    */
-  async getBatchTasks(batchId) {
-    const response = await api.get(`/ratings/batches/${batchId}/tasks`);
+  async getBatchTasks(batchId, params = {}) {
+    const query = new URLSearchParams(params).toString();
+    const url = query ? `/ratings/batches/${batchId}/tasks?${query}` : `/ratings/batches/${batchId}/tasks`;
+    const response = await api.get(url);
     return response.data;
   },
 

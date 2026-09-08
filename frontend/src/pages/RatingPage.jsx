@@ -122,12 +122,14 @@ const RatingPage = () => {
           };
         }
 
-        // Priority: READY-FOR-RATING > IN-PROGRESS > NOT-RATED
+        // Priority: IN-PROGRESS > READY-FOR-RATING > HO-RATED > NOT-RATED
         const currentStatus = projectMap[pName].status;
-        if (batch.status === 'READY_FOR_RATING') {
-          projectMap[pName].status = 'READY-FOR-RATING';
-        } else if (batch.status === 'IN_PROGRESS' && currentStatus !== 'READY-FOR-RATING') {
+        if (batch.status === 'IN_PROGRESS' || batch.status === 'IN-PROGRESS') {
           projectMap[pName].status = 'IN-PROGRESS';
+        } else if ((batch.status === 'READY_FOR_RATING' || batch.status === 'READY-FOR-RATING') && currentStatus !== 'IN-PROGRESS') {
+          projectMap[pName].status = 'READY-FOR-RATING';
+        } else if (batch.status === 'COMPLETED' && currentStatus === 'NOT-RATED') {
+          projectMap[pName].status = 'HO-RATED';
         }
       });
 
@@ -174,8 +176,8 @@ const RatingPage = () => {
   const dur3 = val3 * durationPerVehicle + durationBase;
   const delay3 = delay2 + dur2 + 0.15;
 
-  const val4 = 0; // HO Rated (calculated later)
-  const dur4 = durationBase;
+  const val4 = projectsData.filter(d => d.status === 'HO-RATED').length;
+  const dur4 = val4 * durationPerVehicle + durationBase;
   const delay4 = delay3 + dur3 + 0.15;
 
   const val5 = 0; // SPV Rated (calculated later)

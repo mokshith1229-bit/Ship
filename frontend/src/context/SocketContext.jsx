@@ -8,7 +8,7 @@ export const useSocket = () => {
 };
 
 export const SocketProvider = ({ children }) => {
-  const [socket, setSocket] = useState(null);
+  const [socket, setSocket] = useState(null); 
 
   useEffect(() => {
     // Determine backend URL (usually window.location.hostname for prod)
@@ -45,9 +45,9 @@ export const SocketProvider = ({ children }) => {
     };
   }, []);
 
-  return (
+  return (  
     <SocketContext.Provider value={socket}>
       {children}
     </SocketContext.Provider>
-  );
+  ); 
 };

@@ -37,6 +37,18 @@ const inspectionTaskSchema = new mongoose.Schema(
         type: mongoose.Schema.Types.ObjectId,
         ref: 'MasterList'
       },
+      parameterKey: {
+        type: String,
+        trim: true
+      },
+      parameterName: {
+        type: String,
+        trim: true
+      },
+      group: {
+        type: String,
+        trim: true
+      },
       score: {
         type: Number,
         default: 10

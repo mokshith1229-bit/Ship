@@ -48,11 +48,16 @@ class InspectionEngineRepository {
 
     if (!batch) return null;
 
-    const tasks = await InspectionTask.find({ batchId })
-      .populate('parameters')
-      .lean();
+    const [tasks, totalTasksCount] = await Promise.all([
+      InspectionTask.find({ batchId })
+        .select('chainage category assetType assetSubType status parameters image')
+        .populate('parameters', 'category assetType assetSubType parameter questionId')
+        .limit(100)
+        .lean(),
+      InspectionTask.countDocuments({ batchId })
+    ]);
 
-    return { ...batch, tasks };
+    return { ...batch, tasks, totalTasksCount: totalTasksCount || batch.selectedQuestionsCount };
   }
 
   async deleteBatch(batchId) {
