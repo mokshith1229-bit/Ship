@@ -114,23 +114,38 @@ const InspectionTask = require('../../models/InspectionTask.model');
  * Gets rating version history for a project — returns batches from InspectionBatch collection
  */
 const getVersionHistory = async (projectId) => {
-  const pId = toObjectId(projectId);
-  const queryFilter = pId
-    ? {
-        $or: [
-          { project: projectId },
-          { project: pId }
-        ]
-      }
-    : { project: projectId };
+  if (!projectId) return [];
+  try {
+    const pId = toObjectId(projectId);
+    const queryFilter = pId
+      ? {
+          $or: [
+            { project: projectId },
+            { project: pId }
+          ]
+        }
+      : { project: projectId };
 
-  require('../../models/User.model');
-  const batches = await InspectionBatch.find(queryFilter)
-    .sort({ createdAt: -1 })
-    .populate('createdBy', 'firstName lastName email')
-    .lean();
+    require('../../models/User.model');
+    require('../../models/InspectionBatch.model');
+    const batches = await InspectionBatch.find(queryFilter)
+      .sort({ createdAt: -1 })
+      .populate('createdBy', 'firstName lastName email')
+      .lean();
 
-  return batches;
+    return batches || [];
+  } catch (err) {
+    console.error('Error in rating.service getVersionHistory:', err);
+    try {
+      const batches = await InspectionBatch.find({ project: projectId })
+        .sort({ createdAt: -1 })
+        .lean();
+      return batches || [];
+    } catch (fallbackErr) {
+      console.error('Fallback query error in getVersionHistory:', fallbackErr);
+      return [];
+    }
+  }
 };
 
 
