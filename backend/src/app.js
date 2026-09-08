@@ -155,6 +155,7 @@ const createApp = () => {
   app.use('/api/v1/master', apiLimiter, masterListRoutes);
   app.use('/api/v1/survey', apiLimiter, surveyRoutes);
   app.use('/api/v1/inspections', apiLimiter, inspectionRoutes);
+  app.use('/api/v1/inspection', apiLimiter, inspectionRoutes);
   app.use('/api/v1/dashboard', apiLimiter, dashboardRoutes);
   app.use('/api/v1/analytics', apiLimiter, analyticsRoutes);
   app.use('/api/v1/ratings', apiLimiter, ratingsRoutes);

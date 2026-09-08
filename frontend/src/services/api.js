@@ -1,7 +1,11 @@
 import axios from 'axios';
 
+const defaultBaseURL = import.meta.env.PROD
+  ? 'https://hirate-backend.vercel.app/api/v1'
+  : 'http://localhost:5555/api/v1';
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5555/api/v1',
+  baseURL: import.meta.env.VITE_API_URL || defaultBaseURL,
   headers: {
     'Content-Type': 'application/json'
   }

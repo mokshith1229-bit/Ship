@@ -114,6 +114,7 @@ const InspectionTask = require('../../models/InspectionTask.model');
  * Gets rating version history for a project — returns batches from InspectionBatch collection
  */
 const getVersionHistory = async (projectId) => {
+  console.log("VERSION HISTORY PROJECT:", projectId);
   if (!projectId) return [];
   try {
     const pId = toObjectId(projectId);
@@ -133,6 +134,7 @@ const getVersionHistory = async (projectId) => {
       .populate('createdBy', 'firstName lastName email')
       .lean();
 
+    console.log("BATCH COUNT:", batches ? batches.length : 0);
     return batches || [];
   } catch (err) {
     console.error('Error in rating.service getVersionHistory:', err);
@@ -140,6 +142,7 @@ const getVersionHistory = async (projectId) => {
       const batches = await InspectionBatch.find({ project: projectId })
         .sort({ createdAt: -1 })
         .lean();
+      console.log("BATCH COUNT:", batches ? batches.length : 0);
       return batches || [];
     } catch (fallbackErr) {
       console.error('Fallback query error in getVersionHistory:', fallbackErr);
@@ -341,6 +344,8 @@ const getBatchTasks = async (batchId, user, options = {}) => {
 
   const finalTotal = limit > 0 ? total : tasks.length;
   const totalPages = limit > 0 ? Math.ceil(finalTotal / limit) || 1 : 1;
+
+  console.log("TASK COUNT:", tasks ? tasks.length : 0);
 
   if (!tasks.length) {
     return { tasks: [], total: finalTotal, page, totalPages };
