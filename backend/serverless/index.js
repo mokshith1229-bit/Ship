@@ -16,8 +16,9 @@ module.exports = async (req, res) => {
   }
 
   try {
-    if (!process.env.MONGO_URI) {
-      throw new Error('MONGO_URI environment variable is missing in Vercel!');
+    const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
+    if (!uri) {
+      throw new Error('MONGODB_URI / MONGO_URI environment variable is missing in Vercel!');
     }
     await connectDB();
   } catch (err) {

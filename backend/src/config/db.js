@@ -11,7 +11,7 @@ let memoryServer = null;
 
 const connectDB = async () => {
   try {
-    let uri = process.env.MONGODB_URI;
+    let uri = process.env.MONGODB_URI || process.env.MONGO_URI;
     
     // Try to connect to the real database first
     logger.info(`Attempting MongoDB connection to: ${uri}`);

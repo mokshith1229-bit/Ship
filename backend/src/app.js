@@ -14,6 +14,22 @@ const swaggerSpec = require('./config/swagger');
 const { initCloudinary } = require('./config/cloudinary');
 const { errorHandler, notFoundHandler } = require('./middleware/error.middleware');
 
+// Pre-register all models to prevent MissingSchemaError during population in serverless environments
+require('./models/User.model');
+require('./models/Project.model');
+require('./models/MasterList.model');
+require('./models/Inspection.model');
+require('./models/InspectionBatch.model');
+require('./models/InspectionTask.model');
+require('./models/WorkAssignment.model');
+require('./models/Notification.model');
+require('./models/AuditLog.model');
+require('./models/SurveyAsset.model');
+require('./models/SurveyImport.model');
+require('./models/ImportBatch.model');
+require('./models/Rating.model');
+require('./models/ExtractionTask.model');
+
 // Route modules
 const authRoutes = require('./modules/auth/auth.routes');
 const userRoutes = require('./modules/users/user.routes');
