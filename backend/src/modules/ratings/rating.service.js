@@ -1,5 +1,10 @@
 'use strict';
 
+/**
+ * HiRATE 3.0 Rating Service
+ * Hotfix: Safe ObjectId casting and string project code resolution for Vercel production
+ */
+
 const Inspection = require('../../models/Inspection.model');
 require('../../models/MasterList.model');
 require('../../models/User.model');
