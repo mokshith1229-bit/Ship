@@ -70,8 +70,13 @@ const getVersionHistory = asyncHandler(async (req, res) => {
   if (!req.query.projectId) {
     return res.status(400).json({ success: false, message: 'projectId is required', errors: [] });
   }
-  const data = await ratingService.getVersionHistory(req.query.projectId);
-  return successResponse(res, data, 'Version history retrieved');
+  try {
+    const data = await ratingService.getVersionHistory(req.query.projectId);
+    return successResponse(res, data || [], 'Version history retrieved');
+  } catch (err) {
+    console.error('Error in getVersionHistory controller:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Failed to fetch version history', errors: [err.stack || err.toString()] });
+  }
 });
 
 /**
