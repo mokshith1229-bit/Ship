@@ -3,7 +3,7 @@ import os
 import tempfile
 import pandas as pd
 from PIL import Image
-
+   
 from utils.vtt_parser import parse_vtt
 from utils.frame_extractor import extract_frames
 from utils.metadata_generator import generate_metadata_csv

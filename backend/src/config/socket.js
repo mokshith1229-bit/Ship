@@ -14,7 +14,7 @@ const initializeSocket = (server) => {
   io.on('connection', (socket) => {
     logger.info(`New client connected: ${socket.id}`);
 
-    // Allow clients to join specific project rooms for targeted updates
+    // Allow clients to join specific project rooms for targeted updates 
     socket.on('join_project', (projectId) => {
       socket.join(projectId);
       logger.info(`Socket ${socket.id} joined project room: ${projectId}`);
