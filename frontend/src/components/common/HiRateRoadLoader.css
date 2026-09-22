@@ -1,73 +1,144 @@
-/* src/components/common/HiRateRoadLoader.css */
-.hirate-road-loader-container {
+.hirate-loader-wrapper {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  height: 100%;
   gap: 16px;
+  width: 100%;
 }
 
-.hirate-road-loader-wrapper {
+.hirate-road-loader-container {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.hirate-road-loader-wrapper.small { width: 40px; height: 40px; }
-.hirate-road-loader-wrapper.medium { width: 80px; height: 80px; }
-.hirate-road-loader-wrapper.large { width: 140px; height: 140px; }
+/* Size Variants */
+.hirate-road-loader-container[data-size="small"] {
+  width: 64px;
+  height: 64px;
+}
+.hirate-road-loader-container[data-size="medium"] {
+  width: 120px;
+  height: 120px;
+}
+.hirate-road-loader-container[data-size="large"] {
+  width: 180px;
+  height: 180px;
+}
 
-.road-loader-svg {
+.hirate-road-svg {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   overflow: visible;
 }
 
-.road-rotating-group {
-  transform-origin: 50px 50px;
-  animation: road-car-spin 3s linear infinite;
+/* =========================================
+   LAYER 1: STATIC ROAD 
+   ========================================= */
+.hirate-static-road {
+  /* Road never moves or rotates */
 }
 
-.road-markings {
-  transform-origin: 50px 50px;
-  /* Slowly rotate the markings backwards for a better motion effect */
-  animation: road-car-spin 15s linear infinite reverse;
+.hirate-road-border {
+  fill: none;
+  stroke: #64748B; /* Subtle gray outer border */
+  stroke-width: 22; /* Slightly thicker than surface */
 }
 
-.road-glow-segment {
-  transform-origin: 50px 50px;
+.hirate-road-surface {
+  fill: none;
+  stroke: #252B2F; /* Dark charcoal */
+  stroke-width: 20;
 }
 
-@keyframes road-car-spin {
+.hirate-road-dashed {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.85);
+  stroke-width: 2;
+  stroke-dasharray: 4 8;
+}
+
+/* =========================================
+   LAYER 2 & 3: ROTATING GROUP (Glow + Car)
+   ========================================= */
+.hirate-road-rotating-group {
+  transform-origin: 50px 50px;
+  animation: hirate-road-spin 3s linear infinite;
+}
+
+/* LAYER 2: GREEN GLOW / NITRO TRAIL */
+.hirate-road-glow-trail {
+  fill: none;
+  stroke: #22C55E; /* Bright green */
+  stroke-width: 16;
+  
+  /* Circumference = 2 * PI * 35 = 219.9. 
+     Tail length = 60 units (approx 25% of track). */
+  stroke-dasharray: 60 159.9;
+  
+  /* Rotate stroke backward so it ends exactly at 0 degrees (top point).
+     Stroke starts at 90deg. Tail is 60 units (~98deg). 
+     To end at 0deg, start at -98deg. 
+     So we rotate -98 - 90 = -188deg. */
+  transform-origin: 50px 50px;
+  transform: rotate(-188deg);
+  stroke-linecap: round;
+  
+  /* The blur filter handles the glowing appearance */
+  opacity: 0.9;
+}
+
+/* LAYER 3: CAR */
+.hirate-road-car-wrapper {
+  /* The SVG car is drawn pointing UP (0deg).
+     Since it's moving CLOCKWISE (to the right at the top position),
+     we rotate it 90deg so it points along the path. */
+  transform-origin: 50px 15px;
+  transform: rotate(90deg);
+}
+
+/* =========================================
+   LOADING TEXT
+   ========================================= */
+.hirate-loader-message {
+  color: #475569;
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  text-align: center;
+  animation: pulse-opacity 2s ease-in-out infinite;
+  margin-top: 8px;
+}
+
+/* =========================================
+   ANIMATIONS
+   ========================================= */
+@keyframes hirate-road-spin {
+  0% {
+    transform: rotate(0deg);
+  }
   100% {
     transform: rotate(360deg);
   }
 }
 
-.hirate-road-loader-text {
-  color: #334155;
-  font-weight: 500;
-  text-align: center;
-  animation: pulse-text 2s ease-in-out infinite;
-}
-
-.hirate-road-loader-text.small { font-size: 12px; }
-.hirate-road-loader-text.medium { font-size: 14px; }
-.hirate-road-loader-text.large { font-size: 16px; }
-
-@keyframes pulse-text {
+@keyframes pulse-opacity {
   0%, 100% { opacity: 0.7; }
   50% { opacity: 1; }
 }
 
-/* Accessibility / Reduced Motion */
+/* =========================================
+   ACCESSIBILITY
+   ========================================= */
 @media (prefers-reduced-motion: reduce) {
-  .road-rotating-group,
-  .road-markings,
-  .hirate-road-loader-text {
+  .hirate-road-rotating-group {
+    animation: none;
+  }
+  .hirate-loader-message {
     animation: none;
   }
 }
