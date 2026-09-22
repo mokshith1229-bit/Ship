@@ -126,5 +126,53 @@ export const reportService = {
     link.click();
     document.body.removeChild(link);
     return { success: true, url };
+  },
+
+  // ─── Asset Performance & Decision Center ────────────────────────────────────
+
+  /**
+   * Fetch Performance Center analytics data
+   */
+  async getPerformanceCenterData(project, cycleId, chainageType, chainageFrom, chainageTo, assetType, parameter, roadType, direction) {
+    const response = await api.get('/reports/performance-center', {
+      params: { project, cycleId, chainageType, chainageFrom, chainageTo, assetType, parameter, roadType, direction }
+    });
+    return response.data;
+  },
+
+  /**
+   * Fetch Performance Center raw records for drill-down
+   */
+  async getPerformanceRecords(project, cycleId, chainageType, chainageFrom, chainageTo, roadType, direction, assetType, parameter) {
+    const response = await api.get('/reports/performance-center/records', {
+      params: { project, cycleId, chainageType, chainageFrom, chainageTo, roadType, direction, assetType, parameter }
+    });
+    return response.data;
+  },
+
+  /**
+   * Generate or preview Management PDF report
+   */
+  async generateManagementPdfReport(project, cycleId, mode = 'download', chainageType, chainageFrom, chainageTo, assetType, parameter, roadType, direction) {
+    const response = await api.get('/reports/generate-management-pdf', {
+      params: { project, cycleId, chainageType, chainageFrom, chainageTo, assetType, parameter, roadType, direction },
+      responseType: 'blob'
+    });
+
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+
+    if (mode === 'preview') {
+      return { success: true, url };
+    }
+
+    const link = document.createElement('a');
+    link.href = url;
+    const dateStr = new Date().toISOString().slice(0, 10);
+    link.setAttribute('download', `Management_Report_${project}_${dateStr}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    return { success: true, url };
   }
 };

@@ -37,7 +37,7 @@ export const masterListService = {
   },
 
   async getStats() {
-    const response = await api.get('/master/stats');
+    const response = await api.get('/master/kpis');
     return response.data;
   },
 

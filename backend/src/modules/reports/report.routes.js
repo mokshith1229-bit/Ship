@@ -14,4 +14,9 @@ router.get('/generate-pdf', reportController.generatePdfReport);
 router.get('/generate-comparison-pdf', reportController.generateComparisonPdfReport);
 router.get('/overview-strip-chart', reportController.getOverviewStripChartData);
 
+// ─── Asset Performance & Decision Center ────────────────────────────────────
+router.get('/performance-center', reportController.getPerformanceCenterData);
+router.get('/performance-center/records', reportController.getPerformanceRecords);
+router.get('/generate-management-pdf', reportController.generateManagementPdfReport);
+
 module.exports = router;

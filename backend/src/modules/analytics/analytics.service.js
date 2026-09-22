@@ -128,4 +128,28 @@ const exportSummaryReport = async (projectId) => {
   };
 };
 
-module.exports = { getRatingTrends, getAssetAnalysis, getKPISummary, exportSummaryReport };
+/**
+ * Gets comparison data between two inspection cycles
+ */
+const getComparisonData = async (project, previousCycle, currentCycle, chainageType, chainageFrom, chainageTo, assetType, parameter, roadType, direction) => {
+  // Return dummy data structure expected by the PDF generator
+  return {
+    metrics: {
+      totalCompared: 0,
+      improved: 0,
+      deteriorated: 0,
+      criticalIssues: 0,
+      avgPreviousRating: '0.00',
+      avgCurrentRating: '0.00',
+      netChange: 0
+    },
+    assetPerformances: [],
+    categoryPerformances: [],
+    topDeteriorated: [],
+    topImproved: [],
+    criticalActionItems: [],
+    criticalIssues: []
+  };
+};
+
+module.exports = { getRatingTrends, getAssetAnalysis, getKPISummary, exportSummaryReport, getComparisonData };

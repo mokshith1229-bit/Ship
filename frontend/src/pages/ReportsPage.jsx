@@ -5,8 +5,9 @@ import Sidebar from '../components/Sidebar';
 import ExcelViewer from '../components/ExcelViewer';
 import DynamicStripChart from '../components/DynamicStripChart';
 import OverviewStripChart from '../components/OverviewStripChart';
+import PerformanceCenterModal from './Reports/PerformanceCenterModal';
 import { reportService } from '../services/report.service';
-import { Download, FileSpreadsheet, Loader2, BarChart2, AlertTriangle, Hash, MapPin, CheckCircle, Eye, ChevronDown, ChevronRight, X } from 'lucide-react';
+import { Download, FileSpreadsheet, Loader2, BarChart2, AlertTriangle, Hash, MapPin, CheckCircle, Eye, ChevronDown, ChevronRight, X, TrendingUp } from 'lucide-react';
 
 const ReportsPage = () => {
   const [loading, setLoading] = useState(true);
@@ -46,6 +47,7 @@ const ReportsPage = () => {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [previewType, setPreviewType] = useState(null);
   const [stripChartData, setStripChartData] = useState(null);
+  const [showPerformanceCenter, setShowPerformanceCenter] = useState(false);
 
   useEffect(() => {
     fetchConfig();
@@ -661,6 +663,51 @@ const ReportsPage = () => {
                     </div>
                   </div>
                 )}
+
+                {/* ═══ ASSET PERFORMANCE & DECISION CENTER ═══ */}
+                {selectedProject && (
+                  <div className="mt-10 pt-8 border-t-2 border-gray-100">
+                    <div className="bg-gradient-to-br from-[#0F172A] to-[#1E3A8A] rounded-2xl shadow-lg p-8 text-white">
+                      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                        <div>
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
+                              <TrendingUp className="w-5 h-5 text-blue-300" />
+                            </div>
+                            <h2 className="text-xl font-bold tracking-tight">ASSET PERFORMANCE & DECISION CENTER</h2>
+                          </div>
+                          <p className="text-slate-300 text-sm max-w-xl leading-relaxed">
+                            Transform current inspection data into project-level condition, asset, risk and corridor intelligence.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setShowPerformanceCenter(true)}
+                          disabled={!selectedProject}
+                          className="px-6 py-3 bg-white text-[#0F172A] hover:bg-blue-50 font-bold rounded-xl flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap text-sm"
+                          id="open-performance-center-btn"
+                        >
+                          <TrendingUp className="w-5 h-5" />
+                          OPEN PERFORMANCE CENTER
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Performance Center Modal */}
+                <PerformanceCenterModal
+                  isOpen={showPerformanceCenter}
+                  onClose={() => setShowPerformanceCenter(false)}
+                  project={selectedProject}
+                  cycleId={selectedCycle}
+                  roadType={roadType}
+                  direction={direction}
+                  chainageType={chainageType}
+                  chainageFrom={chainageFrom}
+                  chainageTo={chainageTo}
+                  assetType={selectedAssetType}
+                  parameter={selectedParameter}
+                />
 
               </div>
             )}

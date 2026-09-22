@@ -17,7 +17,7 @@ router.get('/assets', masterListController.getAssetTypes);
 router.get('/road-types', masterListController.getRoadTypes);
 router.get('/parameters', masterListController.getParameters);
 router.get('/chainages', masterListController.getChainages);
-router.get('/stats', masterListController.getStats);
+router.get('/kpis', masterListController.getStats);
 
 router.put('/:id', masterListController.updateMasterListItem);
 router.delete('/project/:projectName', masterListController.deleteProjectMasterList);

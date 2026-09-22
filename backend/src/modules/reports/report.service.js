@@ -106,15 +106,18 @@ class ReportService {
       };
     }
 
-    let rawTasks = await InspectionTask.find(query).populate('parameters').lean();
-
-    if (chainageType === 'custom' && chainageFrom !== undefined && chainageTo !== undefined) {
-      const cFrom = parseFloat(chainageFrom);
-      const cTo = parseFloat(chainageTo);
-      rawTasks = rawTasks.filter(t => {
+    const cursor = InspectionTask.find(query).populate('parameters').lean().cursor({ batchSize: 500 });
+    let rawTasks = [];
+    for await (const t of cursor) {
+      if (chainageType === 'custom' && chainageFrom !== undefined && chainageTo !== undefined) {
+        const cFrom = parseFloat(chainageFrom);
+        const cTo = parseFloat(chainageTo);
         const cVal = parseFloat(t.chainage);
-        return !isNaN(cVal) && cVal >= cFrom && cVal <= cTo;
-      });
+        if (isNaN(cVal) || cVal < cFrom || cVal > cTo) {
+          continue;
+        }
+      }
+      rawTasks.push(t);
     }
 
     let tasks = [];
@@ -243,9 +246,7 @@ class ReportService {
     return allRatings;
   }
 
-  async getSummary(project, cycleId, chainageType, chainageFrom, chainageTo, selectedAssetType, selectedParameter, roadType, direction) {
-    const tasks = await this.getTasksForReport(project, cycleId, chainageType, chainageFrom, chainageTo, selectedAssetType, selectedParameter, roadType, direction);
-
+  calculateSummaryStats(project, tasks, chainageType, chainageFrom, chainageTo) {
     let totalRatings = 0;
     const chainages = new Set();
     const parametersRated = new Set();
@@ -335,9 +336,14 @@ class ReportService {
     };
   }
 
+  async getSummary(project, cycleId, chainageType, chainageFrom, chainageTo, selectedAssetType, selectedParameter, roadType, direction) {
+    const tasks = await this.getTasksForReport(project, cycleId, chainageType, chainageFrom, chainageTo, selectedAssetType, selectedParameter, roadType, direction);
+    return this.calculateSummaryStats(project, tasks, chainageType, chainageFrom, chainageTo);
+  }
+
   async generateExcelReport(project, cycleId, chainageType, chainageFrom, chainageTo, selectedAssetType, selectedParameter, roadType, direction) {
     const tasks = await this.getTasksForReport(project, cycleId, chainageType, chainageFrom, chainageTo, selectedAssetType, selectedParameter, roadType, direction);
-    const summary = await this.getSummary(project, cycleId, chainageType, chainageFrom, chainageTo, selectedAssetType, selectedParameter, roadType, direction);
+    const summary = this.calculateSummaryStats(project, tasks, chainageType, chainageFrom, chainageTo);
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'HiRATE Reports Module';
@@ -820,7 +826,7 @@ class ReportService {
     const summary = await this.getSummary(project, cycleId, chainageType, chainageFrom, chainageTo, selectedAssetType, selectedParameter, roadType, direction);
 
     const PAGE_MARGINS = { top: 100, bottom: 50, left: 40, right: 40 };
-    const doc = new PDFDocument({ margins: PAGE_MARGINS, size: 'A4', bufferPages: true });
+    const doc = new PDFDocument({ margins: PAGE_MARGINS, size: 'A4' });
     doc.on('error', err => console.error('PDF Document Error:', err));
     doc.pipe(res);
 
@@ -2594,17 +2600,18 @@ class ReportService {
     const drawKpi = (x, y, title, value, bgColor, textColor) => {
       doc.fillColor(bgColor).rect(x, y, kpiWidth, kpiHeight).fill();
       doc.fillColor(textColor).font('Helvetica-Bold').fontSize(18).text(value.toString(), x, y + 15, { width: kpiWidth, align: 'center' });
-      doc.font('Helvetica').fontSize(10).text(title, x, y + 40, { width: kpiWidth, align: 'center' });
+      doc.font('Helvetica').fontSize(9).text(title, x, y + 40, { width: kpiWidth, align: 'center' });
     };
 
     drawKpi(startX, kpiY, 'Total Compared', metrics.totalCompared, '#f3f4f6', '#111827');
     drawKpi(startX + (kpiWidth + kpiSpacing) * 1, kpiY, 'Improved', metrics.improved, '#dcfce7', '#166534');
     drawKpi(startX + (kpiWidth + kpiSpacing) * 2, kpiY, 'Deteriorated', metrics.deteriorated, '#fee2e2', '#991b1b');
-    drawKpi(startX + (kpiWidth + kpiSpacing) * 3, kpiY, 'Critical Observations', metrics.criticalIssues, '#fef9c3', '#854d0e');
+    drawKpi(startX + (kpiWidth + kpiSpacing) * 3, kpiY, 'Critical Issues', metrics.criticalIssues, '#fef9c3', '#854d0e');
     drawKpi(startX + (kpiWidth + kpiSpacing) * 4, kpiY, 'Avg Prev Rating', metrics.avgPreviousRating, '#dbeafe', '#1e40af');
     drawKpi(startX + (kpiWidth + kpiSpacing) * 5, kpiY, 'Avg Curr Rating', metrics.avgCurrentRating, '#e0e7ff', '#3730a3');
     drawKpi(startX + (kpiWidth + kpiSpacing) * 6, kpiY, 'Net Change', metrics.netChange > 0 ? `+${metrics.netChange}` : metrics.netChange, '#f3e8ff', '#6b21a8');
 
+    doc.x = 40;
     doc.y = kpiY + kpiHeight + 30;
 
     doc.font('Helvetica-Bold').fontSize(14).fillColor(primaryThemeColor).text('Executive Insight');
