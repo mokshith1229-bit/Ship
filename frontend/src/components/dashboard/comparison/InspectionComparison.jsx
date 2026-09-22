@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import HiRateRoadLoader from '../../common/HiRateRoadLoader';
 import CategoryAssetComparison from './CategoryAssetComparison';
 import ChainageIntelligence from './ChainageIntelligence';
 import { ratingService } from '../../../services/rating.service';

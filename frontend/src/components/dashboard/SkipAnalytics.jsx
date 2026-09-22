@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import HiRateRoadLoader from '../common/HiRateRoadLoader';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MdSkipNext, MdClose, MdImage, MdOutlineLocationOn, MdHistory, MdPerson, MdDashboard, MdListAlt, MdMap } from 'react-icons/md';

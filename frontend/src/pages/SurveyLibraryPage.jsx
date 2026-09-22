@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import HiRateRoadLoader from '../components/common/HiRateRoadLoader';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
 import { masterListService } from '../services/masterList.service';

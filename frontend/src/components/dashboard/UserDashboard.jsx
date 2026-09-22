@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import HiRateRoadLoader from '../common/HiRateRoadLoader';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MdAssignment, MdPendingActions, MdCheckCircle, MdWarning, MdAccessTime, MdPlayArrow } from 'react-icons/md';
@@ -52,7 +53,7 @@ const UserDashboard = () => {
   }, []);
 
   if (loading) {
-    return <div className="p-8 flex justify-center items-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div></div>;
+    return <div className="p-8 flex justify-center items-center h-full"><HiRateRoadLoader size="medium" /></div>;
   }
 
   const activeAssignments = assignments.filter(a => a.status === 'Assigned' || a.status === 'In Progress');

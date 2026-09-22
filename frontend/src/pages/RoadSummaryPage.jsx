@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import HiRateRoadLoader from '../components/common/HiRateRoadLoader';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { MdClear, MdOutlineFileDownload } from 'react-icons/md';
 import Pagination from '../components/Pagination';
