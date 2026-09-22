@@ -1,0 +1,73 @@
+/* src/components/common/HiRateRoadLoader.css */
+.hirate-road-loader-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  gap: 16px;
+}
+
+.hirate-road-loader-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hirate-road-loader-wrapper.small { width: 40px; height: 40px; }
+.hirate-road-loader-wrapper.medium { width: 80px; height: 80px; }
+.hirate-road-loader-wrapper.large { width: 140px; height: 140px; }
+
+.road-loader-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.road-rotating-group {
+  transform-origin: 50px 50px;
+  animation: road-car-spin 3s linear infinite;
+}
+
+.road-markings {
+  transform-origin: 50px 50px;
+  /* Slowly rotate the markings backwards for a better motion effect */
+  animation: road-car-spin 15s linear infinite reverse;
+}
+
+.road-glow-segment {
+  transform-origin: 50px 50px;
+}
+
+@keyframes road-car-spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.hirate-road-loader-text {
+  color: #334155;
+  font-weight: 500;
+  text-align: center;
+  animation: pulse-text 2s ease-in-out infinite;
+}
+
+.hirate-road-loader-text.small { font-size: 12px; }
+.hirate-road-loader-text.medium { font-size: 14px; }
+.hirate-road-loader-text.large { font-size: 16px; }
+
+@keyframes pulse-text {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+/* Accessibility / Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .road-rotating-group,
+  .road-markings,
+  .hirate-road-loader-text {
+    animation: none;
+  }
+}

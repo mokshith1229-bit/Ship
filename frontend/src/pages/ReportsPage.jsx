@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import HiRateRoadLoader from '../components/common/HiRateRoadLoader';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
 import { reportsService } from '../services/reports.service';

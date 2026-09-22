@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import HiRateRoadLoader from '../../../components/common/HiRateRoadLoader';
 import { MdEdit, MdDelete } from 'react-icons/md';
 import { masterListService } from '../../../services/masterList.service';
 import MasterListEditModal from './MasterListEditModal';
@@ -24,8 +25,7 @@ const MasterListTable = ({ data, loading, onRefresh }) => {
   if (loading) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col min-h-[400px] items-center justify-center">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-gray-500 text-sm">Loading master list data...</p>
+        <HiRateRoadLoader size="medium" message="Loading master list data..." />
       </div>
     );
   }

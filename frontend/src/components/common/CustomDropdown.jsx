@@ -84,7 +84,7 @@ const CustomDropdown = ({
 
   return (
     <div 
-      className={`relative w-full ${className}`} 
+      className={`relative w-full ${className} ${isOpen ? 'z-[9999]' : 'z-10'}`} 
       ref={dropdownRef}
       onKeyDown={handleKeyDown}
       tabIndex={disabled ? -1 : 0}
@@ -120,7 +120,7 @@ const CustomDropdown = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: isUp ? 10 : -10, scale: 0.98 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className={`absolute z-[100] w-full ${isUp ? 'bottom-full mb-1.5' : 'mt-1.5'} bg-white border border-gray-100 rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.12)] overflow-hidden`}
+            className={`absolute z-[100] w-full ${isUp ? 'bottom-full mb-2' : 'top-full mt-2'} bg-white border border-gray-100 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.2)] overflow-hidden`}
           >
             <ul 
               className="max-h-60 overflow-y-auto py-1 custom-dropdown-scrollbar focus:outline-none overscroll-contain"

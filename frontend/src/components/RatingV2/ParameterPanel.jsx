@@ -58,7 +58,8 @@ const ParameterPanel = ({ task, params, ratings, onChange, onOpenMissing }) => {
     const paramCategory = param.category || param.assetType || currentCategory;
     const paramMasterRemarks = remarkMasterConfig[paramCategory] || [];
     const combinedMasterRemarks = [...new Set([...categoryRemarks, ...paramMasterRemarks])];
-    const dynamicRemarkOptions = [...new Set([...combinedMasterRemarks, ...allCustomRemarks, ...currentTaskRemarks]), 'Other'];
+    const unsortedRemarks = [...new Set([...combinedMasterRemarks, ...allCustomRemarks, ...currentTaskRemarks])];
+    const dynamicRemarkOptions = [...unsortedRemarks.sort((a, b) => a.localeCompare(b)), 'Other'];
 
     return (
       <div key={pId} className="flex flex-col gap-3 pb-6 border-b border-gray-100 last:border-0 last:pb-0">
@@ -120,7 +121,6 @@ const ParameterPanel = ({ task, params, ratings, onChange, onOpenMissing }) => {
                 }
               }}
               placeholder="Add observation/remark (optional)..."
-              direction="up"
               searchable={true}
             />
           )}

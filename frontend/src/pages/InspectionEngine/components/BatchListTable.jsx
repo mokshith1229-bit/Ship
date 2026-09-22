@@ -1,4 +1,5 @@
 import React from 'react';
+import HiRateRoadLoader from '../../../components/common/HiRateRoadLoader';
 import { MdDelete, MdVisibility } from 'react-icons/md';
 
 const BatchListTable = ({ batches, loading, onDelete, onView }) => {

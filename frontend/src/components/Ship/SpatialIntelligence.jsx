@@ -105,8 +105,7 @@ const SpatialIntelligence = ({ projects = [] }) => {
 
       {loading && (
         <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <div className="w-10 h-10 border-4 border-green-600 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-sm text-gray-500 font-medium">Aggregating geographical and corridor intelligence...</p>
+          <HiRateRoadLoader size="medium" message="Aggregating geographical and corridor intelligence..." />
         </div>
       )}
 

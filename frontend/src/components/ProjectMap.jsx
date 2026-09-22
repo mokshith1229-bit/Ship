@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import HiRateRoadLoader from './common/HiRateRoadLoader';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -111,8 +112,7 @@ const ProjectMap = ({ project }) => {
       {loading && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 rounded-xl">
           <div className="flex flex-col items-center gap-2">
-            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-            <span className="text-xs text-gray-500 font-medium">Loading map data…</span>
+            <HiRateRoadLoader size="medium" message="Loading map data…" />
           </div>
         </div>
       )}
