@@ -21,7 +21,9 @@ const BackgroundVideoLoop = () => {
       const playPromise = videoRef.current.play();
       if (playPromise !== undefined) {
         playPromise.catch(error => {
-          console.log("Video autoplay failed:", error);
+          if (error.name !== 'AbortError') {
+            console.log("Video autoplay failed:", error);
+          }
         });
       }
     }

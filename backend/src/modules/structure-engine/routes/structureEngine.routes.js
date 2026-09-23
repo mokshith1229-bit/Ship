@@ -5,6 +5,7 @@ const router = express.Router();
 const multer = require('multer');
 const structureEngineController = require('../controllers/structureEngine.controller');
 const { authenticate } = require('../../../middleware/auth.middleware');
+const { requirePermission } = require('../../../middleware/permission.middleware');
 
 // Configure multer for excel upload in memory
 const upload = multer({
@@ -21,12 +22,12 @@ const upload = multer({
 router.use(authenticate);
 
 // Detect sheets
-router.post('/detect-sheets', upload.single('file'), structureEngineController.detectSheets);
+router.post('/detect-sheets', requirePermission('Structures Sampling', 'create'), upload.single('file'), structureEngineController.detectSheets);
 
 // Parse Excel and Preview
-router.post('/parse', upload.single('file'), structureEngineController.parseExcel);
+router.post('/parse', requirePermission('Structures Sampling', 'create'), upload.single('file'), structureEngineController.parseExcel);
 
 // Generate Structure Batch
-router.post('/generate', structureEngineController.generateBatch);
+router.post('/generate', requirePermission('Structures Sampling', 'create'), structureEngineController.generateBatch);
 
 module.exports = router;

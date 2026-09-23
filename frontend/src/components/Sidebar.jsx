@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import { projectService } from '../services/project.service';
 import { ratingService } from '../services/rating.service';
+import { roleService } from '../services/role.service';
 
 const SidebarHoverButton = ({ isActive, onClick, onDoubleClick, children }) => {
   const buttonRef = useRef(null);
@@ -116,7 +117,7 @@ const SidebarHoverButton = ({ isActive, onClick, onDoubleClick, children }) => {
 };
 
 const Sidebar = () => {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -159,16 +160,8 @@ const Sidebar = () => {
   }, []);
 
   const projectOptions = useMemo(() => {
-    if (!user) return allProjects;
-    if (user.role === 'Admin' || user.role === 'Administrator') return allProjects;
-    if (user.roadAssignment) {
-      return user.roadAssignment
-        .split(',')
-        .map(p => p.trim().toUpperCase())
-        .filter(p => p);
-    }
-    return [];
-  }, [user, allProjects]);
+    return allProjects;
+  }, [allProjects]);
 
   
   // Sidebar collapsed by default on desktop, but persist user preference
@@ -224,7 +217,6 @@ const Sidebar = () => {
     { name: 'Users', icon: MdGroup, path: '/users', allowedRoles: ['Admin', 'Administrator'] },
     { name: 'User Insights', icon: MdInsertChart, path: '/user-insights', allowedRoles: ['Admin', 'Administrator'] },
     { name: 'Role', icon: MdPerson, path: '/role', allowedRoles: ['Admin', 'Administrator'] },
-    { name: 'Clone Page', icon: MdContentCopy, path: '/demo', allowedRoles: ['Admin', 'Administrator'] },
     { name: 'Profile', icon: MdPerson, path: '/profile', allowedRoles: ['HO', 'SPV', 'User'] },
   ];
 
@@ -329,7 +321,17 @@ const Sidebar = () => {
 
       <div className="flex-1 py-6 px-3.5 relative z-50 overflow-y-auto custom-dropdown-scrollbar">
         <ul className="flex flex-col gap-3">
-          {menuItems.filter(item => !item.allowedRoles || (user && item.allowedRoles.includes(user.role))).map((item) => {
+          {menuItems.filter(item => {
+            if (!user) return false;
+            // Admin has full access
+            if (user.role === 'Admin' || user.role === 'Administrator') return true;
+
+            // Profile is accessible to all users
+            if (item.name === 'Profile') return true;
+
+            // Check dynamic database permission
+            return hasPermission(item.name, 'view');
+          }).map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname.startsWith(item.path);
             const isDashboard = item.name === 'Dashboard';
@@ -386,11 +388,11 @@ const Sidebar = () => {
               </button>
             </div>
             <div className="max-h-[300px] overflow-y-auto custom-dropdown-scrollbar py-1.5 flex flex-col px-2 gap-1">
-              {projectOptions.map(proj => {
+              {projectOptions.map((proj, idx) => {
                 const isSelected = activeProject === proj;
                 return (
                   <button 
-                    key={proj} 
+                    key={`${proj}-${idx}`} 
                     onClick={(e) => {
                       e.stopPropagation();
                       handleNav('/dashboard', proj);

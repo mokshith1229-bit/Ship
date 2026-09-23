@@ -5,10 +5,7 @@ import { ratingService } from '../../services/rating.service';
 import InspectionHeader from '../../components/RatingV2/InspectionHeader';
 import ImageViewer from '../../components/RatingV2/ImageViewer';
 import ImageThumbnailStrip from '../../components/RatingV2/ImageThumbnailStrip';
-import InspectionMap from '../../components/RatingV2/InspectionMap';
 import ParameterPanel from '../../components/RatingV2/ParameterPanel';
-import TaskProgress from '../../components/RatingV2/TaskProgress';
-import RatingNavigation from '../../components/RatingV2/RatingNavigation';
 import AddMissingQuestion from '../../components/RatingV2/AddMissingQuestion';
 
 const RatingV2Page = () => {
@@ -25,21 +22,39 @@ const RatingV2Page = () => {
   const [ratingsState, setRatingsState] = useState({});
   const [saving, setSaving] = useState(false);
   const [isMissingModalOpen, setIsMissingModalOpen] = useState(false);
+  const [activeImageView, setActiveImageView] = useState('current'); // 'prev', 'current', 'next'
 
   const PAGE_SIZE = 50;
   const targetPage = Math.floor(globalIndex / PAGE_SIZE) + 1;
   const localIndex = globalIndex % PAGE_SIZE;
 
-  // Helper to normalize parameters exactly like V1
+  // Helper to normalize parameters exactly like V1 without duplicates
   const getParamsList = (task) => {
     if (!task) return [];
+    let combined = [];
     if (task.category === 'Roadway') {
-      return [...(task.ratings || []), ...(task.parameters || [])];
+      combined = [...(task.parameters || []), ...(task.ratings || [])];
+    } else if (task.category === 'Structures' || task.category === 'Project Facilities' || task.category === 'ATMS') {
+      combined = task.ratings || [];
+    } else {
+      combined = task.parameters || [];
     }
-    if (task.category === 'Structures' || task.category === 'Project Facilities' || task.category === 'ATMS') {
-      return task.ratings || [];
-    }
-    return task.parameters || [];
+    
+    const unique = [];
+    const seen = new Set();
+    combined.forEach(p => {
+      const key = p.parameterKey || p._id || p.masterListId;
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        unique.push({
+            ...p,
+            parameterKey: key,
+            parameterName: p.parameterName || p.parameter,
+            group: p.group || p.assetType || task.assetType
+        });
+      }
+    });
+    return unique;
   };
 
   // Initialize rating state for a task if not already present
@@ -61,10 +76,9 @@ const RatingV2Page = () => {
       
       // Map all standard parameters (either from parameters or pre-populated ratings)
       paramsList.forEach(p => {
-        const pId = p.parameterKey || p._id || p.masterListId; // ratings use parameterKey/masterListId, parameters use _id
-        // Only set default if we didn't already extract an existing score above
+        const pId = p.parameterKey || p._id || p.masterListId;
         if (!initial[pId]) {
-            initial[pId] = { score: p.score ?? 10, remark: p.remark || '' }; // use p.score if it came from ratings array
+            initial[pId] = { score: p.score ?? 10, remark: p.remark || '' }; 
         }
       });
 
@@ -87,18 +101,8 @@ const RatingV2Page = () => {
       if (signal && signal.aborted) return;
       
       const paginatedData = res?.data || res;
-      let fetchedTasks = [];
-      let total = 0;
-
-      if (Array.isArray(paginatedData)) {
-        total = paginatedData.length;
-        const start = (page - 1) * PAGE_SIZE;
-        const end = start + PAGE_SIZE;
-        fetchedTasks = paginatedData.slice(start, end);
-      } else {
-        fetchedTasks = paginatedData?.tasks || [];
-        total = paginatedData?.total || 0;
-      }
+      const fetchedTasks = paginatedData?.tasks || [];
+      const total = paginatedData?.total || 0;
 
       setTasks(fetchedTasks);
       setTotalTasks(total);
@@ -128,75 +132,105 @@ const RatingV2Page = () => {
   const currentTask = tasks[localIndex] || null;
 
   useEffect(() => {
-    if (currentTask) initializeRatings(currentTask);
+    if (currentTask) {
+      initializeRatings(currentTask);
+      setActiveImageView('current');
+    }
   }, [localIndex, currentTask]);
 
-  const handleRatingChange = (paramKey, score, remark) => {
+  const handleRatingChange = (paramKey, score, remark, isSkipped = false) => {
     if (!currentTask) return;
-    setRatingsState(prev => ({
-      ...prev,
-      [currentTask._id]: {
-        ...prev[currentTask._id],
-        [paramKey]: { score, remark }
-      }
-    }));
+    setRatingsState(prev => {
+      const currentTaskRatings = prev[currentTask._id] || {};
+      const currentParamRating = currentTaskRatings[paramKey] || {};
+      
+      return {
+        ...prev,
+        [currentTask._id]: {
+          ...currentTaskRatings,
+          [paramKey]: { 
+            score, 
+            remark,
+            isCustom: currentParamRating.isCustom,
+            parameterName: currentParamRating.parameterName,
+            isSkipped 
+          }
+        }
+      };
+    });
   };
 
-  const handleSaveAndNext = async () => {
+  const handleSaveAndNavigate = async (direction) => {
     if (!currentTask || saving) return;
     setSaving(true);
     try {
       const currentRatings = ratingsState[currentTask._id] || {};
       
-      // Build ratings array for API
-      const paramsList = getParamsList(currentTask);
-      const ratingsData = paramsList.map(p => {
-        const pId = p.parameterKey || p._id || p.masterListId;
-        const r = currentRatings[pId];
-        return {
-          masterListId: p.masterListId || p._id,
-          parameterKey: p.parameterKey || p.questionId,
-          parameterName: p.parameterName || p.parameter,
-          group: p.group || p.assetType || currentTask.assetType, // Handle V1 group logic
-          score: r ? r.score : null,
-          remark: r ? r.remark : ''
-        };
+      const finalRatingsMap = new Map();
+
+      // 1. Add standard parameters
+      (currentTask.parameters || []).forEach(p => {
+        const key = p._id || p.parameterKey;
+        const r = currentRatings[key];
+        finalRatingsMap.set(key, {
+          masterListId: p._id || p.masterListId,
+          parameterKey: key,
+          parameterName: p.parameter || p.parameterName,
+          group: p.group || p.assetType || currentTask.assetType,
+          score: r ? (r.isSkipped ? null : r.score) : null,
+          remark: r ? (r.isSkipped ? 'Skipped' : r.remark) : '',
+          isSkipped: r ? r.isSkipped : false
+        });
       });
 
-      // Include existing dynamic/skipped ratings AND newly added custom questions
-      const finalRatingsData = [...ratingsData];
-      
+      // 2. Add existing DB ratings (overrides standard ones with same key)
+      (currentTask.ratings || []).forEach(p => {
+        const key = p.parameterKey;
+        const r = currentRatings[key];
+        if (finalRatingsMap.has(key)) {
+            const existing = finalRatingsMap.get(key);
+            existing.score = r ? (r.isSkipped ? null : r.score) : existing.score;
+            existing.remark = r ? (r.isSkipped ? 'Skipped' : r.remark) : existing.remark;
+            existing.isSkipped = r ? r.isSkipped : false;
+        } else {
+            finalRatingsMap.set(key, {
+              masterListId: p.masterListId,
+              parameterKey: key,
+              parameterName: p.parameterName,
+              group: p.group || currentTask.assetType,
+              score: r ? (r.isSkipped ? null : r.score) : p.score,
+              remark: r ? (r.isSkipped ? 'Skipped' : r.remark) : p.remark,
+              isSkipped: r ? r.isSkipped : false
+            });
+        }
+      });
+
+      // 3. Add any newly added custom questions
       Object.entries(currentRatings).forEach(([key, r]) => {
-         if (r.isCustom) {
-           finalRatingsData.push({
+         if (r.isCustom && !finalRatingsMap.has(key)) {
+           finalRatingsMap.set(key, {
              parameterKey: key,
              parameterName: r.parameterName,
              group: currentTask.assetType,
-             score: r.score,
-             remark: r.remark
+             score: r.isSkipped ? null : r.score,
+             remark: r.isSkipped ? 'Skipped' : r.remark,
+             isSkipped: r.isSkipped
            });
          }
       });
-      
-      currentTask.ratings?.forEach(existing => {
-         if (!existing.masterListId && !currentRatings[existing.parameterKey]?.isCustom) {
-             const key = existing.parameterKey;
-             const r = currentRatings[key];
-             if (r) {
-                 finalRatingsData.push({ ...existing, score: r.score, remark: r.remark });
-             } else {
-                 finalRatingsData.push(existing);
-             }
-         }
-      });
+
+      const finalRatingsData = Array.from(finalRatingsMap.values());
 
       await ratingService.saveTaskRatings(currentTask._id, finalRatingsData);
       
-      // Move next
-      if (globalIndex < totalTasks - 1) {
+      if (direction === 'next' && globalIndex < totalTasks - 1) {
         const nextIndex = globalIndex + 1;
         setGlobalIndex(nextIndex);
         setSearchParams({ startIndex: nextIndex.toString() });
+      } else if (direction === 'prev' && globalIndex > 0) {
+        const prevIndex = globalIndex - 1;
+        setGlobalIndex(prevIndex);
+        setSearchParams({ startIndex: prevIndex.toString() });
       }
     } catch (err) {
       console.error('Failed to save task', err);
@@ -225,39 +259,29 @@ const RatingV2Page = () => {
     }
   };
 
-  const handleNext = () => {
-    if (globalIndex < totalTasks - 1) {
-      const nextIndex = globalIndex + 1;
-      setGlobalIndex(nextIndex);
-      setSearchParams({ startIndex: nextIndex.toString() });
-    }
+  const handleShiftImageRight = () => {
+    if (activeImageView === 'prev') setActiveImageView('current');
+    else if (activeImageView === 'current' && currentTask?.nextImage) setActiveImageView('next');
   };
 
-  const handlePrevious = () => {
-    if (globalIndex > 0) {
-      const prevIndex = globalIndex - 1;
-      setGlobalIndex(prevIndex);
-      setSearchParams({ startIndex: prevIndex.toString() });
-    }
+  const handleShiftImageLeft = () => {
+    if (activeImageView === 'next') setActiveImageView('current');
+    else if (activeImageView === 'current' && currentTask?.previousImage) setActiveImageView('prev');
   };
 
-  // Keyboard Shortcuts
+  // Keyboard Shortcuts - ONLY Image Shifting (No Save)
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Don't trigger shortcuts if typing in an input
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
-      if (e.key === 'ArrowRight') handleNext();
-      if (e.key === 'ArrowLeft') handlePrevious();
+      if (e.key === 'ArrowRight') handleShiftImageRight();
+      if (e.key === 'ArrowLeft') handleShiftImageLeft();
       if (e.key.toLowerCase() === 's') handleSkip();
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        handleSaveAndNext();
-      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [globalIndex, totalTasks, currentTask, ratingsState, saving]);
+  }, [globalIndex, totalTasks, currentTask, ratingsState, saving, activeImageView]);
 
   if (loading && tasks.length === 0) {
     return <div className="flex h-screen items-center justify-center bg-white text-gray-800">Loading Inspection Data...</div>;
@@ -289,24 +313,29 @@ const RatingV2Page = () => {
       
       <div className="flex flex-1 overflow-hidden p-4 gap-4">
         {/* LEFT / MAIN - Image & Map */}
-        <div className="flex-1 flex flex-col gap-4 overflow-hidden relative rounded-xl bg-gray-50 border border-gray-200">
-          <div className="flex-1 relative overflow-hidden rounded-t-xl">
-            <ImageViewer task={currentTask} />
-            <div className="absolute bottom-4 right-4 z-10">
-              <InspectionMap task={currentTask} mode="compact" />
-            </div>
+        <div className="h-full flex flex-col items-center justify-start gap-4 shrink-0 max-w-[68%] min-w-[50%]">
+          <div className="w-fit h-auto max-h-[calc(100%-110px)] relative overflow-hidden rounded-xl shadow-md border border-gray-300 flex items-center justify-center bg-gray-50">
+            <ImageViewer 
+              task={currentTask} 
+              activeView={activeImageView}
+              onNext={() => handleSaveAndNavigate('next')}
+              onPrevious={() => handleSaveAndNavigate('prev')}
+              hasNext={globalIndex < totalTasks - 1}
+              hasPrevious={globalIndex > 0}
+            />
           </div>
-          <div className="h-24 bg-white border-t border-gray-200 rounded-b-xl flex items-center justify-center">
-             <ImageThumbnailStrip task={currentTask} />
+          <div className="h-auto py-2 w-full bg-white border border-gray-200 rounded-xl flex items-center justify-center relative shadow-sm shrink-0">
+             <ImageThumbnailStrip 
+               task={currentTask} 
+               activeView={activeImageView}
+               onViewChange={setActiveImageView} 
+             />
           </div>
         </div>
 
         {/* RIGHT - Rating Panel */}
-        <div className="w-[450px] flex flex-col bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-          <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-             <h2 className="text-lg font-semibold text-gray-800 uppercase tracking-wide">Inspection Parameters</h2>
-          </div>
-          <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-gray-200">
+        <div className="flex-1 flex flex-col bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="flex-1 p-4 pb-0 flex flex-col overflow-hidden">
             <ParameterPanel 
               task={currentTask} 
               params={getParamsList(currentTask)}
@@ -314,18 +343,6 @@ const RatingV2Page = () => {
               onChange={handleRatingChange}
               onOpenMissing={() => setIsMissingModalOpen(true)}
             />
-          </div>
-          <div className="p-4 border-t border-gray-100 bg-gray-50">
-             <TaskProgress currentIndex={globalIndex} totalTasks={totalTasks} />
-             <RatingNavigation 
-                onPrevious={handlePrevious} 
-                onNext={handleNext} 
-                onSaveAndNext={handleSaveAndNext}
-                onSkip={handleSkip}
-                canGoPrevious={globalIndex > 0} 
-                canGoNext={globalIndex < totalTasks - 1} 
-                saving={saving}
-             />
           </div>
         </div>
       </div>

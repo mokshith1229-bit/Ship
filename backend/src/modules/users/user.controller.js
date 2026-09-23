@@ -153,4 +153,19 @@ const deleteUser = asyncHandler(async (req, res) => {
   return successResponse(res, user, 'User deleted successfully');
 });
 
-module.exports = { getAllUsers, getUserStats, getUserById, createUser, updateUser, toggleUserStatus, deleteUser };
+/**
+ * @swagger
+ * /api/v1/user/dashboard:
+ *   get:
+ *     tags: [Users]
+ *     summary: Get dashboard KPIs, assignments and notifications for the logged-in user
+ *     responses:
+ *       200:
+ *         description: User dashboard data retrieved
+ */
+const getUserDashboard = asyncHandler(async (req, res) => {
+  const data = await userService.getUserDashboard(req.user._id);
+  return successResponse(res, data, 'User dashboard data retrieved successfully');
+});
+
+module.exports = { getAllUsers, getUserStats, getUserById, createUser, updateUser, toggleUserStatus, deleteUser, getUserDashboard };

@@ -3,7 +3,7 @@ import api from './api';
 export const workAssignmentService = {
   // ── Assignments ──────────────────────────────────────────────────────────────
   getAll: (params = {}) =>
-    api.get('/work-assignments', { params }).then(r => r.data?.data || r.data),
+    api.get('/work-assignments', { params: { limit: 200, ...params } }).then(r => r.data?.data || r.data),
 
   getMine: () =>
     api.get('/work-assignments/my').then(r => r.data?.data || r.data),

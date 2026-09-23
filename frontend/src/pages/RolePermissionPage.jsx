@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
 import RoleKPICards from '../components/RolePermission/RoleKPICards';
@@ -16,66 +16,107 @@ const RolePermissionPage = () => {
   const [originalPermissions, setOriginalPermissions] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        // Fetch features and all permissions concurrently
-        const [featRes, adminRes, spvRes, userRes] = await Promise.all([
-          roleService.getFeatures(),
-          roleService.getRolePermissions('Admin'),
-          roleService.getRolePermissions('SPV'),
-          roleService.getRolePermissions('User')
-        ]);
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Fetch features and all permissions concurrently from backend
+      const [featRes, adminRes, spvRes, userRes] = await Promise.all([
+        roleService.getFeatures(),
+        roleService.getRolePermissions('Admin'),
+        roleService.getRolePermissions('SPV'),
+        roleService.getRolePermissions('User')
+      ]);
+      
+      let fetchedFeatures = [];
+      if (featRes.success && Array.isArray(featRes.data)) {
+        fetchedFeatures = featRes.data;
+        setFeatures(fetchedFeatures);
         
-        if (featRes.success && featRes.data) {
-          setFeatures(featRes.data);
-          
-          // Compute KPI stats
-          const modules = featRes.data.filter(f => f.featureType === 'Module').length;
-          
-          setStats({
-            totalFeatures: featRes.data.length,
-            totalModules: modules,
-            activePermissions: featRes.data.length * 3 
-          });
+        // Auto select first module (Dashboard)
+        if (fetchedFeatures.length > 0) {
+          setSelectedFeature(prev => prev ? fetchedFeatures.find(f => f.featureId === prev.featureId) || fetchedFeatures[0] : fetchedFeatures[0]);
         }
-
-        const combined = [];
-        if (adminRes.success) combined.push(...adminRes.data);
-        if (spvRes.success) combined.push(...spvRes.data);
-        if (userRes.success) combined.push(...userRes.data);
-
-        setAllPermissions(combined);
-        setOriginalPermissions(JSON.parse(JSON.stringify(combined)));
-      } catch (err) {
-        console.error("Error loading features/permissions:", err);
       }
-      setLoading(false);
-    };
-    
-    loadData();
+
+      const combined = [];
+      if (adminRes.success && Array.isArray(adminRes.data)) combined.push(...adminRes.data);
+      if (spvRes.success && Array.isArray(spvRes.data)) combined.push(...spvRes.data);
+      if (userRes.success && Array.isArray(userRes.data)) combined.push(...userRes.data);
+
+      // Deduplicate permissions by roleId + featureId
+      const uniquePermsMap = new Map();
+      combined.forEach(p => {
+        const key = `${p.roleId}_${p.featureId}`;
+        if (!uniquePermsMap.has(key)) {
+          uniquePermsMap.set(key, p);
+        }
+      });
+      const uniquePerms = Array.from(uniquePermsMap.values());
+
+      setAllPermissions(uniquePerms);
+      setOriginalPermissions(JSON.parse(JSON.stringify(uniquePerms)));
+
+      // Compute KPI stats
+      const modulesCount = fetchedFeatures.filter(f => f.featureType === 'Module').length;
+      const activeCount = uniquePerms.filter(p => p.permissions && p.permissions.view).length;
+      
+      setStats({
+        totalFeatures: fetchedFeatures.length,
+        totalModules: modulesCount,
+        activePermissions: uniquePerms.length
+      });
+    } catch (err) {
+      console.error("Error loading features/permissions:", err);
+    }
+    setLoading(false);
   }, []);
 
-  const handleUpdatePermission = (permId, newPermissionsObj) => {
-    setAllPermissions(prev => prev.map(p => {
-      if (p._id === permId) {
-        return { ...p, permissions: { ...p.permissions, ...newPermissionsObj } };
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleUpdatePermission = (permId, newPermissionsObj, roleName, featureId) => {
+    setAllPermissions(prev => {
+      let found = false;
+      const updated = prev.map(p => {
+        if ((permId && p._id === permId) || (p.roleId === roleName && p.featureId === featureId)) {
+          found = true;
+          return { ...p, permissions: { ...p.permissions, ...newPermissionsObj } };
+        }
+        return p;
+      });
+
+      if (!found && roleName && featureId) {
+        updated.push({
+          roleId: roleName,
+          featureId: featureId,
+          permissions: { view: false, create: false, edit: false, delete: false, export: false, ...newPermissionsObj }
+        });
       }
-      return p;
-    }));
+
+      return updated;
+    });
   };
 
   const handleBulkAction = (featureId, enable) => {
-    setAllPermissions(prev => prev.map(p => {
-      if (p.featureId === featureId) {
-        return { 
-          ...p, 
-          permissions: { view: enable, create: enable, edit: enable, delete: enable, export: enable } 
-        };
-      }
-      return p;
-    }));
+    const roles = ['Admin', 'SPV', 'User'];
+    setAllPermissions(prev => {
+      const updated = [...prev];
+      roles.forEach(roleName => {
+        const existingIndex = updated.findIndex(p => p.featureId === featureId && p.roleId === roleName);
+        const newPerms = { view: enable, create: enable, edit: enable, delete: enable, export: enable };
+        if (existingIndex >= 0) {
+          updated[existingIndex] = { ...updated[existingIndex], permissions: newPerms };
+        } else {
+          updated.push({
+            roleId: roleName,
+            featureId: featureId,
+            permissions: newPerms
+          });
+        }
+      });
+      return updated;
+    });
   };
 
   return (
@@ -103,7 +144,7 @@ const RolePermissionPage = () => {
             <div className="flex-1 flex gap-6 min-h-[600px] overflow-hidden">
               {/* Left Panel: Feature Tree */}
               <div className="w-[350px] flex-shrink-0">
-                <FeatureTree 
+                <FeatureTree    
                   features={features} 
                   selectedFeature={selectedFeature} 
                   onSelectFeature={setSelectedFeature} 

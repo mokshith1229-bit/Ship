@@ -1,33 +1,18 @@
 'use strict';
 
-/**
- * HiRATE 3.0 Rating Service
- * Hotfix: Safe ObjectId casting and string project code resolution for Vercel production
- */
-
 const Inspection = require('../../models/Inspection.model');
-require('../../models/MasterList.model');
-require('../../models/User.model');
+const InspectionBatch = require('../../models/InspectionBatch.model');
+const InspectionTask = require('../../models/InspectionTask.model');
+const MasterList = require('../../models/MasterList.model');
+const User = require('../../models/User.model');
+const WorkAssignment = require('../../models/WorkAssignment.model');
 const mongoose = require('mongoose');
 
 const toObjectId = (id) => {
   if (!id) return null;
-  if (id instanceof mongoose.Types.ObjectId) return id;
-  if (typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id)) {
+  if (mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id)) {
     return new mongoose.Types.ObjectId(id);
   }
-  return null;
-};
-
-const resolveProjectId = async (projectId) => {
-  if (!projectId) return null;
-  if (projectId instanceof mongoose.Types.ObjectId) return projectId;
-  if (typeof projectId === 'string' && /^[0-9a-fA-F]{24}$/.test(projectId)) {
-    return new mongoose.Types.ObjectId(projectId);
-  }
-  const Project = require('../../models/Project.model');
-  const project = await Project.findOne({ code: projectId }).select('_id').lean();
-  if (project) return project._id;
   return null;
 };
 
@@ -35,9 +20,11 @@ const resolveProjectId = async (projectId) => {
  * Gets all ratings for a project with version filter
  */
 const getProjectRatings = async (projectId, query = {}) => {
-  const pId = await resolveProjectId(projectId);
-  if (!pId) return [];
-  const filter = { projectId: pId };
+  const objId = toObjectId(projectId);
+  const filter = objId 
+    ? { $or: [{ projectId: objId }, { project: projectId }] }
+    : { project: projectId };
+
   if (query.hoStatus) filter.hoStatus = query.hoStatus;
   if (query.category) filter.category = query.category;
 
@@ -79,10 +66,13 @@ const computeOverallRating = async (inspectionId) => {
  * Gets rating summary grouped by category for a project
  */
 const getRatingSummary = async (projectId) => {
-  const pId = await resolveProjectId(projectId);
-  if (!pId) return [];
+  const objId = toObjectId(projectId);
+  const matchFilter = objId 
+    ? { $or: [{ projectId: objId }, { project: projectId }] }
+    : { project: projectId };
+
   return Inspection.aggregate([
-    { $match: { projectId: pId } },
+    { $match: matchFilter },
     { $unwind: { path: '$parameters', preserveNullAndEmptyArrays: true } },
     {
       $group: {
@@ -107,139 +97,72 @@ const getRatingSummary = async (projectId) => {
   ]);
 };
 
-const InspectionBatch = require('../../models/InspectionBatch.model');
-const InspectionTask = require('../../models/InspectionTask.model');
-
 /**
- * Gets rating version history for a project — returns batches from InspectionBatch collection
+ * Gets version history — batches for a project or all rated inspections
  */
 const getVersionHistory = async (projectId) => {
-  console.log("VERSION HISTORY PROJECT:", projectId);
-  if (!projectId) return [];
-  try {
-    const pId = toObjectId(projectId);
-    const queryFilter = pId
-      ? {
-          $or: [
-            { project: projectId },
-            { project: pId }
-          ]
-        }
-      : { project: projectId };
-
-    require('../../models/User.model');
-    require('../../models/InspectionBatch.model');
-    const batches = await InspectionBatch.find(queryFilter)
-      .sort({ createdAt: -1 })
-      .populate('createdBy', 'firstName lastName email')
-      .lean();
-
-    console.log("BATCH COUNT:", batches ? batches.length : 0);
-    return batches || [];
-  } catch (err) {
-    console.error('Error in rating.service getVersionHistory:', err);
-    try {
-      const batches = await InspectionBatch.find({ project: projectId })
-        .sort({ createdAt: -1 })
-        .lean();
-      console.log("BATCH COUNT:", batches ? batches.length : 0);
-      return batches || [];
-    } catch (fallbackErr) {
-      console.error('Fallback query error in getVersionHistory:', fallbackErr);
-      return [];
-    }
+  const query = {
+    $or: [
+      { project: projectId },
+      { project: { $regex: new RegExp(`^${projectId}$`, 'i') } }
+    ]
+  };
+  const objId = toObjectId(projectId);
+  if (objId) {
+    query.$or.push({ projectId: objId }, { _id: objId });
   }
-};
 
+  const batches = await InspectionBatch.find(query)
+    .select('_id name project categories assetTypes status createdAt updatedAt ratableTaskCount reviewCompleted')
+    .sort({ createdAt: -1 })
+    .lean();
+
+  if (batches && batches.length > 0) {
+    return batches;
+  }
+
+  if (objId) {
+    return Inspection.aggregate([
+      { $match: { projectId: objId, hoStatus: 'RATED' } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%b %y', date: '$updatedAt' } },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: -1 } },
+      { $project: { version: '$_id', count: 1, _id: 0 } }
+    ]);
+  }
+
+  return [];
+};
 
 /**
  * Gets batches ready for rating, with the count of ratable tasks (those with images)
  */
 const getReadyBatches = async (user) => {
-  let batchQuery = {};
-  
-  if (user && user.role === 'User') {
-    const WorkAssignment = require('../../models/WorkAssignment.model');
-    const userAssignments = await WorkAssignment.find({
-      assignedTo: user._id,
-      status: { $in: ['Assigned', 'In Progress', 'Completed'] }
-    });
-    
-    if (userAssignments.length === 0) {
-      return [];
-    }
-    
-    const assignedBatchIds = userAssignments.map(a => a.batchId);
-    batchQuery._id = { $in: assignedBatchIds };
-  }
+  let batchQuery = { status: { $in: ['READY_FOR_RATING', 'IN_PROGRESS', 'COMPLETED'] } };
 
   const batches = await InspectionBatch.find(batchQuery)
     .sort({ createdAt: -1 })
     .populate('createdBy', 'firstName lastName email')
     .lean();
 
-  // For each batch, compute how many tasks have images, in-progress count, and completed count
+  // For each batch, compute how many tasks actually have images ready for rating
   const batchesWithCounts = await Promise.all(batches.map(async (batch) => {
-    const [ratableTaskCount, inProgressCount, completedCount] = await Promise.all([
-      InspectionTask.countDocuments({
-        batchId: batch._id,
-        status: { $nin: ['EXTRACTION_FAILED', 'PENDING_IMAGE'] },
-        'image.cloudinaryUrl': { $exists: true, $ne: null, $ne: '' }
-      }),
-      InspectionTask.countDocuments({
-        batchId: batch._id,
-        status: 'IN_PROGRESS',
-        'image.cloudinaryUrl': { $exists: true, $ne: null, $ne: '' }
-      }),
-      InspectionTask.countDocuments({
-        batchId: batch._id,
-        status: 'COMPLETED',
-        'image.cloudinaryUrl': { $exists: true, $ne: null, $ne: '' }
-      })
-    ]);
-
-    let effectiveStatus = batch.status;
-    if (inProgressCount > 0 || (completedCount > 0 && completedCount < ratableTaskCount)) {
-      effectiveStatus = 'IN_PROGRESS';
-    } else if (ratableTaskCount > 0 && completedCount === 0) {
-      effectiveStatus = 'READY_FOR_RATING';
-    } else if (ratableTaskCount > 0 && completedCount >= ratableTaskCount) {
-      effectiveStatus = 'COMPLETED';
-    }
-
-    // Pre-cache count for getBatchTasks
-    const defaultCacheKey = JSON.stringify({
+    const ratableTaskCount = await InspectionTask.countDocuments({
       batchId: batch._id,
       status: { $nin: ['EXTRACTION_FAILED', 'PENDING_IMAGE'] },
       'image.cloudinaryUrl': { $exists: true, $ne: null, $ne: '' }
     });
-    batchCountCache.set(defaultCacheKey, ratableTaskCount);
-
     return {
       ...batch,
-      status: effectiveStatus,
-      ratableTaskCount,
-      inProgressCount,
-      completedCount
+      ratableTaskCount
     };
   }));
 
-  return batchesWithCounts.filter(b => b.ratableTaskCount > 0);
-};
-
-const WorkAssignment = require('../../models/WorkAssignment.model');
-
-const batchCountCache = new Map();
-
-const getCachedCount = async (filter) => {
-  const cacheKey = JSON.stringify(filter);
-  if (batchCountCache.has(cacheKey)) {
-    return batchCountCache.get(cacheKey);
-  }
-  const count = await InspectionTask.countDocuments(filter);
-  batchCountCache.set(cacheKey, count);
-  setTimeout(() => batchCountCache.delete(cacheKey), 300000);
-  return count;
+  return batchesWithCounts;
 };
 
 /**
@@ -248,156 +171,112 @@ const getCachedCount = async (filter) => {
  * Implements RBAC: 'User' role only sees their assigned tasks.
  */
 const getBatchTasks = async (batchId, user, options = {}) => {
-  const bId = mongoose.Types.ObjectId.isValid(batchId) ? new mongoose.Types.ObjectId(batchId) : batchId;
-
   let queryFilter = {
-    batchId: bId,
-    status: { $nin: ['EXTRACTION_FAILED', 'PENDING_IMAGE'] },
-    'image.cloudinaryUrl': { $exists: true, $ne: null, $ne: '' }
+    batchId,
+    status: { $nin: ['EXTRACTION_FAILED', 'PENDING_IMAGE'] }
   };
 
-  // If user is a 'User', restrict to their assignment
-  if (user && user.role === 'User') {
-    const WorkAssignment = require('../../models/WorkAssignment.model');
-    const assignment = await WorkAssignment.findOne({
-      batchId: bId,
-      assignedTo: user._id,
-      status: { $in: ['Assigned', 'In Progress', 'Completed'] }
-    });
-    
-    if (!assignment) {
-      // Return empty if no active assignment
-      return { tasks: [], total: 0, page: 1, totalPages: 1 };
-    }
-
-    // Update assignment status to In Progress if it was just Assigned
-    if (assignment.status === 'Assigned') {
-      assignment.status = 'In Progress';
-      assignment.startedTime = new Date();
-      await assignment.save();
-    }
-
-    if (assignment.questionIds && assignment.questionIds.length > 0) {
-      queryFilter._id = { $in: assignment.questionIds };
-    }
-  }
-
-  // Check if the current batch is a combined Roadway-RSF batch
-  const batchDoc = await InspectionBatch.findById(bId).select('name').lean();
-  const isCombinedBatch = batchDoc?.name && /Roadway.*RSF|RSF.*Roadway/i.test(batchDoc.name);
-
-  // Support optional filters from options
   if (options.category && options.category !== 'All') {
-    const isRSFCat = /Road Signage|RSF/i.test(options.category);
-    const isRoadwayCat = /Roadway/i.test(options.category);
-
-    if (isCombinedBatch && (isRSFCat || isRoadwayCat)) {
-      // Combined Roadway-RSF batch contains tasks ratable under both Roadway and RSF
-    } else {
-      const MasterList = require('../../models/MasterList.model');
-      const escapedCat = options.category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const catRegex = new RegExp(`^${escapedCat}$|^${escapedCat.replace('and', '&')}$`, 'i');
-      
-      const matchingMasterIds = await MasterList.find({
-        category: catRegex
-      }).distinct('_id');
-
-      queryFilter.$or = [
-        { category: options.category },
-        { category: catRegex },
-        ...(matchingMasterIds.length > 0 ? [{ parameters: { $in: matchingMasterIds } }] : [])
-      ];
-    }
+    queryFilter.category = options.category;
   }
   if (options.direction && options.direction !== 'Choose Direction' && options.direction !== 'All') {
     queryFilter.direction = options.direction;
   }
   if (options.roadType && options.roadType !== 'Choose Road Type' && options.roadType !== 'All') {
-    queryFilter.roadType = options.roadType;
+    if (options.roadType === 'SR') {
+      queryFilter.roadType = { $in: ['SR', 'Service Road'] };
+    } else if (options.roadType === 'MCW') {
+      queryFilter.roadType = { $in: ['MCW', 'Main Carriageway'] };
+    } else {
+      queryFilter.roadType = options.roadType;
+    }
   }
   if (options.minChainage || options.maxChainage) {
     queryFilter.chainage = {};
-    if (options.minChainage) queryFilter.chainage.$gte = options.minChainage;
-    if (options.maxChainage) queryFilter.chainage.$lte = options.maxChainage;
+    if (options.minChainage) queryFilter.chainage.$gte = parseFloat(options.minChainage);
+    if (options.maxChainage) queryFilter.chainage.$lte = parseFloat(options.maxChainage);
   }
 
+  // If user is a 'User' and has an assignment, track progress
+  if (user && user.role === 'User') {
+    const assignment = await WorkAssignment.findOne({
+      batchId,
+      assignedTo: user._id
+    });
+    
+    if (assignment) {
+      // Update assignment status to In Progress if it was just Assigned
+      if (assignment.status === 'Assigned') {
+        assignment.status = 'In Progress';
+        assignment.startedTime = new Date();
+        await assignment.save();
+      }
+    }
+  }
+
+  // Pagination support — default: all tasks (limit=0 means no limit)
   const page = Math.max(1, parseInt(options.page) || 1);
-  const limit = Math.max(0, parseInt(options.limit) || 0);
-
-  let taskQuery = InspectionTask.find(queryFilter)
-    .select('_id batchId project category direction assetType assetSubType roadType parameters ratings chainage status image metadata approvedAt approvedBy createdAt updatedAt skippedAssetTypes skipMetadata imageRequirement')
-    .sort({ chainage: 1 });
-
+  const limit = parseInt(options.limit) || 0; // 0 = no pagination (backward compat)
+  const skip = limit > 0 ? (page - 1) * limit : 0;
+  let total = 0;
   if (limit > 0) {
-    taskQuery = taskQuery
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .populate('parameters', 'category direction roadType assetType assetSubType parameter questionId');
-  } else {
-    taskQuery = taskQuery.populate('parameters', 'category direction roadType assetType assetSubType parameter questionId');
+    total = await InspectionTask.countDocuments(queryFilter);
+  }
+  let query = InspectionTask.find(queryFilter)
+    .select('-metadata -extractionDiagnostics')
+    .populate('parameters')
+    .sort({ chainage: 1 });
+  if (limit > 0) {
+    query = query.skip(skip).limit(limit);
   }
 
-  const [total, tasks] = await Promise.all([
-    limit > 0 ? getCachedCount(queryFilter) : Promise.resolve(0),
-    taskQuery.lean()
-  ]);
-
-  const finalTotal = limit > 0 ? total : tasks.length;
-  const totalPages = limit > 0 ? Math.ceil(finalTotal / limit) || 1 : 1;
-
-  console.log("TASK COUNT:", tasks ? tasks.length : 0);
-
+  const tasks = await query.lean();
   if (!tasks.length) {
-    return { tasks: [], total: finalTotal, page, totalPages };
+    return limit > 0
+      ? { tasks: [], total, page, totalPages: Math.ceil(total / limit) }
+      : tasks;
   }
 
-  const { ROADWAY_PARAMETER_CONFIG } = require('../../constants/roadwayConfig');
-
-  // Attach previous and next images directly from sorted tasks array and format ratings for Roadway
+  // ── Attach prev/next images using the already-fetched sorted tasks ──────────
+  // PERF FIX: Previously this re-queried ALL project tasks (another ~29 MB download).
+  // Now we compute prev/next from the sorted tasks we already have in memory.
+  // Tasks are already sorted by chainage ascending from the query above.
   const tasksWithContext = tasks.map((task, idx) => {
-    const prev = tasks[idx - 1];
-    const next = tasks[idx + 1];
-
-    let effectiveCategory = task.category || (task.parameters && task.parameters[0]?.category) || '-';
-    let effectiveAssetType = task.assetType || (task.parameters && task.parameters[0]?.assetType) || '-';
-
-    if (isCombinedBatch && options.category && options.category !== 'All') {
-      effectiveCategory = options.category;
-      if (/Road Signage|RSF/i.test(options.category)) {
-        effectiveAssetType = task.assetType === 'Multi-Asset' ? 'Road Signage & Furniture' : (task.assetType || 'Road Signage & Furniture');
+    // Walk backwards to find the nearest previous task that has an image
+    let prevTask = null;
+    for (let i = idx - 1; i >= 0; i--) {
+      if (tasks[i].image && tasks[i].image.cloudinaryUrl) {
+        prevTask = tasks[i];
+        break;
       }
     }
 
-    let formattedRatings = task.ratings || [];
-    if (effectiveCategory === 'Roadway' || (isCombinedBatch && !options.category)) {
-      formattedRatings = ROADWAY_PARAMETER_CONFIG.map((cfg, i) => {
-        const existing = (task.ratings && task.ratings[i]) || {};
-        return {
-          ...cfg,
-          score: existing.score !== undefined ? existing.score : 10,
-          remark: existing.remark || '',
-          masterListId: existing.masterListId || existing._id || null,
-          _id: existing._id || null
-        };
-      });
+    // Walk forward to find the nearest next task that has an image
+    let nextTask = null;
+    for (let i = idx + 1; i < tasks.length; i++) {
+      if (tasks[i].image && tasks[i].image.cloudinaryUrl) {
+        nextTask = tasks[i];
+        break;
+      }
     }
 
     return {
       ...task,
-      category: effectiveCategory,
-      assetType: effectiveAssetType,
-      ratings: formattedRatings,
-      previousImage: prev && prev.image?.cloudinaryUrl ? { url: prev.image.cloudinaryUrl, chainage: prev.chainage } : null,
-      nextImage: next && next.image?.cloudinaryUrl ? { url: next.image.cloudinaryUrl, chainage: next.chainage } : null
+      previousImage: prevTask ? { url: prevTask.image.cloudinaryUrl, chainage: prevTask.chainage } : null,
+      nextImage: nextTask ? { url: nextTask.image.cloudinaryUrl, chainage: nextTask.chainage } : null
     };
   });
   
-  return {
-    tasks: tasksWithContext,
-    total: finalTotal,
-    page,
-    totalPages
-  };
+  // Return paginated result if pagination was requested, otherwise bare array (backward compat)
+  if (limit > 0) {
+    return {
+      tasks: tasksWithContext,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    };
+  }
+  return tasksWithContext;
 };
 
 /**
@@ -407,23 +286,17 @@ const saveTaskRatings = async (taskId, ratingsData, selectedImageUrl, user) => {
   const task = await InspectionTask.findById(taskId);
   if (!task) throw Object.assign(new Error('Task not found'), { statusCode: 404 });
 
-  // RBAC: If user is 'User', verify they are assigned this task
+  // RBAC: If user is 'User', verify assignment if applicable
   if (user && user.role === 'User') {
     const assignment = await WorkAssignment.findOne({
       batchId: task.batchId,
-      assignedTo: user._id,
-      status: { $in: ['Assigned', 'In Progress'] }
+      assignedTo: user._id
     });
 
-    if (!assignment) {
-      throw Object.assign(new Error('Forbidden: No active assignment for this batch'), { statusCode: 403 });
-    }
-
-    if (assignment.questionIds && assignment.questionIds.length > 0) {
-      const isAssigned = assignment.questionIds.some(qId => qId.toString() === taskId.toString());
-      if (!isAssigned) {
-        throw Object.assign(new Error('Forbidden: You are not assigned to rate this specific task'), { statusCode: 403 });
-      }
+    if (assignment && assignment.status === 'Assigned') {
+      assignment.status = 'In Progress';
+      assignment.startedTime = new Date();
+      await assignment.save();
     }
   }
 
@@ -432,7 +305,21 @@ const saveTaskRatings = async (taskId, ratingsData, selectedImageUrl, user) => {
     if (!task.image) task.image = {};
     task.image.cloudinaryUrl = selectedImageUrl;
   }
-  task.status = 'COMPLETED'; // Or 'RATED' based on the workflow
+  
+  if (task.category === 'Roadway') {
+    const ratedRoadwayGroups = new Set((task.ratings || []).filter(r => r.group).map(r => r.group));
+    const skippedGroups = new Set((task.skippedAssetTypes || []).map(s => s.assetType));
+    const requiredRoadwayGroups = ['Pavement', 'Shoulder', 'Kerb', 'Pavement Markings', 'ROW', 'Median Plantation'];
+    const isRoadwayCompleted = requiredRoadwayGroups.every(g => ratedRoadwayGroups.has(g) || skippedGroups.has(g));
+    
+    if (isRoadwayCompleted) {
+      task.status = 'COMPLETED';
+    } else {
+      task.status = 'IN_PROGRESS';
+    }
+  } else {
+    task.status = 'COMPLETED';
+  }
   await task.save();
 
   // Check if batch is completed
@@ -451,7 +338,7 @@ const saveTaskRatings = async (taskId, ratingsData, selectedImageUrl, user) => {
     // Also mark assignment as completed if user is a 'User'
     if (user && user.role === 'User') {
        await WorkAssignment.updateMany(
-         { batchId: task.batchId, status: { $in: ['Assigned', 'In Progress'] } },
+         { batchId: task.batchId, assignedTo: user._id, status: { $in: ['Assigned', 'In Progress', 'Overdue'] } },
          { $set: { status: 'Completed', completedTime: new Date() } }
        );
     }
@@ -470,40 +357,73 @@ const saveTaskRatings = async (taskId, ratingsData, selectedImageUrl, user) => {
 /**
  * Export completed ratings to CSV
  */
-const exportRatingsCSV = async (projectId) => {
-  const tasks = await InspectionTask.find({ 
+const exportRatingsCSV = async (projectId, batchId) => {
+  const query = { 
     project: projectId, 
-    status: 'COMPLETED' 
-  })
+    status: { $in: ['COMPLETED', 'SKIPPED'] }
+  };
+  
+  if (batchId) {
+    query.batchId = batchId;
+  }
+
+  const tasks = await InspectionTask.find(query)
     .populate('parameters')
     .sort({ chainage: 1 });
 
-  const headers = ['ASSET ID', 'PROJECT', 'CATEGORY', 'ASSET TYPE', 'CHAINAGE', 'DIRECTION', 'PARAMETER', 'SCORE', 'REMARK', 'IMAGE URL', 'RATED AT'];
+  const headers = ['ASSET ID', 'PROJECT', 'CATEGORY', 'ASSET TYPE', 'CHAINAGE', 'ROAD TYPE', 'DIRECTION', 'PARAMETER', 'SCORE', 'REMARK', 'IMAGE URL', 'RATED AT'];
   const rows = [];
   rows.push(headers.join(','));
+  
+  const skipHeaders = ['CATEGORY', 'ASSET TYPE', 'CHAINAGE', 'ROAD TYPE', 'SKIP REASON', 'REMARKS', 'IMAGE URL'];
+  const skipRows = [];
+  skipRows.push(skipHeaders.join(','));
 
   tasks.forEach(task => {
     const assetId = (task._id || '').toString().slice(-6).toUpperCase();
-    const aType = task.assetSubType ? `${task.assetType} (${task.assetSubType})` : (task.assetType || '-');
     const project = task.project || '-';
     const chainage = task.chainage || '-';
     const imageUrl = task.image?.cloudinaryUrl || '-';
     const ratedAt = task.updatedAt ? new Date(task.updatedAt).toLocaleDateString('en-GB') : '-';
 
-    if (task.ratings && task.ratings.length > 0) {
+    // Process Ratings
+    if (task.status === 'COMPLETED' && task.ratings && task.ratings.length > 0) {
       task.ratings.forEach(rating => {
-        // Find matching parameter
-        const param = task.parameters.find(p => p._id.toString() === rating.masterListId.toString());
-        const category = param ? param.category : '-';
-        const paramText = param ? param.parameter : '-';
-        const direction = param && param.direction ? param.direction : '-';
+        let category = '-';
+        let paramText = '-';
+        let direction = '-';
+        let aType = task.assetSubType ? `${task.assetType} (${task.assetSubType})` : (task.assetType || '-');
+
+        if (rating.masterListId) {
+          const param = task.parameters.find(p => p._id.toString() === rating.masterListId.toString());
+          category = param ? param.category : '-';
+          paramText = param ? param.parameter : '-';
+          direction = param && param.direction ? param.direction : '-';
+          if (param && param.assetType) {
+            aType = param.assetSubType ? `${param.assetType} (${param.assetSubType})` : param.assetType;
+          }
+        } else if (rating.parameterKey) {
+          category = task.category || 'Roadway';
+          // Correctly map Roadway group to Asset Type
+          if (category === 'Roadway' && rating.group) {
+            aType = rating.group;
+          }
+          paramText = rating.parameterName || rating.parameterKey;
+          direction = task.direction || '-';
+        }
         
+        // Format Road Type nicely if possible
+        let roadTypeStr = task.roadType || '-';
+        if (roadTypeStr === 'Main Carriageway') roadTypeStr = 'MCW';
+        if (roadTypeStr === 'Service Road') roadTypeStr = 'SR';
+
         const row = [
           `"${assetId}"`,
           `"${project}"`,
           `"${category}"`,
           `"${aType}"`,
           `"${chainage}"`,
+          `"${roadTypeStr}"`,
           `"${direction}"`,
           `"${paramText.replace(/"/g, '""')}"`,
           `"${rating.score}"`,
@@ -514,9 +434,41 @@ const exportRatingsCSV = async (projectId) => {
         rows.push(row.join(','));
       });
     }
+
+    // Process Skips
+    let roadTypeStr = task.roadType || '-';
+    if (roadTypeStr === 'Main Carriageway') roadTypeStr = 'MCW';
+    if (roadTypeStr === 'Service Road') roadTypeStr = 'SR';
+
+    if (task.skippedAssetTypes && task.skippedAssetTypes.length > 0) {
+      task.skippedAssetTypes.forEach(skip => {
+        const skipRow = [
+          `"${task.category || '-'}"`,
+          `"${skip.assetType || '-'}"`,
+          `"${chainage}"`,
+          `"${roadTypeStr}"`,
+          `"${(skip.reason || '').replace(/"/g, '""')}"`,
+          `"${(skip.remarks || '').replace(/"/g, '""')}"`,
+          `"${imageUrl}"`
+        ];
+        skipRows.push(skipRow.join(','));
+      });
+    } else if (task.status === 'SKIPPED' && task.skipMetadata) {
+      // Legacy / full task skip
+      const skipRow = [
+        `"${task.category || '-'}"`,
+        `"${task.assetType || '-'}"`,
+        `"${chainage}"`,
+        `"${roadTypeStr}"`,
+        `"${(task.skipMetadata.reason || '').replace(/"/g, '""')}"`,
+        `"${(task.skipMetadata.remarks || '').replace(/"/g, '""')}"`,
+        `"${imageUrl}"`
+      ];
+      skipRows.push(skipRow.join(','));
+    }
   });
 
-  return rows.join('\n');
+  return rows.join('\n') + '\n\n' + '=== SKIP GALLERY / SKIPPED ASSETS ===\n\n' + skipRows.join('\n');
 };
 
 /**
@@ -526,41 +478,74 @@ const skipTask = async (taskId, skipData, user) => {
   const task = await InspectionTask.findById(taskId);
   if (!task) throw Object.assign(new Error('Task not found'), { statusCode: 404 });
 
-  // RBAC: If user is 'User', verify they are assigned this task
+  // RBAC: If user is 'User', verify assignment if applicable
   if (user && user.role === 'User') {
     const assignment = await WorkAssignment.findOne({
       batchId: task.batchId,
-      assignedTo: user._id,
-      status: { $in: ['Assigned', 'In Progress'] }
+      assignedTo: user._id
     });
 
-    if (!assignment) {
-      throw Object.assign(new Error('Forbidden: No active assignment for this batch'), { statusCode: 403 });
-    }
-
-    if (assignment.questionIds && assignment.questionIds.length > 0) {
-      const isAssigned = assignment.questionIds.some(qId => qId.toString() === taskId.toString());
-      if (!isAssigned) {
-        throw Object.assign(new Error('Forbidden: You are not assigned to rate this specific task'), { statusCode: 403 });
-      }
+    if (assignment && assignment.status === 'Assigned') {
+      assignment.status = 'In Progress';
+      assignment.startedTime = new Date();
+      await assignment.save();
     }
   }
 
-  if (!skipData.reason) {
+  const reason = skipData.skipReason || skipData.reason;
+  if (!reason) {
     throw Object.assign(new Error('Skip reason is required'), { statusCode: 400 });
   }
 
-  if (skipData.reason === 'Other' && !skipData.remarks) {
+  if (reason === 'Other' && !skipData.remarks) {
     throw Object.assign(new Error('Remarks are required when skip reason is "Other"'), { statusCode: 400 });
   }
 
-  task.status = 'SKIPPED';
-  task.skipMetadata = {
-    reason: skipData.reason,
-    remarks: skipData.remarks || '',
-    skippedBy: user._id,
-    skippedAt: new Date()
-  };
+  if (skipData.assetType) {
+    // Asset-level skip
+    if (!task.skippedAssetTypes) task.skippedAssetTypes = [];
+    
+    // Remove if already exists to update
+    task.skippedAssetTypes = task.skippedAssetTypes.filter(s => s.assetType !== skipData.assetType);
+    
+    task.skippedAssetTypes.push({
+      assetType: skipData.assetType,
+      reason: reason,
+      remarks: skipData.remarks || '',
+      skippedBy: user._id,
+      skippedAt: new Date()
+    });
+
+    if (task.category === 'Roadway') {
+      const ratedRoadwayGroups = new Set((task.ratings || []).filter(r => r.group).map(r => r.group));
+      const skippedGroups = new Set(task.skippedAssetTypes.map(s => s.assetType));
+      const requiredRoadwayGroups = ['Pavement', 'Shoulder', 'Kerb', 'Pavement Markings', 'ROW', 'Median Plantation'];
+      const isRoadwayCompleted = requiredRoadwayGroups.every(g => ratedRoadwayGroups.has(g) || skippedGroups.has(g));
+      
+      if (isRoadwayCompleted) {
+        task.status = 'COMPLETED';
+      } else {
+        task.status = 'IN_PROGRESS';
+      }
+    } else {
+      const totalAssetTypes = new Set((task.parameters || []).map(p => p.assetType)).size;
+      if (task.skippedAssetTypes.length >= totalAssetTypes) {
+        task.status = 'SKIPPED';
+      } else {
+        task.status = 'IN_PROGRESS';
+      }
+    }
+  } else {
+    // Legacy / Full task skip
+    task.status = 'SKIPPED';
+    task.skipMetadata = {
+      reason: reason,
+      remarks: skipData.remarks || '',
+      skippedBy: user._id,
+      skippedAt: new Date()
+    };
+  }
+  
   await task.save();
 
   // Check if batch is completed
@@ -579,7 +564,7 @@ const skipTask = async (taskId, skipData, user) => {
     // Also mark assignment as completed if user is a 'User'
     if (user && user.role === 'User') {
        await WorkAssignment.updateMany(
-         { batchId: task.batchId, status: { $in: ['Assigned', 'In Progress'] } },
+         { batchId: task.batchId, assignedTo: user._id, status: { $in: ['Assigned', 'In Progress', 'Overdue'] } },
          { $set: { status: 'Completed', completedTime: new Date() } }
        );
     }
@@ -595,4 +580,72 @@ const skipTask = async (taskId, skipData, user) => {
   return task;
 };
 
-module.exports = { getProjectRatings, computeOverallRating, getRatingSummary, getVersionHistory, getReadyBatches, getBatchTasks, saveTaskRatings, skipTask, exportRatingsCSV };
+const unskipTask = async (taskId, payload, user) => {
+  const task = await InspectionTask.findById(taskId);
+  if (!task) {
+    throw Object.assign(new Error('Task not found'), { statusCode: 404 });
+  }
+
+  if (user && user.role === 'User') {
+    const assignment = await WorkAssignment.findOne({
+      assignedTo: user._id,
+      batchId: task.batchId
+    });
+  }
+
+  if (payload.assetType) {
+    // Asset-level unskip
+    if (task.skippedAssetTypes) {
+      task.skippedAssetTypes = task.skippedAssetTypes.filter(s => s.assetType !== payload.assetType);
+    }
+  } else {
+    // Full task unskip
+    task.skipMetadata = undefined;
+    task.skippedAssetTypes = []; // Clear all skipped groups if unskipping the whole task
+  }
+
+  // Determine status after unskip
+  if (task.ratings && task.ratings.length > 0) {
+    if (task.category === 'Roadway') {
+      const ratedRoadwayGroups = new Set((task.ratings || []).filter(r => r.group).map(r => r.group));
+      const skippedGroups = new Set((task.skippedAssetTypes || []).map(s => s.assetType));
+      const requiredRoadwayGroups = ['Pavement', 'Shoulder', 'Kerb', 'Pavement Markings', 'ROW', 'Median Plantation'];
+      const isRoadwayCompleted = requiredRoadwayGroups.every(g => ratedRoadwayGroups.has(g) || skippedGroups.has(g));
+      
+      task.status = isRoadwayCompleted ? 'COMPLETED' : 'IN_PROGRESS';
+    } else {
+      const totalAssetTypes = new Set((task.parameters || []).map(p => p.assetType)).size;
+      const ratedAssetTypes = new Set((task.ratings || []).map(r => r.assetType)).size;
+      const skippedCount = task.skippedAssetTypes ? task.skippedAssetTypes.length : 0;
+      
+      if (totalAssetTypes > 0 && (ratedAssetTypes + skippedCount) >= totalAssetTypes) {
+        task.status = 'COMPLETED';
+      } else {
+        task.status = 'IN_PROGRESS';
+      }
+    }
+  } else {
+    task.status = 'READY_FOR_RATING';
+  }
+
+  await task.save();
+
+  // Re-evaluate batch status
+  const batch = await InspectionBatch.findById(task.batchId);
+  if (batch && batch.status === 'COMPLETED') {
+    batch.status = 'IN_PROGRESS';
+    await batch.save();
+    
+    // Also mark assignment as In Progress if it was completed
+    if (user && user.role === 'User') {
+       await WorkAssignment.updateMany(
+         { batchId: task.batchId, assignedTo: user._id, status: 'Completed' },
+         { $set: { status: 'In Progress', completedTime: null } }
+       );
+    }
+  }
+
+  return task;
+};
+
+module.exports = { getProjectRatings, computeOverallRating, getRatingSummary, getVersionHistory, getReadyBatches, getBatchTasks, saveTaskRatings, skipTask, unskipTask, exportRatingsCSV };

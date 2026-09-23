@@ -62,6 +62,9 @@ const createAssignment = async (data, adminUser) => {
   if (!batch) {
     batch = await InspectionBatch.findOne({ project: data.batchId, status: { $in: ['READY_FOR_REVIEW', 'READY_FOR_RATING', 'IN_PROGRESS'] } }).sort({ createdAt: -1 });
   }
+  if (!batch) {
+    batch = await InspectionBatch.findOne({ project: data.batchId }).sort({ createdAt: -1 });
+  }
   if (!batch) throw Object.assign(new Error('No in-progress batch found for this project'), { statusCode: 404 });
 
   const inspector = await User.findById(data.assignedTo);
@@ -111,6 +114,9 @@ const bulkAssign = async (data, adminUser) => {
   }
   if (!batch) {
     batch = await InspectionBatch.findOne({ project: data.batchId, status: { $in: ['READY_FOR_REVIEW', 'READY_FOR_RATING', 'IN_PROGRESS'] } }).sort({ createdAt: -1 });
+  }
+  if (!batch) {
+    batch = await InspectionBatch.findOne({ project: data.batchId }).sort({ createdAt: -1 });
   }
   if (!batch) throw Object.assign(new Error('No in-progress batch found for this project'), { statusCode: 404 });
 
@@ -266,8 +272,10 @@ const getTimeline = async (id) => {
 
 // ─── Get in-progress batches for assignment ──────────────────────────────────
 const getBatchesReady = async (project) => {
-  const filter = { status: { $in: ['READY_FOR_REVIEW', 'READY_FOR_RATING', 'IN_PROGRESS'] } };
-  if (project) filter.project = project;
+  const filter = {};
+  if (project) {
+    filter.project = new RegExp(`^${project.trim()}$`, 'i');
+  }
   return InspectionBatch.find(filter)
     .select('name project status uniqueChainagesCount selectedQuestionsCount category createdAt')
     .sort({ createdAt: -1 });
@@ -295,6 +303,7 @@ const markOverdueAssignments = async () => {
 
 // ─── Send due date reminders (called by cron — 24hr before) ──────────────────
 const sendDueDateReminders = async () => {
+  const Notification = require('../../models/Notification.model');
   const now = new Date();
   const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
@@ -304,7 +313,15 @@ const sendDueDateReminders = async () => {
   });
 
   for (const assignment of upcoming) {
-    await fireNotification('DUE_DATE_REMINDER', assignment.assignedTo, assignment.batchName, assignment._id);
+    const alreadySent = await Notification.findOne({
+      userId: assignment.assignedTo,
+      relatedResource: 'WorkAssignment',
+      relatedResourceId: String(assignment._id),
+      createdAt: { $gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) }
+    });
+    if (!alreadySent) {
+      await fireNotification('DUE_DATE_REMINDER', assignment.assignedTo, assignment.batchName, assignment._id);
+    }
   }
 };
 

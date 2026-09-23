@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
+import { useAuth } from '../context/AuthContext';
 import { masterListService } from '../services/masterList.service';
 import MasterListKPIs from './MasterList/components/MasterListKPIs';
 import MasterListFilters from './MasterList/components/MasterListFilters';
@@ -11,6 +12,11 @@ import { MdUploadFile, MdFolder, MdList, MdArrowBack } from 'react-icons/md';
 import Premium3DButton from '../components/common/Premium3DButton';
 
 const MasterListPage = () => {
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('Master List', 'create');
+  const canEdit = hasPermission('Master List', 'edit');
+  const canDelete = hasPermission('Master List', 'delete');
+
   const [data, setData] = useState([]);
   const [stats, setStats] = useState(null);
   const [projects, setProjects] = useState([]);
@@ -118,13 +124,15 @@ const MasterListPage = () => {
               </button>
             </div>
             
-            <Premium3DButton 
-              onClick={() => setShowImportModal(true)}
-              className="!w-auto"
-            >
-              <MdUploadFile className="text-lg" />
-              Import Master List
-            </Premium3DButton>
+            {canCreate && (
+              <Premium3DButton 
+                onClick={() => setShowImportModal(true)}
+                className="!w-auto"
+              >
+                <MdUploadFile className="text-lg" />
+                Import Master List
+              </Premium3DButton>
+            )}
           </div>
         </div>
 
@@ -146,15 +154,16 @@ const MasterListPage = () => {
             </button>
           </div>
         ) : !loading && projects.length === 0 && Object.keys(filters).length === 0 ? (
-          <MasterListEmptyState onImport={() => setShowImportModal(true)} />
+          <MasterListEmptyState onImport={canCreate ? () => setShowImportModal(true) : null} />
         ) : viewMode === 'folders' ? (
           <MasterListProjectFolders 
             projects={projects} 
             onSelectProject={handleSelectProject} 
             onProjectDeleted={fetchDashboardData} 
+            canDelete={canDelete}
           />
         ) : (
-          <MasterListTable data={data} loading={loading} onRefresh={fetchDashboardData} />
+          <MasterListTable data={data} loading={loading} onRefresh={fetchDashboardData} canEdit={canEdit} canDelete={canDelete} />
         )}
       </div>
 

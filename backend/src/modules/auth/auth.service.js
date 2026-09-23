@@ -25,16 +25,24 @@ const generateToken = (user) => {
  * Returns user object and JWT token
  */
 const login = async (emailOrUsername, password) => {
+  if (!emailOrUsername || !password) {
+    throw Object.assign(new Error('Username/Email and password are required'), { statusCode: 400 });
+  }
+
+  const trimmedIdentifier = emailOrUsername.trim();
+  const trimmedPassword = password.trim();
+
   // Find user and include passwordHash (excluded by default)
+  const escapedIdentifier = trimmedIdentifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const user = await User.findOne({
     $or: [
-      { email: emailOrUsername.toLowerCase() },
-      { username: emailOrUsername }
+      { email: trimmedIdentifier.toLowerCase() },
+      { username: new RegExp(`^${escapedIdentifier}$`, 'i') }
     ]
   }).select('+passwordHash');
 
   if (!user) {
-    throw Object.assign(new Error('Invalid email or password'), { statusCode: 401 });
+    throw Object.assign(new Error('Invalid username/email or password'), { statusCode: 401 });
   }
 
   if (!user.isActive) {
@@ -43,9 +51,9 @@ const login = async (emailOrUsername, password) => {
     });
   }
 
-  const isMatch = await user.comparePassword(password);
+  const isMatch = await user.comparePassword(trimmedPassword);
   if (!isMatch) {
-    throw Object.assign(new Error('Invalid email or password'), { statusCode: 401 });
+    throw Object.assign(new Error('Invalid username/email or password'), { statusCode: 401 });
   }
 
   // Update last login

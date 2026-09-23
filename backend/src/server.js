@@ -27,6 +27,19 @@ const startServer = async () => {
     const { initializeSocket } = require('./config/socket');
     initializeSocket(server);
 
+    // Handle server error events (e.g. temporary port lock during fast reload)
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        logger.error(`Port ${PORT} is currently busy. Retrying in 1s...`);
+        setTimeout(() => {
+          server.close();
+          server.listen(PORT);
+        }, 1000);
+      } else {
+        logger.error('Server error:', err);
+      }
+    });
+
     // Start listening
     server.listen(PORT, () => {
       logger.info(`========================================`);

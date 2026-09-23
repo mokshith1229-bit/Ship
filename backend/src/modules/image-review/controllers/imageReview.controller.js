@@ -25,7 +25,7 @@ exports.updateTaskStatus = async (req, res, next) => {
   try {
     const { taskId } = req.params;
     const { status } = req.body;
-    const task = await imageReviewService.updateTaskStatus(taskId, status, req.user.id);
+    const task = await imageReviewService.updateTaskStatus(taskId, status, req.user.id || req.user._id);
     res.status(200).json({ success: true, data: task });
   } catch (err) {
     next(err);
@@ -35,7 +35,7 @@ exports.updateTaskStatus = async (req, res, next) => {
 exports.approveBatch = async (req, res, next) => {
   try {
     const { batchId } = req.params;
-    const batch = await imageReviewService.approveBatch(batchId, req.user.id);
+    const batch = await imageReviewService.approveBatch(batchId, req.user.id || req.user._id);
     res.status(200).json({ success: true, data: batch });
   } catch (err) {
     next(err);

@@ -33,9 +33,11 @@ const inspectionTaskSchema = new mongoose.Schema(
       ref: 'MasterList'
     }],
     ratings: [{
+      _id: false,
       masterListId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'MasterList'
+        ref: 'MasterList',
+        required: false
       },
       parameterKey: {
         type: String,
@@ -58,6 +60,19 @@ const inspectionTaskSchema = new mongoose.Schema(
         trim: true
       }
     }],
+    submittedBy: {
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      userName: {
+        type: String,
+        trim: true
+      },
+      submittedAt: {
+        type: Date
+      }
+    },
     chainage: {
       type: String,
       required: true,

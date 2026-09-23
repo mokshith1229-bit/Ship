@@ -73,8 +73,8 @@ const ProjectIntelligence = ({ projects }) => {
           value={selectedProjectId}
           onChange={(e) => setSelectedProjectId(e.target.value)}
         >
-          {projects.map((p) => (
-            <option key={p.id || p._id} value={p.id || p._id}>
+          {projects.map((p, idx) => (
+            <option key={`${p.id || p._id || idx}-${idx}`} value={p.id || p._id}>
               {p.name || p.code}
             </option>
           ))}

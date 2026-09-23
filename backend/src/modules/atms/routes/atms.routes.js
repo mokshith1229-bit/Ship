@@ -4,6 +4,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const { authenticate } = require('../../../middleware/auth.middleware');
+const { requirePermission } = require('../../../middleware/permission.middleware');
 const atmsController = require('../controllers/atms.controller');
 
 // Configure multer for memory storage
@@ -16,7 +17,7 @@ const upload = multer({
 router.use(authenticate);
 
 // ATMS routes
-router.post('/parse', upload.single('file'), atmsController.parseExcel);
-router.post('/generate', atmsController.generateBatch);
+router.post('/parse', requirePermission('ATMS', 'create'), upload.single('file'), atmsController.parseExcel);
+router.post('/generate', requirePermission('ATMS', 'create'), atmsController.generateBatch);
 
 module.exports = router;

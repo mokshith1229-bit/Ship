@@ -4,8 +4,10 @@ const express = require('express');
 const router = express.Router();
 const shipController = require('./controllers/ship.controller');
 const { authenticate } = require('../../middleware/auth.middleware');
+const { requirePermission } = require('../../middleware/permission.middleware');
 
 router.use(authenticate);
+router.use(requirePermission('SHIP', 'view'));
 
 // Phase 1 Analytics Endpoints
 router.get('/overview', shipController.getOverview);

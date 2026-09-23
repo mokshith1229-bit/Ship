@@ -117,8 +117,8 @@ const AddToCycleModal = ({ project, newMasterListIds, onClose, onSuccess }) => {
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   >
                     <option value="" disabled>Select a cycle for project {project}</option>
-                    {batches.map(b => (
-                      <option key={b._id} value={b._id}>
+                    {batches.map((b, idx) => (
+                      <option key={`${b._id || idx}-${idx}`} value={b._id}>
                         {b.name} - {b.status} (Created: {new Date(b.createdAt).toLocaleDateString()})
                       </option>
                     ))}

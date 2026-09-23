@@ -3,7 +3,6 @@
 const ratingService = require('./rating.service');
 const { successResponse } = require('../../utils/response.util');
 const asyncHandler = require('../../utils/asyncHandler.util');
-const { getIO } = require('../../config/socket');
 
 /**
  * @swagger
@@ -68,15 +67,10 @@ const getRatingSummary = asyncHandler(async (req, res) => {
  */
 const getVersionHistory = asyncHandler(async (req, res) => {
   if (!req.query.projectId) {
-    return res.status(200).json({ success: true, message: 'projectId is required', data: [] });
+    return res.status(400).json({ success: false, message: 'projectId is required', errors: [] });
   }
-  try {
-    const data = await ratingService.getVersionHistory(req.query.projectId);
-    return successResponse(res, data || [], 'Version history retrieved');
-  } catch (err) {
-    console.error('Error in getVersionHistory controller:', err);
-    return res.status(200).json({ success: true, message: 'Version history retrieved', data: [] });
-  }
+  const data = await ratingService.getVersionHistory(req.query.projectId);
+  return successResponse(res, data, 'Version history retrieved');
 });
 
 /**
@@ -105,35 +99,33 @@ const getReadyBatches = asyncHandler(async (req, res) => {
 });
 
 const getBatchTasks = asyncHandler(async (req, res) => {
-  const data = await ratingService.getBatchTasks(req.params.batchId, req.user, req.query);
+  const options = {
+    page: req.query.page,
+    limit: req.query.limit,
+    category: req.query.category,
+    direction: req.query.direction,
+    roadType: req.query.roadType,
+    minChainage: req.query.minChainage,
+    maxChainage: req.query.maxChainage
+  };
+  const data = await ratingService.getBatchTasks(req.params.batchId, req.user, options);
   return successResponse(res, data, 'Batch tasks retrieved');
 });
 
 const saveTaskRatings = asyncHandler(async (req, res) => {
-  const data = await ratingService.saveTaskRatings(req.params.taskId, req.body.ratings, req.body.selectedImageUrl, req.user);
-  
+  console.log(`[RATING] Request received. User: ${req.user?._id}, Task ID: ${req.params.taskId}`);
   try {
-    const io = getIO();
-    io.emit('NEW_ACTIVITY', {
-      id: Date.now().toString(),
-      user: req.user?.name || 'User',
-      project: data.project || 'Unknown Project',
-      chainage: data.chainage || 'Unknown Chainage',
-      action: 'Rated Image',
-      timestamp: new Date().toISOString()
-    });
-    // Fire a metric update request event for the clients to refetch or we can push data
-    io.emit('DASHBOARD_METRICS_UPDATED', {});
-  } catch (err) {
-    // Socket error should not fail the request
-    console.error('Socket emit error:', err);
+    const data = await ratingService.saveTaskRatings(req.params.taskId, req.body.ratings, req.body.selectedImageUrl, req.user);
+    console.log(`[RATING] Success. Task ID: ${req.params.taskId}`);
+    return successResponse(res, data, 'Task ratings saved');
+  } catch (error) {
+    console.error(`[RATING] Failed. Task ID: ${req.params.taskId}. Reason: ${error.message}`);
+    throw error;
   }
-
-  return successResponse(res, data, 'Task ratings saved');
 });
 
 const exportRatingsCSV = asyncHandler(async (req, res) => {
-  const csvData = await ratingService.exportRatingsCSV(req.params.projectId);
+  const csvData = await ratingService.exportRatingsCSV(req.params.projectId, req.query.batchId);
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', `attachment; filename=Ratings_${req.params.projectId}.csv`);
   res.send(csvData);
@@ -141,23 +133,12 @@ const exportRatingsCSV = asyncHandler(async (req, res) => {
 
 const skipTask = asyncHandler(async (req, res) => {
   const data = await ratingService.skipTask(req.params.taskId, req.body, req.user);
-
-  try {
-    const io = getIO();
-    io.emit('NEW_ACTIVITY', {
-      id: Date.now().toString(),
-      user: req.user?.name || 'User',
-      project: data.project || 'Unknown Project',
-      chainage: data.chainage || 'Unknown Chainage',
-      action: `Skipped Image (${req.body.skipReason || 'No reason'})`,
-      timestamp: new Date().toISOString()
-    });
-    io.emit('DASHBOARD_METRICS_UPDATED', {});
-  } catch (err) {
-    console.error('Socket emit error:', err);
-  }
-
   return successResponse(res, data, 'Task skipped successfully');
 });
 
-module.exports = { getProjectRatings, getRatingSummary, getVersionHistory, getOverallRating, getReadyBatches, getBatchTasks, saveTaskRatings, skipTask, exportRatingsCSV };
+const unskipTask = asyncHandler(async (req, res) => {
+  const data = await ratingService.unskipTask(req.params.taskId, req.body, req.user);
+  return successResponse(res, data, 'Task unskipped successfully');
+});
+
+module.exports = { getProjectRatings, getRatingSummary, getVersionHistory, getOverallRating, getReadyBatches, getBatchTasks, saveTaskRatings, skipTask, unskipTask, exportRatingsCSV };

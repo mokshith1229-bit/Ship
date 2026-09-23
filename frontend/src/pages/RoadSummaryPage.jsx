@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import HiRateRoadLoader from '../components/common/HiRateRoadLoader';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { MdClear, MdOutlineFileDownload } from 'react-icons/md';
+import { useAuth } from '../context/AuthContext';
 import Pagination from '../components/Pagination';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
@@ -24,6 +25,9 @@ const RoadSummaryPage = () => {
   const { roadId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { hasPermission } = useAuth();
+  const canExport = hasPermission('Rating', 'export');
+
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [direction, setDirection] = useState('Choose Direction');
@@ -334,10 +338,12 @@ const RoadSummaryPage = () => {
             Get Ratings
           </button>
           
-          <button onClick={handleExportCSV} className="flex items-center gap-2 border-2 border-[#5cb85c] text-[#5cb85c] hover:bg-green-50 font-medium py-1.5 px-4 rounded text-sm transition-colors mb-0.5">
-            <MdOutlineFileDownload className="text-lg" />
-            Generate CSV
-          </button>
+          {canExport && (
+            <button onClick={handleExportCSV} className="flex items-center gap-2 border-2 border-[#5cb85c] text-[#5cb85c] hover:bg-green-50 font-medium py-1.5 px-4 rounded text-sm transition-colors mb-0.5">
+              <MdOutlineFileDownload className="text-lg" />
+              Generate CSV
+            </button>
+          )}
         </div>
 
         {/* Data Table */}

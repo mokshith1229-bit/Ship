@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Layout from '../components/Layout';
+import { useAuth } from '../context/AuthContext';
 import { MdOutlinePrecisionManufacturing } from 'react-icons/md';
 import { inspectionEngineService } from '../services/inspectionEngine.service';
 import BatchCreationForm from './InspectionEngine/components/BatchCreationForm';
@@ -8,6 +9,10 @@ import BatchListTable from './InspectionEngine/components/BatchListTable';
 import BatchSummaryModal from './InspectionEngine/components/BatchSummaryModal';
 
 const InspectionEnginePage = () => {
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('Inspection Engine', 'create');
+  const canDelete = hasPermission('Inspection Engine', 'delete');
+
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedBatchId, setSelectedBatchId] = useState(null);
@@ -77,13 +82,15 @@ const InspectionEnginePage = () => {
         </motion.div>
 
         {/* Batch Generator */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >
-          <BatchCreationForm onBatchCreated={handleBatchCreated} />
-        </motion.div>
+        {canCreate && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <BatchCreationForm onBatchCreated={handleBatchCreated} />
+          </motion.div>
+        )}
 
         {/* Generated Batches List */}
         <motion.div
@@ -98,6 +105,7 @@ const InspectionEnginePage = () => {
             loading={loading} 
             onDelete={handleDeleteBatch}
             onView={(batch) => setSelectedBatchId(batch._id)}
+            canDelete={canDelete}
           />
         </motion.div>
 

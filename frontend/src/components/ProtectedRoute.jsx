@@ -1,10 +1,12 @@
 import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { MdLockOutline, MdArrowBack, MdHome } from 'react-icons/md';
 
-const ProtectedRoute = ({ children, allowedRoles, moduleName }) => {
-  const { user, isAuthenticated, loading, userPermissions } = useAuth();
+const ProtectedRoute = ({ children, allowedRoles, moduleName, action = 'view' }) => {
+  const { user, isAuthenticated, loading, hasPermission } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
   if (loading) {
     return (
@@ -17,18 +19,14 @@ const ProtectedRoute = ({ children, allowedRoles, moduleName }) => {
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
-  
+
   let hasAccess = false;
-  
+
   if (user?.role === 'Admin' || user?.role === 'Administrator') {
     hasAccess = true;
-  } else if (moduleName && userPermissions) {
-    if (userPermissions[moduleName]) {
-      hasAccess = userPermissions[moduleName].view === true;
-    } else {
-      hasAccess = false;
-    }
-  } else if (allowedRoles) {
+  } else if (moduleName) {
+    hasAccess = hasPermission(moduleName, action);
+  } else if (allowedRoles && Array.isArray(allowedRoles)) {
     hasAccess = allowedRoles.includes(user.role);
   } else {
     hasAccess = true;
@@ -37,10 +35,32 @@ const ProtectedRoute = ({ children, allowedRoles, moduleName }) => {
   if (!hasAccess) {
     return (
       <div className="flex h-screen w-screen flex-col items-center justify-center bg-gray-50 text-center px-4">
-        <h1 className="text-6xl font-bold text-green-600 mb-4">403</h1>
-        <h2 className="text-2xl font-semibold text-gray-800 mb-2">Access Denied</h2>
-        <p className="text-gray-600 mb-6 max-w-md">You don't have permission to view this module. Please contact your administrator.</p>
-        <button onClick={() => window.history.back()} className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">Go Back</button>
+        <div className="w-16 h-16 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center text-3xl mb-4 shadow-sm border border-red-100">
+          <MdLockOutline />
+        </div>
+        <h1 className="text-4xl font-black text-gray-900 mb-2">403 - Access Denied</h1>
+        <h2 className="text-lg font-bold text-gray-700 mb-2">
+          Restricted {moduleName || 'Page'} Access
+        </h2>
+        <p className="text-gray-500 mb-6 max-w-md text-sm">
+          Your account role (<strong className="text-gray-700">{user?.role}</strong>) does not have {action} permission for this resource. Please contact your system administrator.
+        </p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => window.history.back()}
+            className="flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+          >
+            <MdArrowBack className="text-base" />
+            <span>Go Back</span>
+          </button>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-xs shadow-sm transition-colors cursor-pointer"
+          >
+            <MdHome className="text-base" />
+            <span>Dashboard</span>
+          </button>
+        </div>
       </div>
     );
   }

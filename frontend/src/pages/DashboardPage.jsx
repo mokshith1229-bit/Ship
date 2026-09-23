@@ -57,14 +57,16 @@ const DashboardPage = () => {
         <Sidebar />
         <div ref={scrollContainerRef} className="flex-1 p-4 lg:p-6 overflow-y-auto flex flex-col custom-scrollbar">
           
-          <div className="relative z-50">
-            <GlobalFilters 
-              selectedProject={selectedProject} 
-              setSelectedProject={setSelectedProject}
-              selectedOverview={selectedOverview}
-              setSelectedOverview={setSelectedOverview}
-            />
-          </div>
+          {isAdmin && (
+            <div className="relative z-50">
+              <GlobalFilters 
+                selectedProject={selectedProject} 
+                setSelectedProject={setSelectedProject}
+                selectedOverview={selectedOverview}
+                setSelectedOverview={setSelectedOverview}
+              />
+            </div>
+          )}
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}

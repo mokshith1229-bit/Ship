@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-  LuUser, 
+  LuMail, 
   LuLock, 
   LuEye, 
   LuEyeOff, 
@@ -28,7 +28,7 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
-    username: '',
+    email: '',
     password: ''
   });
   
@@ -47,8 +47,13 @@ const LoginPage = () => {
   }, [isAuthenticated, navigate, from]);
 
   const handleLogin = async (e) => {
-    e.preventDefault();
-    if (!formData.username || !formData.password) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (loading) return;
+
+    const email = (formData.email || '').trim();
+    const password = (formData.password || '').trim();
+
+    if (!email || !password) {
       setError('Please enter both email and password.');
       return;
     }
@@ -57,7 +62,7 @@ const LoginPage = () => {
     setError('');
 
     try {
-      const response = await authService.login(formData.username, formData.password);
+      const response = await authService.login(email, password);
       if (response.success && response.data) {
         login(response.data.token, response.data.user);
         navigate(from, { replace: true });
@@ -65,7 +70,8 @@ const LoginPage = () => {
         setError(response.message || 'Login failed. Please try again.');
       }
     } catch (err) {
-      setError(err.message || 'Network error or invalid credentials.');
+      const msg = err.response?.data?.message || err.message || 'Invalid email or password.';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -119,15 +125,22 @@ const LoginPage = () => {
             </div>
           )}
           
-          {/* Username/Email Input */}
+          {/* Email Input */}
           <div className="login-input-group anim-input-user">
-            <LuUser className="login-input-icon" />
+            <LuMail className="login-input-icon" />
             <input 
               type="text" 
-              placeholder="Username / Email" 
+              placeholder="Email" 
               className="login-input"
-              value={formData.username}
-              onChange={(e) => setFormData({...formData, username: e.target.value})}
+              value={formData.email}
+              onChange={(e) => setFormData({...formData, email: e.target.value})}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleLogin(e);
+                }
+              }}
+              autoComplete="email"
               required
             />
           </div>
@@ -141,6 +154,13 @@ const LoginPage = () => {
               className="login-input"
               value={formData.password}
               onChange={(e) => setFormData({...formData, password: e.target.value})}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleLogin(e);
+                }
+              }}
+              autoComplete="current-password"
               required
             />
             <button 

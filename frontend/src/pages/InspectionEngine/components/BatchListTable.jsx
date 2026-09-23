@@ -2,7 +2,7 @@ import React from 'react';
 import HiRateRoadLoader from '../../../components/common/HiRateRoadLoader';
 import { MdDelete, MdVisibility } from 'react-icons/md';
 
-const BatchListTable = ({ batches, loading, onDelete, onView }) => {
+const BatchListTable = ({ batches, loading, onDelete, onView, canDelete = true }) => {
   
   if (loading) {
     return (
@@ -79,17 +79,19 @@ const BatchListTable = ({ batches, loading, onDelete, onView }) => {
                     >
                       <MdVisibility size={18} />
                     </button>
-                    <button 
-                      onClick={() => {
-                        if (window.confirm('Are you sure you want to delete this batch?')) {
-                          onDelete(batch._id);
-                        }
-                      }}
-                      className="p-1.5 text-red-600 hover:bg-red-50 rounded"
-                      title="Delete Batch"
-                    >
-                      <MdDelete size={18} />
-                    </button>
+                    {canDelete && (
+                      <button 
+                        onClick={() => {
+                          if (window.confirm('Are you sure you want to delete this batch?')) {
+                            onDelete(batch._id);
+                          }
+                        }}
+                        className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                        title="Delete Batch"
+                      >
+                        <MdDelete size={18} />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

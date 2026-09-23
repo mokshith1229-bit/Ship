@@ -33,11 +33,11 @@ const GlobalFilters = ({ selectedProject, setSelectedProject, selectedOverview, 
     const fetchProjects = async () => {
       try {
         const [allProjectsRes, batches] = await Promise.all([
-          isAdmin ? projectService.getAllProjects().catch(() => []) : Promise.resolve([]),
+          projectService.getAllProjects().catch(() => []),
           ratingService.getReadyBatches().catch(() => [])
         ]);
 
-        const allProjects = allProjectsRes.data || allProjectsRes || [];
+        const allProjects = allProjectsRes?.data || allProjectsRes || [];
         const projectMap = {};
 
         allProjects.forEach(p => {
@@ -65,7 +65,7 @@ const GlobalFilters = ({ selectedProject, setSelectedProject, selectedOverview, 
       }
     };
     fetchProjects();
-  }, [isAdmin]);
+  }, []);
   const assetOptions = [
     { label: 'Asset Type', value: '' },
     { label: 'Flexible Pavement', value: 'Flexible' },

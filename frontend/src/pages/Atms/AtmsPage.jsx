@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Premium3DButton from '../../components/common/Premium3DButton';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { masterListService } from '../../services/masterList.service';
 import { atmsService } from '../../services/atms.service';
 import Layout from '../../components/Layout';
@@ -9,6 +10,8 @@ import CustomDropdown from '../../components/common/CustomDropdown';
 
 export default function AtmsPage() {
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('ATMS', 'create');
   
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState('');
@@ -271,13 +274,15 @@ export default function AtmsPage() {
                   This will create <strong>{preview.summary.assetsFound}</strong> independent ATMS inspection tasks.
                 </div>
                 
-                <Premium3DButton
-                  onClick={handleGenerateBatch}
-                  disabled={loading || preview.summary.assetsFound === 0 || !selectedProject}
-                  className="!w-auto flex items-center justify-center gap-2"
-                >
-                  {loading ? 'Creating Batch...' : 'Generate Inspection'}
-                </Premium3DButton>
+                {canCreate && (
+                  <Premium3DButton
+                    onClick={handleGenerateBatch}
+                    disabled={loading || preview.summary.assetsFound === 0 || !selectedProject}
+                    className="!w-auto flex items-center justify-center gap-2"
+                  >
+                    {loading ? 'Creating Batch...' : 'Generate Inspection'}
+                  </Premium3DButton>
+                )}
               </div>
             </div>
           </div>

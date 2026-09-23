@@ -9,9 +9,9 @@ import { dashboardService } from '../services/dashboard.service';
 const formatInspector = (name) => (!name || name === 'undefined undefined') ? 'System / Unknown' : name;
 
 const SkipGalleryPage = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams] = useSearchParams(); 
   const navigate = useNavigate();
-  const project = searchParams.get('project') || '';
+  const project = searchParams.get('project') || ''; 
   
   const [loading, setLoading] = useState(true);
   const [tree, setTree] = useState([]);
@@ -23,7 +23,7 @@ const SkipGalleryPage = () => {
   const [lightboxImage, setLightboxImage] = useState(null);
 
   useEffect(() => {
-    fetchTree();
+    fetchTree(); 
   }, [project]);
 
   const fetchTree = async () => {

@@ -1,6 +1,11 @@
 import api from './api';
 
 export const dashboardService = {
+  getUserDashboard: async () => {
+    const response = await api.get('/user/dashboard');
+    return response.data?.data || response.data;
+  },
+
   getUserKPIs: async () => {
     const response = await api.get('/dashboard/user-kpis');
     return response.data?.data || response.data;

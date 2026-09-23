@@ -1,24 +1,30 @@
 import React from 'react';
 import { MdCheck, MdClose } from 'react-icons/md';
 
-const AccessBadge = ({ roleName, permissions }) => {
-  if (!permissions) return <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-[11px] font-bold">Unknown</span>;
+const AccessBadge = ({ permissions }) => {
+  if (!permissions) {
+    return <span className="px-2.5 py-1 bg-gray-100 text-gray-500 rounded-full text-[11px] font-bold uppercase tracking-wider">No Access</span>;
+  }
   
   const { view, create, edit, delete: del, export: exp } = permissions;
   
   if (!view && !create && !edit && !del && !exp) {
-    return <span className="px-2 py-1 bg-red-100 text-red-600 rounded-full text-[11px] font-bold uppercase tracking-wider">No Access</span>;
+    return <span className="px-2.5 py-1 bg-red-100 text-red-600 rounded-full text-[11px] font-bold uppercase tracking-wider">No Access</span>;
   }
   
-  if (roleName === 'Admin' || (view && create && edit && del && exp)) {
-    return <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-[11px] font-bold uppercase tracking-wider">Full Access</span>;
+  if (view && create && edit && del && exp) {
+    return <span className="px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-[11px] font-bold uppercase tracking-wider">Full Access</span>;
   }
   
-  if (roleName === 'SPV') {
-    return <span className="px-2 py-1 bg-blue-100 text-blue-600 rounded-full text-[11px] font-bold uppercase tracking-wider">Review Access</span>;
+  if (view && !create && !edit && !del && !exp) {
+    return <span className="px-2.5 py-1 bg-sky-100 text-sky-700 rounded-full text-[11px] font-bold uppercase tracking-wider">View Only</span>;
   }
   
-  return <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-[11px] font-bold uppercase tracking-wider">Limited Access</span>;
+  if (view && edit && !del) {
+    return <span className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full text-[11px] font-bold uppercase tracking-wider">Review Access</span>;
+  }
+  
+  return <span className="px-2.5 py-1 bg-yellow-100 text-yellow-700 rounded-full text-[11px] font-bold uppercase tracking-wider">Limited Access</span>;
 };
 
 const ToggleSwitch = ({ checked, onChange }) => (
@@ -26,15 +32,14 @@ const ToggleSwitch = ({ checked, onChange }) => (
     <input 
       type="checkbox" 
       className="sr-only peer" 
-      checked={checked} 
+      checked={!!checked} 
       onChange={(e) => onChange(e.target.checked)} 
     />
     <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500 shadow-inner"></div>
   </label>
 );
 
-const RoleTable = ({ roles, featurePermissions, onUpdatePermission }) => {
-  // Ensure we display Admin, SPV, User in that order, even if some are missing from DB
+const RoleTable = ({ featurePermissions = [], onUpdatePermission, selectedFeature }) => {
   const displayRoles = ['Admin', 'SPV', 'User'];
   
   return (
@@ -54,9 +59,19 @@ const RoleTable = ({ roles, featurePermissions, onUpdatePermission }) => {
             const permissions = rolePerm?.permissions || { view: false, create: false, edit: false, delete: false, export: false };
             
             const handleToggle = (key, value) => {
-              if (rolePerm) {
-                onUpdatePermission(rolePerm._id, { [key]: value });
+              const updatedPermissions = { ...permissions, [key]: value };
+              // If any active permission is enabled (create, edit, delete, export), also enable view if not already
+              if (value && key !== 'view' && !permissions.view) {
+                updatedPermissions.view = true;
               }
+              // If view is turned off, turn off all actions
+              if (!value && key === 'view') {
+                updatedPermissions.create = false;
+                updatedPermissions.edit = false;
+                updatedPermissions.delete = false;
+                updatedPermissions.export = false;
+              }
+              onUpdatePermission(rolePerm?._id, updatedPermissions, roleName, selectedFeature?.featureId);
             };
             
             return (
@@ -66,39 +81,39 @@ const RoleTable = ({ roles, featurePermissions, onUpdatePermission }) => {
                 </td>
                 <td className="p-4">
                   {permissions.view ? (
-                    <div className="flex items-center gap-1 text-green-600 font-medium">
+                    <div className="flex items-center gap-1 text-green-600 font-medium text-sm">
                       <MdCheck className="text-lg" /> Visible
                     </div>
                   ) : (
-                    <div className="flex items-center gap-1 text-gray-400 font-medium">
+                    <div className="flex items-center gap-1 text-gray-400 font-medium text-sm">
                       <MdClose className="text-lg" /> Hidden
                     </div>
                   )}
                 </td>
                 <td className="p-4">
-                  <AccessBadge roleName={roleName} permissions={permissions} />
+                  <AccessBadge permissions={permissions} />
                 </td>
                 <td className="p-4">
                   <div className="flex items-center gap-6">
                     <div className="flex flex-col items-center gap-1">
                       <span className="text-xs font-semibold text-gray-500 uppercase">View</span>
-                      <ToggleSwitch checked={!!permissions.view} onChange={(v) => handleToggle('view', v)} />
+                      <ToggleSwitch checked={permissions.view} onChange={(v) => handleToggle('view', v)} />
                     </div>
                     <div className="flex flex-col items-center gap-1">
                       <span className="text-xs font-semibold text-gray-500 uppercase">Create</span>
-                      <ToggleSwitch checked={!!permissions.create} onChange={(v) => handleToggle('create', v)} />
+                      <ToggleSwitch checked={permissions.create} onChange={(v) => handleToggle('create', v)} />
                     </div>
                     <div className="flex flex-col items-center gap-1">
                       <span className="text-xs font-semibold text-gray-500 uppercase">Edit</span>
-                      <ToggleSwitch checked={!!permissions.edit} onChange={(v) => handleToggle('edit', v)} />
+                      <ToggleSwitch checked={permissions.edit} onChange={(v) => handleToggle('edit', v)} />
                     </div>
                     <div className="flex flex-col items-center gap-1">
                       <span className="text-xs font-semibold text-gray-500 uppercase">Delete</span>
-                      <ToggleSwitch checked={!!permissions.delete} onChange={(v) => handleToggle('delete', v)} />
+                      <ToggleSwitch checked={permissions.delete} onChange={(v) => handleToggle('delete', v)} />
                     </div>
                     <div className="flex flex-col items-center gap-1">
                       <span className="text-xs font-semibold text-gray-500 uppercase">Export</span>
-                      <ToggleSwitch checked={!!permissions.export} onChange={(v) => handleToggle('export', v)} />
+                      <ToggleSwitch checked={permissions.export} onChange={(v) => handleToggle('export', v)} />
                     </div>
                   </div>
                 </td>

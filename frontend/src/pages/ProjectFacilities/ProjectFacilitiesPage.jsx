@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Premium3DButton from '../../components/common/Premium3DButton';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { masterListService } from '../../services/masterList.service';
 import { projectFacilitiesService } from '../../services/projectFacilities.service';
 import Layout from '../../components/Layout';
@@ -9,6 +10,8 @@ import CustomDropdown from '../../components/common/CustomDropdown';
 
 export default function ProjectFacilitiesPage() {
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('Project Facilities', 'create');
   
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState('');
@@ -275,13 +278,15 @@ export default function ProjectFacilitiesPage() {
                   This will create <strong>{preview.summary.facilitiesFound}</strong> independent Project Facility inspection tasks.
                 </div>
                 
-                <Premium3DButton
-                  onClick={handleGenerateBatch}
-                  disabled={loading || preview.summary.facilitiesFound === 0 || !selectedProject}
-                  className="!w-auto flex items-center justify-center gap-2"
-                >
-                  {loading ? 'Creating Batch...' : 'Generate Inspection'}
-                </Premium3DButton>
+                {canCreate && (
+                  <Premium3DButton
+                    onClick={handleGenerateBatch}
+                    disabled={loading || preview.summary.facilitiesFound === 0 || !selectedProject}
+                    className="!w-auto flex items-center justify-center gap-2"
+                  >
+                    {loading ? 'Creating Batch...' : 'Generate Inspection'}
+                  </Premium3DButton>
+                )}
               </div>
             </div>
           </div>

@@ -132,8 +132,8 @@ const MasterListImportModal = ({ onClose, onSuccess }) => {
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 uppercase"
                 >
                   <option value="" disabled>Select a project</option>
-                  {projectsList.map(p => (
-                    <option key={p._id || p.code} value={p.code}>
+                  {projectsList.map((p, idx) => (
+                    <option key={`${p._id || p.code || idx}-${idx}`} value={p.code}>
                       {p.code} - {p.fullName}
                     </option>
                   ))}

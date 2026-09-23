@@ -41,24 +41,31 @@ function App() {
       <Route path="/dashboard" element={<ProtectedRoute moduleName="Dashboard"><DashboardPage /></ProtectedRoute>} />
       <Route path="/demo" element={<ProtectedRoute moduleName="Clone Page" allowedRoles={['Admin', 'Administrator']}><ClonePage /></ProtectedRoute>} />
       <Route path="/notifications" element={<ProtectedRoute moduleName="Notifications"><NotificationPage /></ProtectedRoute>} />
-      <Route path="/users" element={<ProtectedRoute moduleName="Users"><UserManagementPage /></ProtectedRoute>} />
-      <Route path="/user-insights" element={<ProtectedRoute moduleName="User Insights"><UserInsightsPage /></ProtectedRoute>} />
+      
+      {/* Users & Insights Routes */}
+      <Route path="/users" element={<ProtectedRoute moduleName="Users" action="view"><UserManagementPage /></ProtectedRoute>} />
+      <Route path="/users/create" element={<ProtectedRoute moduleName="Users" action="create"><UserManagementPage defaultTab="add-user" /></ProtectedRoute>} />
+      <Route path="/users/edit" element={<ProtectedRoute moduleName="Users" action="edit"><UserManagementPage /></ProtectedRoute>} />
+      <Route path="/users/insights" element={<ProtectedRoute moduleName="User Insights" action="view"><UserInsightsPage /></ProtectedRoute>} />
+      <Route path="/user-insights" element={<ProtectedRoute moduleName="User Insights" action="view"><UserInsightsPage /></ProtectedRoute>} />
+      
+      {/* Sampling & Management Routes */}
       <Route path="/master-list" element={<ProtectedRoute moduleName="Master List"><MasterListPage /></ProtectedRoute>} />
       <Route path="/inspection-engine" element={<ProtectedRoute moduleName="Inspection Engine"><InspectionEnginePage /></ProtectedRoute>} />
-      <Route path="/roadway-sampling" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><RoadwaySamplingPage /></ProtectedRoute>} />
-      <Route path="/structure-sampling" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><StructureSamplingPage /></ProtectedRoute>} />
-      <Route path="/project-facilities" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><ProjectFacilitiesPage /></ProtectedRoute>} />
-      <Route path="/atms" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator']}><AtmsPage /></ProtectedRoute>} />
+      <Route path="/roadway-sampling" element={<ProtectedRoute moduleName="Roadway Sampling"><RoadwaySamplingPage /></ProtectedRoute>} />
+      <Route path="/structure-sampling" element={<ProtectedRoute moduleName="Structures Sampling"><StructureSamplingPage /></ProtectedRoute>} />
+      <Route path="/project-facilities" element={<ProtectedRoute moduleName="Project Facilities"><ProjectFacilitiesPage /></ProtectedRoute>} />
+      <Route path="/atms" element={<ProtectedRoute moduleName="ATMS"><AtmsPage /></ProtectedRoute>} />
       <Route path="/survey-library" element={<ProtectedRoute moduleName="Survey Library"><SurveyLibraryPage /></ProtectedRoute>} />
       <Route path="/survey-processing" element={<ProtectedRoute moduleName="Survey Processing"><SurveyProcessingPage /></ProtectedRoute>} />
       <Route path="/skip-gallery" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><SkipGalleryPage /></ProtectedRoute>} />
       <Route path="/image-review" element={<ProtectedRoute moduleName="Image Review"><ImageReviewPage /></ProtectedRoute>} />
       <Route path="/rating" element={<ProtectedRoute moduleName="Rating"><RatingPage /></ProtectedRoute>} />
       <Route path="/rating/inspector/:batchId" element={<ProtectedRoute moduleName="Rating"><InspectorApp /></ProtectedRoute>} />
-      <Route path="/rating-v2" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><RatingPage /></ProtectedRoute>} />
-      <Route path="/rating-v2/:roadId" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><RoadSummaryPage /></ProtectedRoute>} />
-      <Route path="/rating-v2/inspector/:batchId" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><RatingV2Page /></ProtectedRoute>} />
-      <Route path="/role" element={<ProtectedRoute moduleName="Role Management"><RolePermissionPage /></ProtectedRoute>} />
+      <Route path="/rating-v2" element={<ProtectedRoute moduleName="Rating V2"><RatingPage /></ProtectedRoute>} />
+      <Route path="/rating-v2/:roadId" element={<ProtectedRoute moduleName="Rating V2"><RoadSummaryPage /></ProtectedRoute>} />
+      <Route path="/rating-v2/inspector/:batchId" element={<ProtectedRoute moduleName="Rating V2"><RatingV2Page /></ProtectedRoute>} />
+      <Route path="/role" element={<ProtectedRoute moduleName="Role"><RolePermissionPage /></ProtectedRoute>} />
       <Route path="/rating/:roadId" element={<ProtectedRoute moduleName="Rating"><RoadSummaryPage /></ProtectedRoute>} />
       <Route path="/rating/:roadId/detail/:detailId" element={<ProtectedRoute moduleName="Rating"><RatingDetailPage /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><ProfilePage /></ProtectedRoute>} />

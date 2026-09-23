@@ -3,7 +3,7 @@ import { masterListService } from '../../../services/masterList.service';
 import { MdDelete, MdWarning } from 'react-icons/md';
 import AnimatedFolderIcon from './AnimatedFolderIcon';
 
-const MasterListProjectFolders = ({ projects, onSelectProject, onProjectDeleted }) => {
+const MasterListProjectFolders = ({ projects, onSelectProject, onProjectDeleted, canDelete = true }) => {
   const [deleting, setDeleting] = useState(null);
 
   const handleDelete = async (e, projectName) => {
@@ -38,20 +38,22 @@ const MasterListProjectFolders = ({ projects, onSelectProject, onProjectDeleted 
           onClick={() => onSelectProject(project)}
           className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center cursor-pointer hover:-translate-y-1 hover:border-green-300 hover:shadow-lg transition-all duration-300 group relative"
         >
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button 
-              onClick={(e) => handleDelete(e, project)}
-              disabled={deleting === project}
-              className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
-              title="Delete Project Master List"
-            >
-              {deleting === project ? (
-                <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                <MdDelete className="text-xl" />
-              )}
-            </button>
-          </div>
+          {canDelete && (
+            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button 
+                onClick={(e) => handleDelete(e, project)}
+                disabled={deleting === project}
+                className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                title="Delete Project Master List"
+              >
+                {deleting === project ? (
+                  <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <MdDelete className="text-xl" />
+                )}
+              </button>
+            </div>
+          )}
           <AnimatedFolderIcon className="text-green-500 mb-4 group-hover:text-green-600 transition-colors duration-300" />
           <h3 className="text-lg font-semibold text-gray-800 text-center w-full truncate">{project}</h3>
           <p className="text-xs text-gray-400 mt-2">Click to view items</p>

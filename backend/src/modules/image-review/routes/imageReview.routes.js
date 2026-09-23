@@ -7,7 +7,7 @@ const { requireRole } = require('../../../middleware/role.middleware');
 const imageReviewController = require('../controllers/imageReview.controller');
 
 router.use(authenticate);
-router.use(requireRole('Admin', 'Manager'));
+router.use(requireRole('Admin', 'Administrator', 'HO', 'Manager'));
 
 // Get all batches ready for review
 router.get('/batches', imageReviewController.getBatchesForReview);

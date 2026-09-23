@@ -91,8 +91,8 @@ const TemporalIntelligence = ({ projects = [] }) => {
             onChange={e => setSelectedProject(e.target.value)}
             className="text-base font-bold text-gray-800 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white min-w-[220px]"
           >
-            {projects.map(p => (
-              <option key={p.id || p.code} value={p.code}>{p.name}</option>
+            {projects.map((p, idx) => (
+              <option key={`${p.id || p.code || idx}-${idx}`} value={p.code}>{p.name}</option>
             ))}
           </select>
         </div>

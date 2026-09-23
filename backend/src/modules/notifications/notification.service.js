@@ -33,4 +33,8 @@ const markAllAsRead = async (userId) => {
   return Notification.updateMany({ userId, isRead: false }, { isRead: true });
 };
 
-module.exports = { send, getNotifications, markAsRead, markAllAsRead };
+const clearAllNotifications = async (userId) => {
+  return Notification.deleteMany({ userId });
+};
+
+module.exports = { send, getNotifications, markAsRead, markAllAsRead, clearAllNotifications };

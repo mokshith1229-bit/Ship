@@ -13,6 +13,77 @@ const ProfilePage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const isAdmin = user && (user.role === 'Admin' || user.role === 'Administrator' || user.role === 'HO' || user.role === 'SPV');
+
+  // Format last login dynamically
+  const formatLastLogin = (dateVal) => {
+    const d = dateVal ? new Date(dateVal) : new Date();
+    const validDate = isNaN(d.getTime()) ? new Date() : d;
+    const datePart = validDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timePart = validDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return `${datePart}, ${timePart}`;
+  };
+
+  const formatLastLoginShort = (dateVal) => {
+    const d = dateVal ? new Date(dateVal) : new Date();
+    const validDate = isNaN(d.getTime()) ? new Date() : d;
+    const datePart = validDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timePart = validDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return `${datePart} ${timePart}`;
+  };
+
+  // User accounts: display strictly login information
+  const userActivities = [
+    {
+      dateLabel: 'Today',
+      title: 'Logged In',
+      subtitle: `Successful login (${formatLastLogin(user?.lastLogin)})`,
+      timeAgo: 'Just now'
+    },
+    {
+      dateLabel: 'Yesterday',
+      title: 'Logged In',
+      subtitle: 'Successful login (Session authenticated)',
+      timeAgo: '1 day ago'
+    },
+    {
+      dateLabel: 'Earlier',
+      title: 'Logged In',
+      subtitle: 'Successful login via Windows Chrome',
+      timeAgo: '2 days ago'
+    }
+  ];
+
+  // Admin accounts: display full administrative activities
+  const adminActivities = [
+    {
+      dateLabel: 'Today',
+      title: 'Updated User Permission',
+      subtitle: 'Role Management',
+      timeAgo: '10 mins ago'
+    },
+    {
+      dateLabel: 'Yesterday',
+      title: 'Created New Project',
+      subtitle: 'Project: HIRATE Enhancement',
+      timeAgo: '1 day ago'
+    },
+    {
+      dateLabel: '05 Aug 2026',
+      title: 'Updated Master List',
+      subtitle: 'Rating Categories',
+      timeAgo: '2 days ago'
+    },
+    {
+      dateLabel: '04 Aug 2026',
+      title: 'Logged In',
+      subtitle: 'Successful login',
+      timeAgo: '3 days ago'
+    }
+  ];
+
+  const recentActivities = isAdmin ? adminActivities : userActivities;
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[#F8F9FA]">
       <Navbar />
@@ -67,7 +138,7 @@ const ProfilePage = () => {
                     <MdHistory className="text-green-200" />
                     <div className="flex flex-col">
                       <span className="text-[10px] text-green-200 uppercase font-bold tracking-wider leading-tight">Last Login</span>
-                      <span className="text-xs font-semibold text-white">07 Aug 2026 10:25 AM</span>
+                      <span className="text-xs font-semibold text-white">{formatLastLoginShort(user?.lastLogin)}</span>
                     </div>
                   </div>
                 </div>
@@ -159,7 +230,7 @@ const ProfilePage = () => {
                       </div>
                       <span className="text-sm font-medium text-gray-600">Last Login</span>
                     </div>
-                    <span className="text-sm font-bold text-gray-800">07 Aug 2026, 10:25 AM</span>
+                    <span className="text-sm font-bold text-gray-800">{formatLastLogin(user?.lastLogin)}</span>
                   </div>
                   
                   <div className="flex items-center justify-between pb-4 border-b border-gray-50">
@@ -220,54 +291,19 @@ const ProfilePage = () => {
                   {/* Vertical Line */}
                   <div className="absolute left-[15px] top-2 bottom-2 w-px bg-gray-100 z-0"></div>
                   
-                  <div className="relative z-10 flex items-start gap-12">
-                    <div className="flex items-center gap-4 w-32 shrink-0 pt-1">
-                      <div className="w-2 h-2 bg-green-500 rounded-full outline outline-4 outline-white"></div>
-                      <span className="text-xs font-bold text-green-600">Today</span>
+                  {recentActivities.map((act, index) => (
+                    <div key={index} className="relative z-10 flex items-start gap-12">
+                      <div className="flex items-center gap-4 w-32 shrink-0 pt-1">
+                        <div className="w-2 h-2 bg-green-500 rounded-full outline outline-4 outline-white"></div>
+                        <span className="text-xs font-bold text-green-600">{act.dateLabel}</span>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-bold text-gray-800">{act.title}</h4>
+                        <p className="text-xs font-medium text-gray-500 mt-0.5">{act.subtitle}</p>
+                      </div>
+                      <span className="text-xs font-medium text-gray-400 whitespace-nowrap pt-1">{act.timeAgo}</span>
                     </div>
-                    <div className="flex-1">
-                      <h4 className="text-sm font-bold text-gray-800">Updated User Permission</h4>
-                      <p className="text-xs font-medium text-gray-500 mt-0.5">Role Management</p>
-                    </div>
-                    <span className="text-xs font-medium text-gray-400 whitespace-nowrap pt-1">10 mins ago</span>
-                  </div>
-                  
-                  <div className="relative z-10 flex items-start gap-12">
-                    <div className="flex items-center gap-4 w-32 shrink-0 pt-1">
-                      <div className="w-2 h-2 bg-green-500 rounded-full outline outline-4 outline-white"></div>
-                      <span className="text-xs font-bold text-green-600">Yesterday</span>
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-sm font-bold text-gray-800">Created New Project</h4>
-                      <p className="text-xs font-medium text-gray-500 mt-0.5">Project: HIRATE Enhancement</p>
-                    </div>
-                    <span className="text-xs font-medium text-gray-400 whitespace-nowrap pt-1">1 day ago</span>
-                  </div>
-                  
-                  <div className="relative z-10 flex items-start gap-12">
-                    <div className="flex items-center gap-4 w-32 shrink-0 pt-1">
-                      <div className="w-2 h-2 bg-green-500 rounded-full outline outline-4 outline-white"></div>
-                      <span className="text-xs font-bold text-green-600">05 Aug 2026</span>
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-sm font-bold text-gray-800">Updated Master List</h4>
-                      <p className="text-xs font-medium text-gray-500 mt-0.5">Rating Categories</p>
-                    </div>
-                    <span className="text-xs font-medium text-gray-400 whitespace-nowrap pt-1">2 days ago</span>
-                  </div>
-                  
-                  <div className="relative z-10 flex items-start gap-12">
-                    <div className="flex items-center gap-4 w-32 shrink-0 pt-1">
-                      <div className="w-2 h-2 bg-green-500 rounded-full outline outline-4 outline-white"></div>
-                      <span className="text-xs font-bold text-green-600">04 Aug 2026</span>
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-sm font-bold text-gray-800">Logged In</h4>
-                      <p className="text-xs font-medium text-gray-500 mt-0.5">Successful login</p>
-                    </div>
-                    <span className="text-xs font-medium text-gray-400 whitespace-nowrap pt-1">3 days ago</span>
-                  </div>
-                  
+                  ))}
                 </div>
               </div>
             </div>

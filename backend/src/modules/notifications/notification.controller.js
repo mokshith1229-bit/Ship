@@ -25,4 +25,9 @@ const markAllAsRead = asyncHandler(async (req, res) => {
   return successResponse(res, null, 'All notifications marked as read');
 });
 
-module.exports = { getNotifications, markAsRead, markAllAsRead };
+const clearAllNotifications = asyncHandler(async (req, res) => {
+  await notificationService.clearAllNotifications(req.user._id);
+  return successResponse(res, null, 'All notifications cleared');
+});
+
+module.exports = { getNotifications, markAsRead, markAllAsRead, clearAllNotifications };

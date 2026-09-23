@@ -2814,8 +2814,8 @@ const UserInsightsPage = () => {
                           }}
                           className="w-full h-[46px] pl-4 pr-10 border border-borderColor rounded-xl text-sm bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-textColor font-bold appearance-none cursor-pointer shadow-sm transition-all duration-200"
                         >
-                          {usersList.map((user) => (
-                            <option key={user.name || user.email} value={user.name}>
+                          {usersList.map((user, idx) => (
+                            <option key={`${user.name || user.email}-${idx}`} value={user.name}>
                               {user.name}
                             </option>
                           ))}
@@ -2835,8 +2835,8 @@ const UserInsightsPage = () => {
                           onChange={(e) => setSelectedProject(e.target.value)}
                           className="w-full h-[46px] pl-4 pr-10 border border-borderColor rounded-xl text-sm bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-textColor font-bold appearance-none cursor-pointer shadow-sm transition-all duration-200"
                         >
-                          {projectOptions.map((proj) => (
-                            <option key={proj} value={proj}>
+                          {projectOptions.map((proj, idx) => (
+                            <option key={`${proj}-${idx}`} value={proj}>
                               {proj}
                             </option>
                           ))}
@@ -2856,8 +2856,8 @@ const UserInsightsPage = () => {
                           onChange={(e) => setSelectedDuration(e.target.value)}
                           className="w-full h-[46px] pl-4 pr-10 border border-borderColor rounded-xl text-sm bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-textColor font-bold appearance-none cursor-pointer shadow-sm transition-all duration-200"
                         >
-                          {durationOptions.map((dur) => (
-                            <option key={dur} value={dur}>
+                          {durationOptions.map((dur, idx) => (
+                            <option key={`${dur}-${idx}`} value={dur}>
                               {dur}
                             </option>
                           ))}

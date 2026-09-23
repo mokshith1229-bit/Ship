@@ -87,7 +87,8 @@ class PerformanceCenterService {
     // Unique chainages
     const chainageSet = new Set();
     allRatings.forEach(r => {
-      if (r.chainage) chainageSet.add(r.chainage.toFixed(2));
+      const ch = typeof r.chainage === 'number' ? r.chainage : parseFloat(r.chainage);
+      if (!isNaN(ch)) chainageSet.add(ch.toFixed(2));
     });
 
     // Image coverage
@@ -367,11 +368,12 @@ class PerformanceCenterService {
     // Critical chainages (chainages with most critical issues)
     const chainageCritMap = {};
     allRatings.filter(r => r.score === 1).forEach(r => {
-      const ch = r.chainage.toFixed(2);
+      const chNum = typeof r.chainage === 'number' ? r.chainage : parseFloat(r.chainage);
+      const ch = !isNaN(chNum) ? chNum.toFixed(2) : '0.00';
       chainageCritMap[ch] = (chainageCritMap[ch] || 0) + 1;
     });
     const criticalChainages = Object.entries(chainageCritMap)
-      .map(([chainage, count]) => ({ chainage: parseFloat(chainage), count }))
+      .map(([chainage, count]) => ({ chainage: parseFloat(chainage) || 0, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
@@ -387,20 +389,34 @@ class PerformanceCenterService {
   // ─── SECTION 6: CORRIDOR / CHAINAGE INTELLIGENCE ────────────────────────────
 
   computeChainageIntelligence(allRatings) {
-    if (allRatings.length === 0) {
-      return { distribution: [], hotspots: [], minChainage: 0, maxChainage: 0 };
+    if (!allRatings || allRatings.length === 0) {
+      return { distribution: [], hotspots: [], minChainage: 0, maxChainage: 0, totalChainageSpan: 0 };
+    }
+
+    const validRatings = allRatings.filter(r => {
+      const ch = typeof r.chainage === 'number' ? r.chainage : parseFloat(r.chainage);
+      return !isNaN(ch);
+    });
+
+    if (validRatings.length === 0) {
+      return { distribution: [], hotspots: [], minChainage: 0, maxChainage: 0, totalChainageSpan: 0 };
     }
 
     // Find chainage range
     let minCh = Infinity;
     let maxCh = -Infinity;
-    allRatings.forEach(r => {
-      if (r.chainage < minCh) minCh = r.chainage;
-      if (r.chainage > maxCh) maxCh = r.chainage;
+    validRatings.forEach(r => {
+      const ch = typeof r.chainage === 'number' ? r.chainage : parseFloat(r.chainage);
+      if (ch < minCh) minCh = ch;
+      if (ch > maxCh) maxCh = ch;
     });
 
+    if (!isFinite(minCh) || !isFinite(maxCh)) {
+      return { distribution: [], hotspots: [], minChainage: 0, maxChainage: 0, totalChainageSpan: 0 };
+    }
+
     // Create bins for chainage distribution
-    const range = maxCh - minCh;
+    const range = Math.max(0, maxCh - minCh);
     const binCount = Math.min(Math.max(Math.ceil(range / 1), 10), 50); // 1km bins, min 10 max 50
     const binSize = range > 0 ? range / binCount : 1;
 
@@ -409,8 +425,8 @@ class PerformanceCenterService {
       const start = minCh + (i * binSize);
       const end = minCh + ((i + 1) * binSize);
       bins.push({
-        start: parseFloat(start.toFixed(2)),
-        end: parseFloat(end.toFixed(2)),
+        start: parseFloat(start.toFixed(2)) || 0,
+        end: parseFloat(end.toFixed(2)) || 0,
         label: `${start.toFixed(1)}–${end.toFixed(1)}`,
         totalRatings: 0,
         issues: 0,
@@ -421,14 +437,17 @@ class PerformanceCenterService {
     }
 
     // Distribute ratings into bins
-    allRatings.forEach(r => {
-      let binIdx = Math.floor((r.chainage - minCh) / binSize);
+    validRatings.forEach(r => {
+      const ch = typeof r.chainage === 'number' ? r.chainage : parseFloat(r.chainage);
+      let binIdx = Math.floor((ch - minCh) / binSize);
       if (binIdx >= binCount) binIdx = binCount - 1;
-      if (binIdx < 0) binIdx = 0;
-      bins[binIdx].totalRatings++;
-      bins[binIdx].sumScore += r.score;
-      if (r.score === 1 || r.score === 5) bins[binIdx].issues++;
-      if (r.score === 1) bins[binIdx].critical++;
+      if (binIdx < 0 || isNaN(binIdx)) binIdx = 0;
+      if (bins[binIdx]) {
+        bins[binIdx].totalRatings++;
+        bins[binIdx].sumScore += (Number(r.score) || 0);
+        if (r.score === 1 || r.score === 5) bins[binIdx].issues++;
+        if (r.score === 1) bins[binIdx].critical++;
+      }
     });
 
     // Calculate avg rating per bin
@@ -454,12 +473,13 @@ class PerformanceCenterService {
 
     // Per-chainage detail for direction analysis
     const directionMap = {};
-    allRatings.forEach(r => {
-      const ch = r.chainage.toFixed(2);
+    validRatings.forEach(r => {
+      const chNum = typeof r.chainage === 'number' ? r.chainage : parseFloat(r.chainage);
+      const ch = !isNaN(chNum) ? chNum.toFixed(2) : '0.00';
       const dir = r.direction || '-';
       const key = `${ch}_${dir}`;
       if (!directionMap[key]) {
-        directionMap[key] = { chainage: r.chainage, direction: dir, issues: 0, total: 0 };
+        directionMap[key] = { chainage: chNum, direction: dir, issues: 0, total: 0 };
       }
       directionMap[key].total++;
       if (r.score === 1 || r.score === 5) directionMap[key].issues++;
@@ -468,9 +488,9 @@ class PerformanceCenterService {
     return {
       distribution: bins,
       hotspots,
-      minChainage: parseFloat(minCh.toFixed(2)),
-      maxChainage: parseFloat(maxCh.toFixed(2)),
-      totalChainageSpan: parseFloat(range.toFixed(2))
+      minChainage: parseFloat(minCh.toFixed(2)) || 0,
+      maxChainage: parseFloat(maxCh.toFixed(2)) || 0,
+      totalChainageSpan: parseFloat(range.toFixed(2)) || 0
     };
   }
 

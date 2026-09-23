@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Premium3DButton from '../../components/common/Premium3DButton';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { masterListService } from '../../services/masterList.service';
 import { structureEngineService } from '../../services/structureEngine.service';
 import Layout from '../../components/Layout';
@@ -9,6 +10,8 @@ import CustomDropdown from '../../components/common/CustomDropdown';
 
 export default function StructureSamplingPage() {
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('Structures Sampling', 'create');
   
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState('');
@@ -471,8 +474,8 @@ export default function StructureSamplingPage() {
                     className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                   >
                     <option value="">Select Project</option>
-                    {projects.map(p => (
-                      <option key={p} value={p}>{p}</option>
+                    {projects.map((p, idx) => (
+                      <option key={`${p}-${idx}`} value={p}>{p}</option>
                     ))}
                   </select>
                 </div>
@@ -493,13 +496,15 @@ export default function StructureSamplingPage() {
                   This will create <strong>{preview.totalInspectionPoints}</strong> independent Structure inspection tasks.
                 </div>
                 
-                <Premium3DButton
-                  onClick={handleGenerateBatch}
-                  disabled={loading || preview.validStructuresCount === 0 || !selectedProject}
-                  className="!w-auto flex items-center justify-center gap-2"
-                >
-                  {loading ? 'Creating Batch...' : 'Generate Structure Batch'}
-                </Premium3DButton>
+                {canCreate && (
+                  <Premium3DButton
+                    onClick={handleGenerateBatch}
+                    disabled={loading || preview.validStructuresCount === 0 || !selectedProject}
+                    className="!w-auto flex items-center justify-center gap-2"
+                  >
+                    {loading ? 'Creating Batch...' : 'Generate Structure Batch'}
+                  </Premium3DButton>
+                )}
               </div>
             </div>
           </div>

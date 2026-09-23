@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LuSend, LuCheck } from 'react-icons/lu';
 
-const AnimatedAssignButton = ({ onClick, disabled, className = '', ...props }) => {
+const AnimatedAssignButton = ({ onClick, disabled, className = '', type = "button", ...props }) => {
   const [status, setStatus] = useState('idle');
 
   // Animation sequence driven purely by time to guarantee visual continuity
@@ -28,16 +28,34 @@ const AnimatedAssignButton = ({ onClick, disabled, className = '', ...props }) =
     return 'border-black bg-white text-black';
   };
 
+  const handleClick = async (e) => {
+    if (disabled || status !== 'idle') {
+      e?.preventDefault?.();
+      return;
+    }
+    
+    if (onClick) {
+      try {
+        const res = await onClick(e);
+        if (res === false) {
+          return;
+        }
+        setStatus('sending');
+      } catch (err) {
+        console.error(err);
+      }
+    } else {
+      setStatus('sending');
+    }
+  };
+
   return (
     <motion.button
+      type={type}
       whileHover={status === 'idle' ? { scale: 1.02 } : {}}
       whileTap={status === 'idle' ? { scale: 0.98 } : {}}
-      disabled={disabled || status !== 'idle'}
-      onClick={(e) => {
-        if (disabled || status !== 'idle') { e.preventDefault(); return; }
-        setStatus('sending');
-        onClick?.(e);
-      }}
+      disabled={disabled || status === 'sending'}
+      onClick={handleClick}
       className={`relative flex items-center justify-center h-[42px] min-w-[145px] px-5 rounded-full overflow-hidden border-[1.5px] transition-colors duration-500 ${getColorClasses()} ${className}`}
       {...props}
     >

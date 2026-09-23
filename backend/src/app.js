@@ -29,6 +29,9 @@ require('./models/SurveyImport.model');
 require('./models/ImportBatch.model');
 require('./models/Rating.model');
 require('./models/ExtractionTask.model');
+require('./models/Feature.model');
+require('./models/RolePermission.model');
+require('./models/PermissionHistory.model');
 
 // Route modules
 const authRoutes = require('./modules/auth/auth.routes');
@@ -52,6 +55,7 @@ const reportsRoutes = require('./modules/reports/report.routes');
 const atmsRoutes = require('./modules/atms/routes/atms.routes');
 const projectFacilitiesRoutes = require('./modules/project-facilities/routes/projectFacilities.routes');
 const structureEngineRoutes = require('./modules/structure-engine/routes/structureEngine.routes');
+const roleRoutes = require('./modules/roles/role.routes');
 
 // ─── Due-date reminder cron (runs every hour) ─────────────────────────────────
 const { sendDueDateReminders, markOverdueAssignments } = require('./modules/work-assignment/workAssignment.service');
@@ -171,6 +175,7 @@ const createApp = () => {
   app.use('/api/v1/atms', apiLimiter, atmsRoutes);
   app.use('/api/v1/project-facilities', apiLimiter, projectFacilitiesRoutes);
   app.use('/api/v1/structure-engine', apiLimiter, structureEngineRoutes);
+  app.use('/api/v1/roles', apiLimiter, roleRoutes);
 
   // ─── 404 Handler ─────────────────────────────────────────────────────────────
   app.use(notFoundHandler);

@@ -216,8 +216,8 @@ const BulkAssignmentModal = ({
                 onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
                 className="h-11 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-gray-800 font-medium cursor-pointer"
               >
-                {categories.map((c) => (
-                  <option key={c} value={c}>{c}</option>
+                {categories.map((c, idx) => (
+                  <option key={`${c}-${idx}`} value={c}>{c}</option>
                 ))}
               </select>
             </div>

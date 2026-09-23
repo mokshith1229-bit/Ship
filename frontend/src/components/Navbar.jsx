@@ -24,11 +24,11 @@ const Navbar = () => {
     const fetchProjects = async () => {
       try {
         const [allProjectsRes, batches] = await Promise.all([
-          isAdmin ? projectService.getAllProjects().catch(() => []) : Promise.resolve([]),
+          projectService.getAllProjects().catch(() => []),
           ratingService.getReadyBatches().catch(() => [])
         ]);
 
-        const allProjects = allProjectsRes.data || allProjectsRes || [];
+        const allProjects = allProjectsRes?.data || allProjectsRes || [];
         const projectMap = {};
 
         allProjects.forEach(p => {
@@ -56,7 +56,7 @@ const Navbar = () => {
       }
     };
     fetchProjects();
-  }, [isAdmin]);
+  }, []);
 
   useEffect(() => {
     const pathParts = location.pathname.split('/');
@@ -80,6 +80,22 @@ const Navbar = () => {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const notifRef = useRef(null);
+  const [viewedNotifIds, setViewedNotifIds] = useState(() => {
+    try {
+      const stored = localStorage.getItem(`viewed_notifs_${user?.id || user?._id || 'user'}`);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    if (!user) return;
+    try {
+      const stored = localStorage.getItem(`viewed_notifs_${user?.id || user?._id || 'user'}`);
+      if (stored) setViewedNotifIds(JSON.parse(stored));
+    } catch (e) {}
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -93,17 +109,56 @@ const Navbar = () => {
         
         if (data.success && Array.isArray(data.data)) {
           if (isNormalUser) {
+            const now = new Date();
+            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
             const activeAssignments = data.data
-              .filter(a => a.status === 'Assigned' || a.status === 'In Progress')
-              .map(a => ({
-                _id: a._id,
-                title: 'New Assignment',
-                type: 'INFO',
-                body: `${a.project} - ${a.batchName || 'Batch'} (Due: ${new Date(a.dueDate).toLocaleDateString()})`,
-                createdAt: a.createdAt,
-                link: `/rating/inspector/${a.batchId?._id || a.batchId}`,
-                isAssignment: true
-              }));
+              .filter(a => a.status !== 'Completed')
+              .map(a => {
+                const dueDate = a.dueDate ? new Date(a.dueDate) : null;
+                const isOverdue = a.status === 'Overdue' || (dueDate && dueDate < startOfToday);
+                const isDueToday = !isOverdue && dueDate && dueDate >= startOfToday && dueDate <= endOfToday;
+                const batchId = a.batchId?._id || a.batchId;
+                const batchName = a.batchName || a.batchId?.name || 'Inspection Batch';
+                const formattedDueDate = dueDate ? dueDate.toLocaleDateString('en-GB') : 'N/A';
+
+                let title = 'New Assignment';
+                let type = 'INFO';
+                let body = `${a.project || 'Project'} - ${batchName} (Due: ${formattedDueDate})`;
+
+                if (isOverdue) {
+                  title = 'Overdue Task';
+                  type = 'ERROR';
+                  body = `${a.project || 'Project'} - ${batchName} (Overdue since ${formattedDueDate})`;
+                } else if (isDueToday) {
+                  title = 'Due Today';
+                  type = 'WARNING';
+                  body = `${a.project || 'Project'} - ${batchName} (Due Today: ${formattedDueDate})`;
+                }
+
+                return {
+                  _id: a._id,
+                  title,
+                  type,
+                  body,
+                  createdAt: a.createdAt || new Date(),
+                  link: batchId ? `/rating/inspector/${batchId}` : '/dashboard',
+                  isAssignment: true,
+                  isOverdue,
+                  isDueToday
+                };
+              });
+
+            // Sort Overdue first, then Due Today, then others
+            activeAssignments.sort((a, b) => {
+              if (a.isOverdue && !b.isOverdue) return -1;
+              if (!a.isOverdue && b.isOverdue) return 1;
+              if (a.isDueToday && !b.isDueToday) return -1;
+              if (!a.isDueToday && b.isDueToday) return 1;
+              return new Date(b.createdAt) - new Date(a.createdAt);
+            });
+
             setNotifications(activeAssignments);
           } else {
             const unread = data.data.filter(n => !n.isRead);
@@ -130,6 +185,43 @@ const Navbar = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Unread badge count calculation
+  const unreadCount = notifications.filter(n => !viewedNotifIds.includes(n._id)).length;
+
+  const handleToggleNotifications = () => {
+    const nextState = !showNotifications;
+    setShowNotifications(nextState);
+    if (nextState && notifications.length > 0) {
+      // Mark all current notifications as viewed when opened
+      const allIds = notifications.map(n => n._id);
+      const newViewed = Array.from(new Set([...viewedNotifIds, ...allIds]));
+      setViewedNotifIds(newViewed);
+      try {
+        localStorage.setItem(`viewed_notifs_${user?.id || user?._id || 'user'}`, JSON.stringify(newViewed));
+      } catch (e) {}
+    }
+  };
+
+  const handleNotificationClick = async (notif) => {
+    try {
+      const newViewed = Array.from(new Set([...viewedNotifIds, notif._id]));
+      setViewedNotifIds(newViewed);
+      try {
+        localStorage.setItem(`viewed_notifs_${user?.id || user?._id || 'user'}`, JSON.stringify(newViewed));
+      } catch (e) {}
+
+      setShowNotifications(false);
+      if (!notif.isAssignment) {
+        await api.put(`/notifications/${notif._id}/read`).catch(() => {});
+      }
+      if (notif.link) {
+        navigate(notif.link);
+      }
+    } catch (e) {
+      console.error('Failed to handle notification click', e);
+    }
+  };
+
   return (
     <header className="h-[60px] bg-white border-b border-borderColor flex items-center justify-between px-4 shrink-0 relative z-[1000]">
       <div className="flex items-center gap-4">
@@ -155,14 +247,14 @@ const Navbar = () => {
       <div className="flex items-center gap-6">
         <div className="relative" ref={notifRef}>
           <button 
-            onClick={() => setShowNotifications(!showNotifications)}
-            className="relative text-green-800 hover:text-green-700 transition-colors" 
+            onClick={handleToggleNotifications}
+            className="relative text-green-800 hover:text-green-700 transition-colors cursor-pointer" 
             title="Notifications"
           >
             <MdNotifications className="text-3xl" />
-            {notifications.length > 0 && (
+            {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-white">
-                {notifications.length}
+                {unreadCount}
               </span>
             )}
           </button>
@@ -172,62 +264,59 @@ const Navbar = () => {
             <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-[2000] overflow-hidden">
               <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex justify-between items-center">
                 <span className="font-semibold text-gray-800 text-sm">Notifications</span>
-                <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-0.5 rounded-full">{notifications.length} New</span>
+                {unreadCount > 0 ? (
+                  <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-0.5 rounded-full">{unreadCount} New</span>
+                ) : (
+                  <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{notifications.length} Total</span>
+                )}
               </div>
               <div className="max-h-[350px] overflow-y-auto custom-dropdown-scrollbar">
                 {notifications.length === 0 ? (
                   <div className="p-6 text-center text-gray-500 text-sm">
-                    No new notifications.
+                    No notifications available.
                   </div>
                 ) : (
-                  notifications.map((notif) => (
-                    <div key={notif._id} className="p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                      <div className="flex justify-between items-start mb-1">
-                        <span className="font-bold text-gray-900 text-sm">{notif.title}</span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          notif.type === 'SUCCESS' ? 'bg-green-100 text-green-800 border-green-200' :
-                          notif.type === 'WARNING' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
-                          notif.type === 'ERROR' ? 'bg-red-100 text-red-800 border-red-200' :
-                          'bg-blue-100 text-blue-800 border-blue-200'
-                        } border`}>
-                          {notif.type || 'INFO'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-600 mb-2">{notif.body}</p>
-                      
-                      <div className="flex justify-between items-center mt-3">
-                        <span className="text-[10px] text-gray-400 font-medium">
-                          {new Date(notif.createdAt).toLocaleDateString()} {new Date(notif.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                        </span>
+                  notifications.map((notif) => {
+                    const isUnviewed = !viewedNotifIds.includes(notif._id);
+                    return (
+                      <div
+                        key={notif._id}
+                        onClick={() => handleNotificationClick(notif)}
+                        className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer ${
+                          isUnviewed ? 'bg-green-50/20' : ''
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`font-bold text-sm ${
+                            notif.isOverdue ? 'text-red-600' : notif.isDueToday ? 'text-amber-600' : 'text-gray-900'
+                          }`}>
+                            {notif.title}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600 mb-2">{notif.body}</p>
                         
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={async () => {
-                              try {
-                                if (notif.isAssignment) {
-                                  setShowNotifications(false);
-                                  navigate(notif.link);
-                                } else {
-                                  await api.put(`/notifications/${notif._id}/read`);
-                                  setNotifications(prev => prev.filter(n => n._id !== notif._id));
-                                  if (notif.link) {
-                                    setShowNotifications(false);
-                                    navigate(notif.link);
-                                  }
-                                }
-                              } catch (e) {
-                                console.error('Failed to handle notification click', e);
-                              }
-                            }}
-                            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded shadow-sm transition-colors"
-                          >
-                            {notif.link ? 'View' : 'Mark Read'}
-                          </button>
+                        <div className="flex justify-between items-center mt-2.5">
+                          <span className="text-[10px] text-gray-400 font-medium">
+                            {new Date(notif.createdAt).toLocaleDateString('en-GB')} {new Date(notif.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          </span>
                         </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
+              </div>
+
+              {/* Notification Footer Link */}
+              <div className="p-2.5 bg-gray-50 border-t border-gray-100 text-center">
+                <button
+                  onClick={() => {
+                    setShowNotifications(false);
+                    navigate('/notifications');
+                  }}
+                  className="text-xs font-bold text-green-700 hover:text-green-800 hover:underline transition-colors cursor-pointer"
+                >
+                  View all in Notification Center →
+                </button>
               </div>
             </div>
           )}

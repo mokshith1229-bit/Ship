@@ -135,7 +135,7 @@ const CustomDropdown = ({
                   
                   return (
                     <li
-                      key={opt.value}
+                      key={`${opt.value ?? ''}-${index}`}
                       role="option"
                       aria-selected={isSelected}
                       onClick={(e) => {

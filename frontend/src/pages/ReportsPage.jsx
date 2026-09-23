@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import HiRateRoadLoader from '../components/common/HiRateRoadLoader';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
-import HiRateRoadLoader from '../components/common/HiRateRoadLoader';
 import ExcelViewer from '../components/ExcelViewer';
 import DynamicStripChart from '../components/DynamicStripChart';
 import OverviewStripChart from '../components/OverviewStripChart';

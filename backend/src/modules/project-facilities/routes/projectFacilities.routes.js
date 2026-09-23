@@ -4,6 +4,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const { authenticate } = require('../../../middleware/auth.middleware');
+const { requirePermission } = require('../../../middleware/permission.middleware');
 const projectFacilitiesController = require('../controllers/projectFacilities.controller');
 
 const upload = multer({
@@ -16,7 +17,7 @@ const upload = multer({
 // Protect all routes
 router.use(authenticate);
 
-router.post('/parse', upload.single('file'), projectFacilitiesController.parseExcel);
-router.post('/generate', projectFacilitiesController.generateBatch);
+router.post('/parse', requirePermission('Project Facilities', 'create'), upload.single('file'), projectFacilitiesController.parseExcel);
+router.post('/generate', requirePermission('Project Facilities', 'create'), projectFacilitiesController.generateBatch);
 
 module.exports = router;

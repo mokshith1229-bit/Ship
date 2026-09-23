@@ -2,6 +2,8 @@
 
 const InspectionBatch = require('../../../models/InspectionBatch.model');
 const InspectionTask = require('../../../models/InspectionTask.model');
+const User = require('../../../models/User.model');
+const MasterList = require('../../../models/MasterList.model');
 
 class ImageReviewService {
   async getBatchesForReview() {
@@ -18,7 +20,7 @@ class ImageReviewService {
 
   async updateTaskStatus(taskId, status, userId) {
     const task = await InspectionTask.findById(taskId);
-    if (!task) throw new Error('Task not found');
+    if (!task) throw Object.assign(new Error('Task not found'), { statusCode: 404 });
 
     if (status === 'READY_FOR_RATING') {
       task.imageApproved = true;
@@ -36,10 +38,10 @@ class ImageReviewService {
 
   async approveBatch(batchId, userId) {
     const batch = await InspectionBatch.findById(batchId);
-    if (!batch) throw new Error('Batch not found');
+    if (!batch) throw Object.assign(new Error('Batch not found'), { statusCode: 404 });
 
     if (!['READY_FOR_REVIEW', 'READY_FOR_RATING', 'IN_PROGRESS', 'COMPLETED'].includes(batch.status)) {
-      throw new Error(`Batch cannot be approved in status: ${batch.status}`);
+      throw Object.assign(new Error(`Batch cannot be approved in status: ${batch.status}`), { statusCode: 400 });
     }
 
     const tasks = await InspectionTask.find({ batchId });
@@ -72,7 +74,7 @@ class ImageReviewService {
 
   async rejectBatch(batchId) {
     const batch = await InspectionBatch.findById(batchId);
-    if (!batch) throw new Error('Batch not found');
+    if (!batch) throw Object.assign(new Error('Batch not found'), { statusCode: 404 });
 
     batch.status = 'FAILED';
     await batch.save();

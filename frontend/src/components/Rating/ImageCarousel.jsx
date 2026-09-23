@@ -2,10 +2,16 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MdFullscreen, MdClose, MdZoomIn, MdZoomOut, MdRotateRight, MdRotateLeft, MdChevronLeft, MdChevronRight } from 'react-icons/md';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import defaultHw1 from '../../assets/highway_new_1.png';
+import defaultHw2 from '../../assets/highway_new_2.png';
+import defaultHw3 from '../../assets/highway_new_3.png';
+
+const fallbackImages = [defaultHw1, defaultHw2, defaultHw3];
 
 const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode = false, baseChainage, onEscape }) => {
   const currentIndex = activeIndex;
   const [fullScreenIndex, setFullScreenIndex] = useState(null);
+  const [imgSrcMap, setImgSrcMap] = useState({});
   
   // Fullscreen specific states
   const [rotation, setRotation] = useState(0);
@@ -13,6 +19,21 @@ const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode
   // Zoom Magnifier states
   const [isZoomed, setIsZoomed] = useState(false);
   const [backgroundPos, setBackgroundPos] = useState('50% 50%');
+
+  const getImageSrc = useCallback((img, index) => {
+    if (imgSrcMap[index]) return imgSrcMap[index];
+    const rawUrl = typeof img === 'string' ? img : img?.url;
+    if (rawUrl && rawUrl.trim() !== '') return rawUrl;
+    return fallbackImages[index % fallbackImages.length];
+  }, [imgSrcMap]);
+
+  const handleImageError = useCallback((index) => {
+    setImgSrcMap(prev => {
+      const fallback = fallbackImages[index % fallbackImages.length];
+      if (prev[index] === fallback) return prev;
+      return { ...prev, [index]: fallback };
+    });
+  }, []);
 
   const nextImage = useCallback(() => {
     if (onIndexChange) {
@@ -107,6 +128,7 @@ const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode
 
             {images.map((img, index) => {
               const distance = index - currentIndex;
+              const currentSrc = getImageSrc(img, index);
               
               // Calculate transforms based on the distance from the center
               let x = '0%';
@@ -138,7 +160,7 @@ const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode
 
               return (
                 <motion.div
-                  key={img + index}
+                  key={index}
                   initial={false}
                   animate={{
                     x,
@@ -148,7 +170,7 @@ const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode
                     filter: `brightness(${brightness})`
                   }}
                   transition={{ duration: 0.45, ease: "easeOut" }}
-                  className="absolute w-[85%] sm:w-[65%] md:w-[60%] aspect-video bg-white rounded-[24px] border border-gray-200 shadow-[0_16px_50px_rgba(0,0,0,0.12)] group"
+                  className="absolute w-[85%] sm:w-[65%] md:w-[60%] aspect-video bg-white rounded-[24px] border border-gray-200 shadow-[0_16px_50px_rgba(0,0,0,0.12)] group overflow-hidden"
                 >
                   {/* Chainage Display Above Image */}
                   <div className="absolute -top-10 left-1/2 -translate-x-1/2 text-gray-800 font-bold text-lg whitespace-nowrap z-50 transition-opacity">
@@ -159,8 +181,6 @@ const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode
                     className={`w-full h-full overflow-hidden rounded-[24px] relative ${distance === 0 ? 'cursor-crosshair' : 'cursor-pointer'}`}
                     onClick={(e) => {
                       if (distance !== 0) return;
-                      // Only allow full screen if clicking the button? No, allow full screen on click too.
-                      // Wait, previous code allowed click to fullscreen.
                       setFullScreenIndex(index);
                       setRotation(0);
                     }}
@@ -176,11 +196,11 @@ const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode
                     }}
                   >
                     <motion.img 
-                      src={img.url || img} 
-                      crossOrigin="anonymous"
+                      src={currentSrc} 
                       alt={`Road view ${index + 1}`} 
                       className={`w-full h-full object-cover transition-opacity duration-300 ease-out group-hover:scale-[1.03] ${distance === 0 && isZoomed ? 'opacity-0' : 'opacity-100'}`}
                       draggable={false}
+                      onError={() => handleImageError(index)}
                     />
 
                     {/* Zoomed Magnifier Overlay */}
@@ -188,7 +208,7 @@ const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode
                       <div 
                         className={`absolute inset-0 z-20 pointer-events-none transition-opacity duration-300 ${isZoomed ? 'opacity-100' : 'opacity-0'}`}
                         style={{
-                          backgroundImage: `url(${img.url || img})`,
+                          backgroundImage: `url(${currentSrc})`,
                           backgroundPosition: backgroundPos,
                           backgroundSize: '250%',
                           backgroundRepeat: 'no-repeat'
@@ -204,12 +224,13 @@ const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode
                         setRotation(0);
                       }}
                       className="absolute top-4 right-4 z-40 bg-white/90 backdrop-blur hover:bg-white text-gray-700 hover:text-green-600 p-2 rounded-full shadow-md transition-all"
+                      title="Open Fullscreen"
                     >
                       <MdFullscreen className="text-2xl" />
                     </button>
                   </div>
                 </motion.div>
-              )
+              );
             })}
           </div>
         </div>
@@ -282,8 +303,7 @@ const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode
                     <TransformComponent wrapperStyle={{ width: "100%", height: "100%" }} contentStyle={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <motion.img
                         key={`fs-${fullScreenIndex}`}
-                        src={images[fullScreenIndex]?.url || images[fullScreenIndex]}
-                        crossOrigin="anonymous"
+                        src={getImageSrc(images[fullScreenIndex], fullScreenIndex)}
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ 
                           opacity: 1, 
@@ -293,6 +313,7 @@ const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode
                         transition={{ duration: 0.3 }}
                         className="w-full h-full object-contain cursor-grab active:cursor-grabbing"
                         style={{ originX: 0.5, originY: 0.5 }}
+                        onError={() => handleImageError(fullScreenIndex)}
                       />
                     </TransformComponent>
                   </div>
@@ -314,7 +335,7 @@ const ImageCarousel = ({ images = [], activeIndex = 1, onIndexChange, isEditMode
               onClick={nextFsImage}
               disabled={fullScreenIndex === images.length - 1}
               className="absolute right-auto md:right-28 left-auto right-6 z-50 w-14 h-14 bg-white/10 hover:bg-white text-white hover:text-gray-900 border border-white/20 rounded-full flex items-center justify-center backdrop-blur-md transition-all shadow-lg disabled:opacity-20 disabled:pointer-events-none"
-              style={{ right: 'calc(48px + 3rem + 2rem)' }} // Offset by the tool buttons on the right. Actually, I can just use a fixed right offset, e.g. right-32
+              style={{ right: 'calc(48px + 3rem + 2rem)' }}
             >
               <MdChevronRight className="text-4xl" />
             </button>

@@ -160,8 +160,8 @@ const InspectionComparison = ({ selectedProject }) => {
             onChange={(e) => setVersionA(e.target.value)}
           >
             <option value="">Select Batch</option>
-            {batches.map(b => (
-              <option key={b._id} value={b._id}>{b.name || new Date(b.createdAt).toLocaleDateString()}</option>
+            {batches.map((b, idx) => (
+              <option key={`a-${b._id}-${idx}`} value={b._id}>{b.name || new Date(b.createdAt).toLocaleDateString()}</option>
             ))}
           </select>
         </div>
@@ -174,8 +174,8 @@ const InspectionComparison = ({ selectedProject }) => {
             onChange={(e) => setVersionB(e.target.value)}
           >
             <option value="">Select Batch</option>
-            {batches.map(b => (
-              <option key={b._id} value={b._id}>{b.name || new Date(b.createdAt).toLocaleDateString()}</option>
+            {batches.map((b, idx) => (
+              <option key={`b-${b._id}-${idx}`} value={b._id}>{b.name || new Date(b.createdAt).toLocaleDateString()}</option>
             ))}
           </select>
         </div>

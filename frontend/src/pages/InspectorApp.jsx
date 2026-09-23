@@ -8,7 +8,11 @@ import { ratingService } from '../services/rating.service';
 import { resolveRemarkRating } from '../utils/remarkRatingResolver';
 import leftArrowImg from '../assets/leftarrow.PNG';
 import rightArrowImg from '../assets/rightarrow.PNG';
+import defaultHw1 from '../assets/highway_new_1.png';
+import defaultHw2 from '../assets/highway_new_2.png';
+import defaultHw3 from '../assets/highway_new_3.png';
 import MasterListEditModal from '../pages/MasterList/components/MasterListEditModal';
+import { useAuth } from '../hooks/useAuth';
 
 // REMARK_OPTIONS removed in favor of dynamic JSON config
 const SKIP_REASONS = [
@@ -45,12 +49,20 @@ const buildInitialRatings = (task) => {
 
 const InspectorApp = () => {
   const { batchId } = useParams();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const assignmentId = searchParams.get('assignmentId');
+  const categoryParam = searchParams.get('category');
+  const pagesParam = searchParams.get('pages');
   const startIndex = parseInt(searchParams.get('startIndex'), 10) || 0;
 
   const handleGoBack = () => {
+    if (assignmentId || categoryParam || pagesParam) {
+      navigate('/dashboard');
+      return;
+    }
     const road = location.state?.roadId || currentTask?.project || tasks[0]?.project;
     const basePath = location.pathname.startsWith('/rating-v2') ? '/rating-v2' : '/rating';
     if (road) {
@@ -117,13 +129,19 @@ const InspectorApp = () => {
     setGlobalIndex((prev) => prev !== startIndex ? startIndex : prev);
   }, [startIndex]);
 
-  const prevBatchIdRef = React.useRef(batchId);
+  const prevParamsRef = React.useRef({ batchId, categoryParam, pagesParam, assignmentId });
   useEffect(() => {
-    if (prevBatchIdRef.current !== batchId) {
-      prevBatchIdRef.current = batchId;
+    const prev = prevParamsRef.current;
+    if (
+      prev.batchId !== batchId ||
+      prev.categoryParam !== categoryParam ||
+      prev.pagesParam !== pagesParam ||
+      prev.assignmentId !== assignmentId
+    ) {
+      prevParamsRef.current = { batchId, categoryParam, pagesParam, assignmentId };
       setLoadedPage(null);
     }
-  }, [batchId]);
+  }, [batchId, categoryParam, pagesParam, assignmentId]);
 
   useEffect(() => {
     // Reset custom remark inputs when navigating to a new task
@@ -147,12 +165,17 @@ const InspectorApp = () => {
       fetchTasksForPage(targetPage, controller.signal);
       return () => controller.abort();
     }
-  }, [targetPage, loadedPage, batchId]);
+  }, [targetPage, loadedPage, batchId, categoryParam, pagesParam, assignmentId]);
 
   const fetchTasksForPage = async (page, signal) => {
     try {
       setLoading(true);
-      const res = await ratingService.getBatchTasks(batchId, { page, limit: PAGE_SIZE });
+      const queryParams = { page, limit: PAGE_SIZE };
+      if (assignmentId) queryParams.assignmentId = assignmentId;
+      if (categoryParam) queryParams.category = categoryParam;
+      if (pagesParam) queryParams.pages = pagesParam;
+
+      const res = await ratingService.getBatchTasks(batchId, queryParams);
       if (signal && signal.aborted) {
         return;
       }
@@ -279,13 +302,22 @@ const InspectorApp = () => {
           
         ratingsPayload = [...roadwayRatings, ...rsfRatings];
       } else if (currentTask.category === 'Structures' || currentTask.category === 'Project Facilities' || currentTask.category === 'ATMS') {
-        ratingsPayload = (currentTask.ratings || []).map(p => ({
-          parameterKey: p.parameterKey,
-          parameterName: p.parameterName,
-          group: p.group,
-          score: Number(taskRatings[p.parameterKey]?.score ?? 10),
-          remark: taskRatings[p.parameterKey]?.remark || ''
-        }));
+        const sourceList = (currentTask.ratings && currentTask.ratings.length > 0)
+          ? currentTask.ratings
+          : (currentTask.parameters || []);
+
+        ratingsPayload = sourceList.map(p => {
+          const key = p.parameterKey || p._id;
+          const ratingObj = taskRatings[key] || taskRatings[p.parameterKey] || taskRatings[p._id] || {};
+          return {
+            parameterKey: p.parameterKey || (p.parameter ? p.parameter.toLowerCase().replace(/\s+/g, '_') : undefined),
+            parameterName: p.parameterName || p.parameter,
+            group: p.group || p.assetType || currentTask.category,
+            ...(p.masterListId ? { masterListId: p.masterListId } : {}),
+            score: Number(ratingObj.score ?? p.score ?? 10),
+            remark: ratingObj.remark || p.remark || ''
+          };
+        });
       } else {
         ratingsPayload = (currentTask.parameters || []).map(p => ({
           masterListId: p._id,
@@ -366,10 +398,19 @@ const InspectorApp = () => {
 
       const selectedImageUrl = images[activeImageIndex]?.url;
       
-      await ratingService.saveTaskRatings(currentTask._id, ratingsPayload, selectedImageUrl);
+      const res = await ratingService.saveTaskRatings(currentTask._id, ratingsPayload, selectedImageUrl);
+      const savedTask = res?.data || res;
       setTasks(prev => {
         const updated = [...prev];
-        const taskToUpdate = { ...updated[localIndex], status: 'COMPLETED', ratings: ratingsPayload };
+        const taskToUpdate = { 
+          ...updated[localIndex], 
+          status: 'COMPLETED', 
+          ratings: ratingsPayload,
+          submittedBy: savedTask?.submittedBy || {
+            userName: user?.name || user?.username || 'Admin',
+            submittedAt: new Date()
+          }
+        };
         if (selectedImageUrl) {
           taskToUpdate.image = { ...taskToUpdate.image, cloudinaryUrl: selectedImageUrl };
         }
@@ -378,8 +419,9 @@ const InspectorApp = () => {
       });
       return true;
     } catch (err) {
-      console.error(err);
-      alert('Failed to save ratings. Please try again.');
+      console.error('Error saving task ratings:', err);
+      const errMsg = err.response?.data?.message || err.message || 'Failed to save ratings. Please try again.';
+      alert(`Save Error: ${errMsg}`);
       return false;
     } finally {
       setSaving(false);
@@ -504,27 +546,27 @@ const InspectorApp = () => {
   // Guarantee any currently saved remark for this task is in the dropdown options
   const currentTaskRemarks = Object.values(taskRatings || {}).map(r => r.remark).filter(r => r && r !== 'Other');
 
-  const images = [];
-  if (currentTask?.image?.cloudinaryUrl) {
-    const c = parseFloat(currentTask.chainage);
-    const currentImg = { url: currentTask.image.cloudinaryUrl, chainage: currentTask.chainage };
-    
-    let prevImg = currentImg;
-    if (currentTask.previousImage?.url) {
-      prevImg = { url: currentTask.previousImage.url, chainage: currentTask.previousImage.chainage || (c - 0.010).toFixed(3) };
-    } else if (currentTask.image?.previousUrl) {
-      prevImg = { url: currentTask.image.previousUrl, chainage: (c - 0.010).toFixed(3) };
-    }
-    
-    let nextImg = currentImg;
-    if (currentTask.nextImage?.url) {
-      nextImg = { url: currentTask.nextImage.url, chainage: currentTask.nextImage.chainage || (c + 0.010).toFixed(3) };
-    } else if (currentTask.image?.nextUrl) {
-      nextImg = { url: currentTask.image.nextUrl, chainage: (c + 0.010).toFixed(3) };
-    }
-    
-    images.push(prevImg, currentImg, nextImg);
-  }
+  const getTaskImageUrl = (t) => {
+    if (!t) return '';
+    if (typeof t.image === 'string') return t.image;
+    return t.image?.cloudinaryUrl || t.image?.url || t.imageUrl || '';
+  };
+
+  const c = parseFloat(currentTask?.chainage) || 0;
+  const currentImgUrl = getTaskImageUrl(currentTask);
+  const prevChainage = currentTask?.previousImage?.chainage || (c > 0.010 ? (c - 0.010).toFixed(3) : '0.000');
+  const currChainage = currentTask?.chainage || '0.000';
+  const nextChainage = currentTask?.nextImage?.chainage || (c + 0.010).toFixed(3);
+
+  const prevUrl = currentTask?.previousImage?.url || currentTask?.image?.previousUrl || currentImgUrl || defaultHw1;
+  const centerUrl = currentImgUrl || defaultHw2;
+  const nextUrl = currentTask?.nextImage?.url || currentTask?.image?.nextUrl || currentImgUrl || defaultHw3;
+
+  const images = [
+    { url: prevUrl, chainage: prevChainage },
+    { url: centerUrl, chainage: currChainage },
+    { url: nextUrl, chainage: nextChainage }
+  ];
 
   const renderParamCard = (param) => {
     const pId = param.parameterKey || param._id;
@@ -727,7 +769,19 @@ const InspectorApp = () => {
             <MdHome className="text-xl" />
           </button>
           <div>
-            <h1 className="text-base font-semibold text-gray-900">Rating Interface</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-semibold text-gray-900">Rating Interface</h1>
+              {(categoryParam || currentTask?.category) && (
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                  {categoryParam?.startsWith('AssetExcel') ? (currentTask?.category || 'Roadway') : (categoryParam || currentTask?.category)}
+                </span>
+              )}
+              {pagesParam && (
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                  {pagesParam}
+                </span>
+              )}
+            </div>
             <p className="text-xs text-gray-500">Task {globalIndex + 1} of {totalTasks || '...'}</p>
           </div>
         </div>
@@ -1017,7 +1071,7 @@ const InspectorApp = () => {
                 <>
                   {(currentTask.status === 'COMPLETED' || currentTask.submittedBy?.userName) && (
                     <span className="text-sm font-medium text-gray-700 bg-gray-100 px-3 py-1.5 rounded-md border border-gray-200">
-                      Submitted By: <span className="font-bold">{currentTask.submittedBy?.userName || 'Admin'}</span>
+                      Submitted By: <span className="font-bold">{currentTask.submittedBy?.userName || user?.name || user?.username || 'Admin'}</span>
                     </span>
                   )}
                   {currentTask.status !== 'SKIPPED' && (
@@ -1081,8 +1135,8 @@ const InspectorApp = () => {
                           className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#5cb85c]/20 focus:border-[#5cb85c] shadow-sm transition-shadow appearance-none cursor-pointer"
                         >
                           <option value="">Select a reason...</option>
-                          {SKIP_REASONS.map(reason => (
-                            <option key={reason} value={reason}>{reason}</option>
+                          {SKIP_REASONS.map((reason, idx) => (
+                            <option key={`${reason}-${idx}`} value={reason}>{reason}</option>
                           ))}
                         </select>
                       </div>

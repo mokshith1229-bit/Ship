@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
+import { useAuth } from '../context/AuthContext';
 import { MdOutlineVideoCameraFront, MdOutlineCloudUpload } from 'react-icons/md';
 import { surveyProcessingService } from '../services/surveyProcessing.service';
 import SurveyProcessingModal from './SurveyProcessing/components/SurveyProcessingModal';
 
 const SurveyProcessingPage = () => {
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('Survey Processing', 'create');
+
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedBatch, setSelectedBatch] = useState(null);
@@ -63,19 +67,19 @@ const SurveyProcessingPage = () => {
                   <th className="px-6 py-4 font-medium">Strategy</th>
                   <th className="px-6 py-4 font-medium">Questions</th>
                   <th className="px-6 py-4 font-medium">Chainages</th>
-                  <th className="px-6 py-4 font-medium text-right">Action</th>
+                  {canCreate && <th className="px-6 py-4 font-medium text-right">Action</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {loading ? (
                   <tr>
-                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={canCreate ? 6 : 5} className="px-6 py-12 text-center text-gray-500">
                       Loading pending batches...
                     </td>
                   </tr>
                 ) : batches.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={canCreate ? 6 : 5} className="px-6 py-12 text-center text-gray-500">
                       No inspection batches waiting for images.
                     </td>
                   </tr>
@@ -103,19 +107,21 @@ const SurveyProcessingPage = () => {
                       </td>
                       <td className="px-6 py-4 text-gray-600">{batch.selectedQuestionsCount}</td>
                       <td className="px-6 py-4 text-gray-600">{batch.uniqueChainagesCount}</td>
-                      <td className="px-6 py-4 text-right">
-                        <button
-                          onClick={() => setSelectedBatch(batch)}
-                          className={`inline-flex items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors text-sm ${
-                            batch.status === 'FAILED'
-                              ? 'bg-red-50 text-red-700 hover:bg-red-600 hover:text-white'
-                              : 'bg-green-50 text-green-700 hover:bg-green-600 hover:text-white'
-                          }`}
-                        >
-                          <MdOutlineCloudUpload className="text-lg" />
-                          {batch.status === 'FAILED' ? 'Retry Upload' : 'Upload Video'}
-                        </button>
-                      </td>
+                      {canCreate && (
+                        <td className="px-6 py-4 text-right">
+                          <button
+                            onClick={() => setSelectedBatch(batch)}
+                            className={`inline-flex items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors text-sm ${
+                              batch.status === 'FAILED'
+                                ? 'bg-red-50 text-red-700 hover:bg-red-600 hover:text-white'
+                                : 'bg-green-50 text-green-700 hover:bg-green-600 hover:text-white'
+                            }`}
+                          >
+                            <MdOutlineCloudUpload className="text-lg" />
+                            {batch.status === 'FAILED' ? 'Retry Upload' : 'Upload Video'}
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}

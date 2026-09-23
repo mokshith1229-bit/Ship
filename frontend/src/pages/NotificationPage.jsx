@@ -29,6 +29,7 @@ import AnimatedAssignButton from '../components/common/AnimatedAssignButton';
 import AnimatedDeliveryButton from '../components/common/AnimatedDeliveryButton';
 import DynamicGlowButton from '../components/common/DynamicGlowButton';
 import GenerateBatchButton from './InspectionEngine/components/GenerateBatchButton';
+import UserNotificationCenter from '../components/notifications/UserNotificationCenter';
 
 // Helper to format date into "DD MMM YYYY"
 const formatDate = (dateStr) => {
@@ -60,8 +61,8 @@ const categories = [
 
 const NotificationPage = () => {
   const { user: authUser } = useAuth();
-  // Expanded role check to match backend update allowing User role to assign work
-  const isAdmin = authUser?.role === 'Admin' || authUser?.role === 'Administrator' || authUser?.role === 'HO' || authUser?.role === 'SPV' || authUser?.role === 'User';
+  // Admin roles have assignment privileges; User role receives dedicated User Notification Center
+  const isAdmin = authUser && (authUser.role === 'Admin' || authUser.role === 'Administrator' || authUser.role === 'HO' || authUser.role === 'SPV');
   const navigate = useNavigate();
 
   // ── Live API States ──────────────────────────────────────────────────────
@@ -87,11 +88,11 @@ const NotificationPage = () => {
         ]);
         const usersArray = usersData || [];
         const assignmentsArray = assignmentsData || [];
-        
+
         setUsers(usersArray);
         setReadyBatches(batchesData || []);
         setAssignments(assignmentsArray);
-        
+
         // Calculate stats locally
         const now = new Date();
         const pendingCount = assignmentsArray.filter(a => a.status !== 'Completed').length;
@@ -104,16 +105,16 @@ const NotificationPage = () => {
           const completedDate = a.completedTime ? new Date(a.completedTime) : new Date(a.updatedAt);
           return completedDate.getDate() === now.getDate() && completedDate.getMonth() === now.getMonth() && completedDate.getFullYear() === now.getFullYear();
         }).length;
-        
+
         const totalUsers = usersArray.length;
         const availableUsers = usersArray.filter(u => u.isActive).length;
 
         // Merge with statsData if it exists, or just override with local calculations
-        setStats({ 
-          assignedToday, 
-          pendingTasks: pendingCount, 
-          completedToday, 
-          totalUsers, 
+        setStats({
+          assignedToday,
+          pendingTasks: pendingCount,
+          completedToday,
+          totalUsers,
           availableUsers,
           ...statsData, // Let backend override if it returns valid values, otherwise use local
           assignedToday: statsData?.assignedToday || assignedToday,
@@ -127,7 +128,7 @@ const NotificationPage = () => {
         const assignmentsData = await workAssignmentService.getMine();
         const assignments = assignmentsData || [];
         setAssignments(assignments);
-        
+
         const now = new Date();
         const pendingCount = assignments.filter(a => a.status !== 'Completed').length;
         const completedCount = assignments.filter(a => a.status === 'Completed').length;
@@ -160,33 +161,78 @@ const NotificationPage = () => {
     fetchData();
   }, [fetchData]);
 
-  // Build Route/Section options using the same project list as RatingPage (from master list).
-  // Deduplicate by code first to prevent duplicate key warnings.
-  const uniqueMasterProjects = masterProjects.reduce((acc, p) => {
-    const code = typeof p === 'string' ? p : (p.code || p.name || 'UNKNOWN');
-    if (!acc.some(x => {
-      const xCode = typeof x === 'string' ? x : (x.code || x.name || 'UNKNOWN');
-      return xCode === code;
-    })) {
-      acc.push(p);
-    }
-    return acc;
-  }, []);
+  // 1. Map distinct projects currently in progress / available for Route/Section
+  const distinctProjects = React.useMemo(() => {
+    const projectMap = new Map();
 
-  const ratingProjects = uniqueMasterProjects.map((p, idx) => {
-    const code = typeof p === 'string' ? p : (p.code || p.name || 'UNKNOWN');
-    const fullName = typeof p === 'string' ? p : (p.fullName || code);
-    // Find the most recent in-progress batch for this project
-    const matchingBatch = readyBatches.find(b => b.project === code);
-    return {
-      id: matchingBatch ? matchingBatch._id : `no-batch-${code}-${idx}`,
-      displayName: `${code} — ${fullName}`,
-      fullName: `${code} — ${fullName}`,
-      project: code,
-      hasBatch: !!matchingBatch,
-      totalPages: matchingBatch?.uniqueChainagesCount || 0
-    };
-  });
+    // Prioritize active/in-progress batches from readyBatches
+    (readyBatches || []).forEach(batch => {
+      const code = batch.project;
+      if (!code) return;
+      if (!projectMap.has(code)) {
+        projectMap.set(code, {
+          id: code,
+          code: code,
+          displayName: code,
+          fullName: code,
+          project: code,
+          batchCount: 1,
+          hasBatches: true
+        });
+      } else {
+        projectMap.get(code).batchCount += 1;
+      }
+    });
+
+    // Also include master list projects
+    (masterProjects || []).forEach(p => {
+      const code = typeof p === 'string' ? p : (p.code || p.name || 'UNKNOWN');
+      if (code && code !== 'UNKNOWN' && !projectMap.has(code)) {
+        const fullName = typeof p === 'string' ? p : (p.fullName || code);
+        projectMap.set(code, {
+          id: code,
+          code: code,
+          displayName: fullName !== code ? `${code} — ${fullName}` : code,
+          fullName: fullName,
+          project: code,
+          batchCount: 0,
+          hasBatches: false
+        });
+      }
+    });
+
+    return Array.from(projectMap.values()).sort((a, b) => {
+      if (a.hasBatches && !b.hasBatches) return -1;
+      if (!a.hasBatches && b.hasBatches) return 1;
+      return a.code.localeCompare(b.code);
+    });
+  }, [readyBatches, masterProjects]);
+
+  // 2. Map available batches for Category dropdown (Reference 3 Image)
+  const availableBatches = React.useMemo(() => {
+    return (readyBatches || []).map((batch) => {
+      const dateObj = batch.createdAt ? new Date(batch.createdAt) : null;
+      const day = dateObj ? dateObj.getDate() : '';
+      const month = dateObj ? dateObj.toLocaleDateString('en-GB', { month: 'short' }) : '';
+      const dateStr = dateObj ? `${day} ${month} - ` : '';
+      const pageCount = batch.uniqueChainagesCount || batch.totalPages || 0;
+      const formattedVersion = `${dateStr}${batch.name}`;
+      return {
+        id: (batch._id || batch.id || '').toString(),
+        name: batch.name,
+        project: batch.project || '',
+        category: batch.category || 'Roadway',
+        totalPages: pageCount,
+        displayName: `${batch.project} — ${formattedVersion}${pageCount ? ` (${pageCount} pages)` : ''}`,
+        versionLabel: formattedVersion,
+        rawName: batch.name,
+        status: batch.status
+      };
+    });
+  }, [readyBatches]);
+
+  // Helper to normalize strings for project matching (e.g. 'GMC - BS 2' vs 'GMC-BS 2')
+  const normalizeCode = (s) => (s || '').replace(/[\s\-_]/g, '').toLowerCase();
 
   // Filter and Search States
   const [searchQuery, setSearchQuery] = useState('');
@@ -204,33 +250,47 @@ const NotificationPage = () => {
   const [formData, setFormData] = useState({
     roadProject: '',
     routeSection: '',
-    category: 'Roadway',
+    batchId: '',
+    category: '',
     subSection: '',
     priority: 'Medium',
     dueDate: '',
     remarks: ''
   });
 
-  // Searchable combobox dropdown states - Road / Project
-  const [isProjDropdownOpen, setIsProjDropdownOpen] = useState(false);
-  const [projDropdownSearch, setProjDropdownSearch] = useState('');
-  const [projActiveIndex, setProjActiveIndex] = useState(-1);
-  const projDropdownRef = useRef(null);
-
-  // Searchable combobox dropdown states - Route / Section
+  // Searchable combobox dropdown states - Route / Section (Projects)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [dropdownSearch, setDropdownSearch] = useState('');
   const [activeRouteIndex, setActiveRouteIndex] = useState(-1);
   const dropdownRef = useRef(null);
 
-  // Filter route sections
-  const filteredProjects = ratingProjects.filter(p =>
-    p.displayName.toLowerCase().includes(dropdownSearch.toLowerCase())
+  // Searchable combobox dropdown states - Category (Batches)
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const [categoryDropdownSearch, setCategoryDropdownSearch] = useState('');
+  const [activeCategoryIndex, setActiveCategoryIndex] = useState(-1);
+  const categoryDropdownRef = useRef(null);
+
+  // Filter route sections (Projects)
+  const filteredRouteProjects = distinctProjects.filter(p =>
+    p.displayName.toLowerCase().includes(dropdownSearch.toLowerCase()) ||
+    p.code.toLowerCase().includes(dropdownSearch.toLowerCase())
   );
 
+  // Filter category (Batches)
+  const filteredBatches = availableBatches.filter(b => {
+    const matchesProject = !formData.routeSection ||
+      normalizeCode(b.project) === normalizeCode(formData.routeSection) ||
+      b.project.toLowerCase() === formData.routeSection.toLowerCase();
+    const q = categoryDropdownSearch.toLowerCase().trim();
+    const matchesSearch = !q ||
+      b.displayName.toLowerCase().includes(q) ||
+      b.versionLabel.toLowerCase().includes(q) ||
+      b.name.toLowerCase().includes(q) ||
+      b.project.toLowerCase().includes(q);
+    return matchesProject && matchesSearch;
+  });
 
-
-  // Key handlers for Route / Section
+  // Key handlers for Route / Section (Projects)
   const handleRouteKeyDown = (e) => {
     if (!isDropdownOpen) {
       if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
@@ -243,18 +303,25 @@ const NotificationPage = () => {
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setActiveRouteIndex(prev => (prev + 1) % filteredProjects.length);
+      setActiveRouteIndex(prev => (prev + 1) % filteredRouteProjects.length);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setActiveRouteIndex(prev => (prev - 1 + filteredProjects.length) % filteredProjects.length);
+      setActiveRouteIndex(prev => (prev - 1 + filteredRouteProjects.length) % filteredRouteProjects.length);
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (activeRouteIndex >= 0 && activeRouteIndex < filteredProjects.length) {
-        const selected = filteredProjects[activeRouteIndex];
-        setFormData(prev => ({ 
-          ...prev, 
-          routeSection: selected.id,
-          subSection: `Pages 1-${selected.totalPages}` // Auto-populate pages
+      if (activeRouteIndex >= 0 && activeRouteIndex < filteredRouteProjects.length) {
+        const selected = filteredRouteProjects[activeRouteIndex];
+        const projCode = selected.code;
+        const projectBatches = availableBatches.filter(b => normalizeCode(b.project) === normalizeCode(projCode));
+        const firstBatch = projectBatches[0];
+
+        setFormData(prev => ({
+          ...prev,
+          roadProject: projCode,
+          routeSection: projCode,
+          batchId: firstBatch ? firstBatch.id : '',
+          category: firstBatch ? (firstBatch.rawName || firstBatch.name) : 'Roadway',
+          subSection: firstBatch && firstBatch.totalPages ? `Pages 1-${firstBatch.totalPages}` : (firstBatch ? 'Pages 1-15' : prev.subSection)
         }));
         setIsDropdownOpen(false);
         setDropdownSearch('');
@@ -266,20 +333,73 @@ const NotificationPage = () => {
     }
   };
 
+  // Key handlers for Category (Batches)
+  const handleCategoryKeyDown = (e) => {
+    if (!isCategoryDropdownOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        setIsCategoryDropdownOpen(true);
+        setActiveCategoryIndex(0);
+        e.preventDefault();
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveCategoryIndex(prev => (prev + 1) % filteredBatches.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveCategoryIndex(prev => (prev - 1 + filteredBatches.length) % filteredBatches.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (activeCategoryIndex >= 0 && activeCategoryIndex < filteredBatches.length) {
+        const b = filteredBatches[activeCategoryIndex];
+        setFormData(prev => ({
+          ...prev,
+          roadProject: b.project,
+          routeSection: b.project,
+          batchId: b.id,
+          category: b.rawName || b.name,
+          subSection: b.totalPages ? `Pages 1-${b.totalPages}` : 'Pages 1-15'
+        }));
+        setIsCategoryDropdownOpen(false);
+        setCategoryDropdownSearch('');
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsCategoryDropdownOpen(false);
+      setCategoryDropdownSearch('');
+    }
+  };
+
   // Reset active index when search changes or dropdown opens
   useEffect(() => {
     setActiveRouteIndex(-1);
   }, [isDropdownOpen]);
 
+  useEffect(() => {
+    setActiveCategoryIndex(-1);
+  }, [isCategoryDropdownOpen]);
+
   // Get active selected project details
-  const activeSelectedProject = ratingProjects.find(p => p.id === formData.routeSection);
-  const routeSectionDisplayValue = activeSelectedProject ? activeSelectedProject.fullName : 'Select Route / Section';
+  const activeSelectedProject = distinctProjects.find(p => p.code === formData.routeSection || p.id === formData.routeSection || normalizeCode(p.code) === normalizeCode(formData.routeSection));
+  const routeSectionDisplayValue = activeSelectedProject ? activeSelectedProject.displayName : (formData.routeSection || 'Select Route / Section');
+
+  // Get active selected batch details
+  const activeSelectedBatch = availableBatches.find(b =>
+    (formData.batchId && (b.id === formData.batchId || b.id.toString() === formData.batchId.toString())) ||
+    (formData.category && (b.name === formData.category || b.rawName === formData.category || b.versionLabel === formData.category))
+  );
+  const categoryDisplayValue = activeSelectedBatch ? activeSelectedBatch.displayName : (formData.category || 'Select Batch / Category');
 
   // Click outside to close dropdowns
   useEffect(() => {
     const handleOutsideClick = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setIsDropdownOpen(false);
+      }
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target)) {
+        setIsCategoryDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleOutsideClick);
@@ -292,6 +412,13 @@ const NotificationPage = () => {
       if (el) el.scrollIntoView({ block: 'nearest' });
     }
   }, [activeRouteIndex, isDropdownOpen]);
+
+  useEffect(() => {
+    if (isCategoryDropdownOpen && activeCategoryIndex >= 0) {
+      const el = document.getElementById(`category-opt-${activeCategoryIndex}`);
+      if (el) el.scrollIntoView({ block: 'nearest' });
+    }
+  }, [activeCategoryIndex, isCategoryDropdownOpen]);
 
   // Duplicate Error and Modal States
   const [duplicateError, setDuplicateError] = useState(null);
@@ -315,12 +442,12 @@ const NotificationPage = () => {
   const bulkRouteDropdownRef = useRef(null);
 
   // Bulk options filters
-  const bulkFilteredProjects = ratingProjects.filter(p =>
-    p.displayName.toLowerCase().includes(bulkRouteSearch.toLowerCase())
+  const bulkFilteredProjects = distinctProjects.filter(p =>
+    p.displayName.toLowerCase().includes(bulkRouteSearch.toLowerCase()) ||
+    p.code.toLowerCase().includes(bulkRouteSearch.toLowerCase())
   );
 
   // Keyboard navigation key handlers for Bulk dropdowns
-
 
   const handleBulkRouteKeyDown = (e) => {
     if (!isBulkRouteOpen) {
@@ -341,10 +468,12 @@ const NotificationPage = () => {
       e.preventDefault();
       if (bulkRouteActiveIndex >= 0 && bulkRouteActiveIndex < bulkFilteredProjects.length) {
         const selected = bulkFilteredProjects[bulkRouteActiveIndex];
-        setBulkFormData(prev => ({ 
-          ...prev, 
-          routeSection: selected.id,
-          totalPages: selected.totalPages?.toString() || ''
+        const projBatches = availableBatches.filter(b => b.project.toLowerCase() === selected.code.toLowerCase());
+        const firstBatch = projBatches[0];
+        setBulkFormData(prev => ({
+          ...prev,
+          routeSection: selected.code,
+          totalPages: firstBatch && firstBatch.totalPages ? firstBatch.totalPages.toString() : ''
         }));
         setIsBulkRouteOpen(false);
         setBulkRouteSearch('');
@@ -373,8 +502,8 @@ const NotificationPage = () => {
     }
   }, [bulkRouteActiveIndex, isBulkRouteOpen]);
 
-  const bulkSelectedRouteProject = ratingProjects.find(p => p.id === bulkFormData.routeSection);
-  const bulkRouteDisplayValue = bulkSelectedRouteProject ? bulkSelectedRouteProject.displayName : 'Select Route / Section';
+  const bulkSelectedRouteProject = distinctProjects.find(p => p.code === bulkFormData.routeSection || p.id === bulkFormData.routeSection);
+  const bulkRouteDisplayValue = bulkSelectedRouteProject ? bulkSelectedRouteProject.displayName : (bulkFormData.routeSection || 'Select Route / Section');
 
   // Calculations for auto-splitting or full pages allocation
   const activeBulkUsers = users.filter(u => u.isActive && u.role.toLowerCase() === 'user');
@@ -501,7 +630,8 @@ const NotificationPage = () => {
     setFormData({
       roadProject: '',
       routeSection: '',
-      category: 'Roadway',
+      batchId: '',
+      category: '',
       subSection: '',
       priority: 'Medium',
       dueDate: '',
@@ -511,45 +641,59 @@ const NotificationPage = () => {
 
   // Handle Assign Work form submission
   const handleAssignWork = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
 
     if (!selectedEmployee) {
       alert("Please select a user from the table first.");
-      return;
+      return false;
     }
-    if (!formData.routeSection) {
-      alert("Please select an Inspection Batch.");
-      return;
+    if (!formData.routeSection && !formData.batchId) {
+      alert("Please select a Route/Section project or an Inspection Batch.");
+      return false;
+    }
+    if (!formData.subSection) {
+      alert("Please enter the sub-section / pages to assign.");
+      return false;
     }
 
     setSaving(true);
     try {
+      let parsedDueDate;
+      if (formData.dueDate) {
+        const d = new Date(formData.dueDate);
+        parsedDueDate = !isNaN(d.getTime()) ? d.toISOString() : new Date().toISOString();
+      } else {
+        parsedDueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      }
+
       if (editingAssignmentId) {
         await workAssignmentService.edit(editingAssignmentId, {
           priority: formData.priority,
-          dueDate: new Date(formData.dueDate).toISOString(),
-          category: formData.category,
+          dueDate: parsedDueDate,
+          category: formData.category || 'Roadway',
           pages: formData.subSection,
           remarks: formData.remarks
         });
       } else {
         await workAssignmentService.create({
-          batchId: formData.routeSection,
-          assignedTo: selectedEmployee._id,
+          batchId: formData.batchId || formData.routeSection,
+          assignedTo: selectedEmployee._id || selectedEmployee.id,
           priority: formData.priority,
-          dueDate: new Date(formData.dueDate).toISOString(),
-          category: formData.category,
+          dueDate: parsedDueDate,
+          category: formData.category || 'Roadway',
           pages: formData.subSection,
           remarks: formData.remarks
         });
       }
-      
+
       await fetchData();
       setEditingAssignmentId(null);
       handleResetForm();
+      return true;
     } catch (err) {
       console.error(err);
-      alert(err?.response?.data?.message || 'Failed to assign work.');
+      alert(err?.response?.data?.message || err?.message || 'Failed to assign work.');
+      return false;
     } finally {
       setSaving(false);
     }
@@ -582,11 +726,11 @@ const NotificationPage = () => {
   // Filter users based on query and filters
   const filteredUsers = users.filter(user => {
     const query = searchQuery.toLowerCase().trim();
-    const matchesSearch = !query || 
+    const matchesSearch = !query ||
       (user.name && user.name.toLowerCase().includes(query)) ||
       (user.username && user.username.toLowerCase().includes(query)) ||
       (user.email && user.email.toLowerCase().includes(query));
-    
+
     // Convert boolean isActive to matching 'Active' or 'Inactive' string
     const statusStr = user.isActive ? 'Active' : 'Inactive';
     const matchesStatus = !statusFilter || statusStr === statusFilter;
@@ -621,14 +765,28 @@ const NotificationPage = () => {
     );
   };
 
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col h-screen overflow-hidden bg-pageBg">
+        <Navbar />
+        <div className="flex flex-1 overflow-hidden">
+          <Sidebar />
+          <div className="flex-1 overflow-y-auto p-6">
+            <UserNotificationCenter />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-pageBg">
       <Navbar />
-      
+
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <Sidebar />
-        
+
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col overflow-y-auto p-6 space-y-6">
           {/* Header Section */}
@@ -638,12 +796,12 @@ const NotificationPage = () => {
                 {isAdmin ? "Notification & Work Assignment" : "My Assignments"}
               </h1>
               <p className="text-muted text-sm mt-1">
-                {isAdmin 
+                {isAdmin
                   ? "Assign highway rating tasks to users and monitor assignment progress."
                   : "Monitor and start your assigned highway rating tasks."}
               </p>
             </div>
-            
+
             {isAdmin && (
               <GenerateBatchButton
                 onClick={() => setIsBulkOpen(true)}
@@ -747,441 +905,490 @@ const NotificationPage = () => {
           {/* Split Layout: Left Card (All Users) / Right Card (Assign Work Panel) */}
           {isAdmin && (
             <div className="grid grid-cols-[48fr_52fr] gap-6 items-stretch">
-            
-            {/* Left Card: All Users User List */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-[520px] justify-between">
-              <div>
-                {/* Header & Filters */}
-                <div className="p-5 border-b border-gray-200 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-md font-bold text-gray-900">All Users</h2>
-                  </div>
 
-                  <div className="flex items-center gap-3">
-                    {/* Search */}
-                    <div className="relative flex-1">
-                      <LuSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Search by name, username or email..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full h-10 pl-10 pr-4 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 text-textColor placeholder-gray-400 transition-colors"
-                      />
+              {/* Left Card: All Users User List */}
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-[520px] justify-between">
+                <div>
+                  {/* Header & Filters */}
+                  <div className="p-5 border-b border-gray-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-md font-bold text-gray-900">All Users</h2>
                     </div>
 
-                    {/* Status Filter */}
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      className="h-10 px-3 border border-gray-200 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:outline-none focus:border-green-600 cursor-pointer shrink-0"
-                    >
-                      <option value="">Status: All</option>
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                    </select>
+                    <div className="flex items-center gap-3">
+                      {/* Search */}
+                      <div className="relative flex-1">
+                        <LuSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Search by name, username or email..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="w-full h-10 pl-10 pr-4 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 text-textColor placeholder-gray-400 transition-colors"
+                        />
+                      </div>
 
-                    {/* Role Filter */}
-                    <select
-                      value={roleFilter}
-                      onChange={(e) => setRoleFilter(e.target.value)}
-                      className="h-10 px-3 border border-gray-200 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:outline-none focus:border-green-600 cursor-pointer shrink-0"
-                    >
-                      <option value="">Role: All</option>
-                      <option value="User">User</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Users Table */}
-                <div className="overflow-x-auto min-h-[300px]">
-                  <table className="w-full border-collapse text-left">
-                    <thead>
-                      <tr className="border-b border-gray-200 bg-gray-50/50 sticky top-0 z-10">
-                        <th className="py-2.5 px-4 text-[10px] font-bold uppercase tracking-wider text-gray-400 text-center w-12" />
-                        <th className="py-2.5 px-4 text-[10px] font-bold uppercase tracking-wider text-gray-400">USER</th>
-                        <th className="py-2.5 px-4 text-[10px] font-bold uppercase tracking-wider text-gray-400">ROLE</th>
-                        <th className="py-2.5 px-4 text-[10px] font-bold uppercase tracking-wider text-gray-400">STATUS</th>
-                        <th className="py-2.5 px-4 text-[10px] font-bold uppercase tracking-wider text-gray-400 text-right">ACTIONS</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {paginatedUsers.length > 0 ? (
-                        paginatedUsers.map((user) => {
-                          const currentId = user._id || user.id;
-                          const isSelected = selectedUserId === currentId;
-                          const isActive = user.isActive;
-                          return (
-                            <tr
-                              key={currentId}
-                              onClick={() => {
-                                if (isActive) {
-                                  setSelectedUserId(currentId);
-                                }
-                              }}
-                              className={`hover:bg-gray-50/50 transition-colors cursor-pointer ${
-                                isSelected ? 'bg-green-50/40 border-l-[3px] border-l-green-600' : 'border-l-[3px] border-l-transparent'
-                              }`}
-                            >
-                              <td className="py-3 px-4 text-center">
-                                <input
-                                  type="radio"
-                                  name="selectedUserRadio"
-                                  checked={isSelected}
-                                  disabled={!isActive}
-                                  onChange={() => setSelectedUserId(currentId)}
-                                  className="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500 focus:ring-1 cursor-pointer disabled:opacity-40"
-                                />
-                              </td>
-                              <td className="py-3 px-4">
-                                <div className="flex items-center gap-3">
-                                  {renderAvatar(user)}
-                                  <div className="min-w-0">
-                                    <span className="font-semibold text-gray-800 text-sm block truncate leading-normal">{user.name}</span>
-                                    <span className="text-[11px] text-gray-400 block truncate leading-normal">@{user.username || 'user'}</span>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="py-3 px-4 text-xs font-semibold text-gray-500">{user.role}</td>
-                              <td className="py-3 px-4">
-                                <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-semibold border ${
-                                  isActive 
-                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
-                                    : 'bg-rose-50 text-rose-600 border-rose-100'
-                                }`}>
-                                  {isActive ? 'Active' : 'Inactive'}
-                                </span>
-                              </td>
-                              <td className="py-3 px-4 text-right">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (isActive) {
-                                      setSelectedUserId(currentId);
-                                    }
-                                  }}
-                                  disabled={!isActive}
-                                  className={`px-4 py-1.5 border rounded-lg text-xs font-bold transition-all duration-200 ${
-                                    !isActive
-                                      ? 'border-gray-200 text-gray-300 cursor-not-allowed bg-white'
-                                      : isSelected 
-                                        ? 'bg-green-600 text-white border-green-600 shadow-sm cursor-pointer' 
-                                        : 'border-green-600 text-green-600 hover:bg-green-50/50 bg-white cursor-pointer'
-                                  }`}
-                                  title={!isActive ? "Inactive users cannot receive assignments." : "Assign"}
-                                >
-                                  Assign
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      ) : (
-                        <tr>
-                          <td colSpan="5" className="py-12 text-center text-sm text-gray-400">
-                            <div className="flex flex-col items-center justify-center gap-1.5">
-                              <LuCircleAlert className="text-xl" />
-                              <span>No employees match filters.</span>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Left Pagination */}
-              {totalUserPages > 1 && (
-                <div className="p-4 border-t border-gray-200 bg-white flex items-center justify-between">
-                  <span className="text-xs text-gray-500 font-medium">
-                    Showing {(userPage - 1) * USERS_PER_PAGE + 1} to {Math.min(userPage * USERS_PER_PAGE, filteredUsers.length)} of {filteredUsers.length} users
-                  </span>
-                  
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setUserPage(prev => Math.max(prev - 1, 1))}
-                      disabled={userPage === 1}
-                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:border-[#5cb85c] hover:text-[#5cb85c] hover:bg-green-50 active:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:text-gray-400 disabled:hover:bg-transparent transition-colors cursor-pointer text-gray-600"
-                    >
-                      <LuChevronLeft className="text-sm" />
-                    </button>
-                    {Array.from({ length: totalUserPages }, (_, i) => i + 1).map((p) => (
-                      <button
-                        key={p}
-                        onClick={() => setUserPage(p)}
-                        className={`group relative overflow-hidden w-8 h-8 rounded-lg text-xs font-bold transition-all duration-300 border cursor-pointer flex items-center justify-center ${
-                          userPage === p 
-                            ? 'bg-[#5cb85c] text-white border-[#5cb85c] shadow-[0_4px_12px_rgba(92,184,92,0.3)]' 
-                            : 'bg-white border-gray-200 text-gray-600'
-                        }`}
+                      {/* Status Filter */}
+                      <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="h-10 px-3 border border-gray-200 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:outline-none focus:border-green-600 cursor-pointer shrink-0"
                       >
-                        {/* Slide-Up Green Fill */}
-                        <span className={`absolute inset-0 bg-[#5cb85c] transition-transform duration-300 ease-out ${userPage === p ? 'translate-y-0' : 'translate-y-[101%] group-hover:translate-y-0'}`}></span>
-                        {/* Text */}
-                        <span className={`relative z-10 transition-colors duration-300 ${userPage === p ? 'text-white' : 'group-hover:text-white'}`}>
-                          {p}
-                        </span>
-                      </button>
-                    ))}
-                    <button
-                      onClick={() => setUserPage(prev => Math.min(prev + 1, totalUserPages))}
-                      disabled={userPage === totalUserPages}
-                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:border-[#5cb85c] hover:text-[#5cb85c] hover:bg-green-50 active:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:text-gray-400 disabled:hover:bg-transparent transition-colors cursor-pointer text-gray-600"
-                    >
-                      <LuChevronRight className="text-sm" />
-                    </button>
+                        <option value="">Status: All</option>
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                      </select>
+
+                      {/* Role Filter */}
+                      <select
+                        value={roleFilter}
+                        onChange={(e) => setRoleFilter(e.target.value)}
+                        className="h-10 px-3 border border-gray-200 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:outline-none focus:border-green-600 cursor-pointer shrink-0"
+                      >
+                        <option value="">Role: All</option>
+                        <option value="User">User</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Users Table */}
+                  <div className="overflow-x-auto min-h-[300px]">
+                    <table className="w-full border-collapse text-left">
+                      <thead>
+                        <tr className="border-b border-gray-200 bg-gray-50/50 sticky top-0 z-10">
+                          <th className="py-2.5 px-4 text-[10px] font-bold uppercase tracking-wider text-gray-400 text-center w-12" />
+                          <th className="py-2.5 px-4 text-[10px] font-bold uppercase tracking-wider text-gray-400">USER</th>
+                          <th className="py-2.5 px-4 text-[10px] font-bold uppercase tracking-wider text-gray-400">ROLE</th>
+                          <th className="py-2.5 px-4 text-[10px] font-bold uppercase tracking-wider text-gray-400">STATUS</th>
+                          <th className="py-2.5 px-4 text-[10px] font-bold uppercase tracking-wider text-gray-400 text-right">ACTIONS</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {paginatedUsers.length > 0 ? (
+                          paginatedUsers.map((user) => {
+                            const currentId = user._id || user.id;
+                            const isSelected = selectedUserId === currentId;
+                            const isActive = user.isActive;
+                            return (
+                              <tr
+                                key={currentId}
+                                onClick={() => {
+                                  if (isActive) {
+                                    setSelectedUserId(currentId);
+                                  }
+                                }}
+                                className={`hover:bg-gray-50/50 transition-colors cursor-pointer ${isSelected ? 'bg-green-50/40 border-l-[3px] border-l-green-600' : 'border-l-[3px] border-l-transparent'
+                                  }`}
+                              >
+                                <td className="py-3 px-4 text-center">
+                                  <input
+                                    type="radio"
+                                    name="selectedUserRadio"
+                                    checked={isSelected}
+                                    disabled={!isActive}
+                                    onChange={() => setSelectedUserId(currentId)}
+                                    className="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500 focus:ring-1 cursor-pointer disabled:opacity-40"
+                                  />
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-3">
+                                    {renderAvatar(user)}
+                                    <div className="min-w-0">
+                                      <span className="font-semibold text-gray-800 text-sm block truncate leading-normal">{user.name}</span>
+                                      <span className="text-[11px] text-gray-400 block truncate leading-normal">@{user.username || 'user'}</span>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4 text-xs font-semibold text-gray-500">{user.role}</td>
+                                <td className="py-3 px-4">
+                                  <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-semibold border ${isActive
+                                      ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                      : 'bg-rose-50 text-rose-600 border-rose-100'
+                                    }`}>
+                                    {isActive ? 'Active' : 'Inactive'}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 text-right">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (isActive) {
+                                        setSelectedUserId(currentId);
+                                      }
+                                    }}
+                                    disabled={!isActive}
+                                    className={`px-4 py-1.5 border rounded-lg text-xs font-bold transition-all duration-200 ${!isActive
+                                        ? 'border-gray-200 text-gray-300 cursor-not-allowed bg-white'
+                                        : isSelected
+                                          ? 'bg-green-600 text-white border-green-600 shadow-sm cursor-pointer'
+                                          : 'border-green-600 text-green-600 hover:bg-green-50/50 bg-white cursor-pointer'
+                                      }`}
+                                    title={!isActive ? "Inactive users cannot receive assignments." : "Assign"}
+                                  >
+                                    Assign
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan="5" className="py-12 text-center text-sm text-gray-400">
+                              <div className="flex flex-col items-center justify-center gap-1.5">
+                                <LuCircleAlert className="text-xl" />
+                                <span>No employees match filters.</span>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Right Card: Assign Work Panel */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 min-h-[520px] flex flex-col justify-between">
-              
-              {/* Header & Subtitle displaying selected employee info */}
-              <div>
-                <h2 className="text-md font-bold text-gray-900 leading-none">
-                  {editingAssignmentId 
-                    ? `Edit Assignment For: ${selectedEmployee ? selectedEmployee.name : ''}` 
-                    : (selectedEmployee ? `Assign Work To:  ${selectedEmployee.name}` : 'Assign Work')}
-                </h2>
-                {selectedEmployee ? (
-                  <p className="text-[11px] text-gray-400 mt-2 font-medium">
-                    {selectedEmployee.role}  •  {selectedEmployee.email}  •  {selectedEmployee.id || '1234201'}
-                  </p>
-                ) : (
-                  <p className="text-[11px] text-gray-400 mt-2 font-medium">No employee selected</p>
+                {/* Left Pagination */}
+                {totalUserPages > 1 && (
+                  <div className="p-4 border-t border-gray-200 bg-white flex items-center justify-between">
+                    <span className="text-xs text-gray-500 font-medium">
+                      Showing {(userPage - 1) * USERS_PER_PAGE + 1} to {Math.min(userPage * USERS_PER_PAGE, filteredUsers.length)} of {filteredUsers.length} users
+                    </span>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setUserPage(prev => Math.max(prev - 1, 1))}
+                        disabled={userPage === 1}
+                        className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:border-[#5cb85c] hover:text-[#5cb85c] hover:bg-green-50 active:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:text-gray-400 disabled:hover:bg-transparent transition-colors cursor-pointer text-gray-600"
+                      >
+                        <LuChevronLeft className="text-sm" />
+                      </button>
+                      {Array.from({ length: totalUserPages }, (_, i) => i + 1).map((p) => (
+                        <button
+                          key={p}
+                          onClick={() => setUserPage(p)}
+                          className={`group relative overflow-hidden w-8 h-8 rounded-lg text-xs font-bold transition-all duration-300 border cursor-pointer flex items-center justify-center ${userPage === p
+                              ? 'bg-[#5cb85c] text-white border-[#5cb85c] shadow-[0_4px_12px_rgba(92,184,92,0.3)]'
+                              : 'bg-white border-gray-200 text-gray-600'
+                            }`}
+                        >
+                          {/* Slide-Up Green Fill */}
+                          <span className={`absolute inset-0 bg-[#5cb85c] transition-transform duration-300 ease-out ${userPage === p ? 'translate-y-0' : 'translate-y-[101%] group-hover:translate-y-0'}`}></span>
+                          {/* Text */}
+                          <span className={`relative z-10 transition-colors duration-300 ${userPage === p ? 'text-white' : 'group-hover:text-white'}`}>
+                            {p}
+                          </span>
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => setUserPage(prev => Math.min(prev + 1, totalUserPages))}
+                        disabled={userPage === totalUserPages}
+                        className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:border-[#5cb85c] hover:text-[#5cb85c] hover:bg-green-50 active:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:text-gray-400 disabled:hover:bg-transparent transition-colors cursor-pointer text-gray-600"
+                      >
+                        <LuChevronRight className="text-sm" />
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
 
-              {/* Form Layout replicated exactly from the design mockup */}
-              <form onSubmit={handleAssignWork} className="space-y-4 mt-5 flex-1 flex flex-col justify-between">
-                <div className="space-y-4">
-                  
-                  {/* Route / Section */}
-                  <div className="grid grid-cols-1 gap-4">
+              {/* Right Card: Assign Work Panel */}
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 min-h-[520px] flex flex-col justify-between">
 
-                    {/* Route / Section (Searchable Combobox Component) */}
-                    <div className="flex flex-col gap-1.5" ref={dropdownRef}>
-                      <label className="text-xs font-bold text-textColor">
-                        Route / Section <span className="text-rose-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                          onKeyDown={handleRouteKeyDown}
-                          className="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus-within:border-green-600 focus-within:ring-1 focus-within:ring-green-600 text-textColor font-medium flex items-center justify-between cursor-pointer"
-                        >
-                          <span className="truncate">{routeSectionDisplayValue}</span>
-                          <LuChevronDown className="text-gray-400 text-base" />
-                        </button>
-                        
-                        {isDropdownOpen && (
-                          <div className="absolute top-11 left-0 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-50 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100 max-h-60">
-                            {/* Dropdown Search Box */}
-                            <div className="p-2 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
-                              <LuSearch className="text-gray-400 text-sm shrink-0" />
-                              <input
-                                type="text"
-                                placeholder="Search road or project..."
-                                value={dropdownSearch}
-                                onChange={(e) => {
-                                  setDropdownSearch(e.target.value);
-                                  setActiveRouteIndex(0);
-                                }}
-                                onKeyDown={handleRouteKeyDown}
-                                className="w-full bg-transparent text-xs focus:outline-none placeholder-gray-400 text-textColor"
-                              />
-                            </div>
-                            
-                            {/* Dropdown Options List */}
-                            <div className="overflow-y-auto divide-y divide-gray-50">
-                              {Array.from(new Map(filteredProjects.map(p => [p.code, p])).values()).length > 0 ? (
-                                Array.from(new Map(filteredProjects.map(p => [p.code, p])).values()).map((p, index) => (
-                                  <button
-                                    key={`proj-opt-${p.code}-${index}`}
-                                    id={`route-opt-${index}`}
-                                    type="button"
-                                    disabled={!p.hasBatch}
-                                    onClick={() => {
-                                      if (!p.hasBatch) return;
-                                      setFormData(prev => ({ ...prev, routeSection: p.id }));
-                                      setIsDropdownOpen(false);
-                                      setDropdownSearch('');
-                                    }}
-                                    className={`w-full text-left px-3 py-2.5 text-xs transition-colors font-medium flex items-center justify-between gap-2 ${
-                                      !p.hasBatch
-                                        ? 'opacity-40 cursor-not-allowed text-gray-400'
-                                        : formData.routeSection === p.id 
-                                          ? 'bg-green-50 text-green-600' 
-                                          : activeRouteIndex === index 
+                {/* Header & Subtitle displaying selected employee info */}
+                <div>
+                  <h2 className="text-md font-bold text-gray-900 leading-none">
+                    {editingAssignmentId
+                      ? `Edit Assignment For: ${selectedEmployee ? selectedEmployee.name : ''}`
+                      : (selectedEmployee ? `Assign Work To:  ${selectedEmployee.name}` : 'Assign Work')}
+                  </h2>
+                  {selectedEmployee ? (
+                    <p className="text-[11px] text-gray-400 mt-2 font-medium">
+                      {selectedEmployee.role}  •  {selectedEmployee.email}  •  {selectedEmployee.id || '1234201'}
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-gray-400 mt-2 font-medium">No employee selected</p>
+                  )}
+                </div>
+
+                {/* Form Layout replicated exactly from the design mockup */}
+                <form onSubmit={handleAssignWork} className="space-y-4 mt-5 flex-1 flex flex-col justify-between">
+                  <div className="space-y-4">
+
+                    {/* Route / Section */}
+                    <div className="grid grid-cols-1 gap-4">
+
+                      {/* Route / Section (Searchable Combobox Component) */}
+                      <div className="flex flex-col gap-1.5" ref={dropdownRef}>
+                        <label className="text-xs font-bold text-textColor">
+                          Route / Section <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                            onKeyDown={handleRouteKeyDown}
+                            className="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus-within:border-green-600 focus-within:ring-1 focus-within:ring-green-600 text-textColor font-medium flex items-center justify-between cursor-pointer"
+                          >
+                            <span className="truncate">{routeSectionDisplayValue}</span>
+                            <LuChevronDown className="text-gray-400 text-base" />
+                          </button>
+
+                          {isDropdownOpen && (
+                            <div className="absolute top-11 left-0 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-50 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100 max-h-60">
+                              {/* Dropdown Search Box */}
+                              <div className="p-2 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
+                                <LuSearch className="text-gray-400 text-sm shrink-0" />
+                                <input
+                                  type="text"
+                                  placeholder="Search road or project..."
+                                  value={dropdownSearch}
+                                  onChange={(e) => {
+                                    setDropdownSearch(e.target.value);
+                                    setActiveRouteIndex(0);
+                                  }}
+                                  onKeyDown={handleRouteKeyDown}
+                                  className="w-full bg-transparent text-xs focus:outline-none placeholder-gray-400 text-textColor"
+                                />
+                              </div>
+
+                              {/* Dropdown Options List */}
+                              <div className="overflow-y-auto divide-y divide-gray-50">
+                                {filteredRouteProjects.length > 0 ? (
+                                  filteredRouteProjects.map((p, index) => (
+                                    <button
+                                      key={`route-opt-${p.id}-${index}`}
+                                      id={`route-opt-${index}`}
+                                      type="button"
+                                      onClick={() => {
+                                        const projCode = p.code;
+                                        const projectBatches = availableBatches.filter(b => b.project.toLowerCase() === projCode.toLowerCase());
+                                        const firstBatch = projectBatches[0];
+                                        setFormData(prev => ({
+                                          ...prev,
+                                          roadProject: projCode,
+                                          routeSection: projCode,
+                                          batchId: firstBatch ? firstBatch.id : '',
+                                          category: firstBatch ? firstBatch.name : '',
+                                          subSection: firstBatch && firstBatch.totalPages ? `Pages 1-${firstBatch.totalPages}` : (firstBatch ? 'Pages 1-15' : prev.subSection)
+                                        }));
+                                        setIsDropdownOpen(false);
+                                        setDropdownSearch('');
+                                      }}
+                                      className={`w-full text-left px-3 py-2.5 text-xs transition-colors font-medium flex items-center justify-between gap-2 ${formData.routeSection === p.code
+                                          ? 'bg-green-50 text-green-600'
+                                          : activeRouteIndex === index
                                             ? 'bg-gray-50 text-textColor'
                                             : 'hover:bg-green-50/50 text-textColor'
-                                    }`}
-                                  >
-                                    <span className="truncate">{p.displayName}</span>
-                                    <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${p.hasBatch ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
-                                      {p.hasBatch ? 'Active' : 'No Batch'}
-                                    </span>
-                                  </button>
-                                ))
-                              ) : (
-                                <div className="p-3 text-center text-xs text-gray-400 font-medium">No roads found</div>
-                              )}
+                                        }`}
+                                    >
+                                      <span className="truncate">{p.displayName}</span>
+                                      <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${p.hasBatches ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+                                        {p.hasBatches ? 'Active' : 'Master'}
+                                      </span>
+                                    </button>
+                                  ))
+                                ) : (
+                                  <div className="p-3 text-center text-xs text-gray-400 font-medium">No roads or projects found</div>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
+                    </div>
+
+                    {/* Category & Sub Section */}
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Category (Searchable Batches Combobox Component) */}
+                      <div className="flex flex-col gap-1.5" ref={categoryDropdownRef}>
+                        <label className="text-xs font-bold text-textColor">
+                          Category <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                            onKeyDown={handleCategoryKeyDown}
+                            className="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus-within:border-green-600 focus-within:ring-1 focus-within:ring-green-600 text-textColor font-medium flex items-center justify-between cursor-pointer"
+                          >
+                            <span className="truncate">{categoryDisplayValue}</span>
+                            <LuChevronDown className="text-gray-400 text-base" />
+                          </button>
+
+                          {isCategoryDropdownOpen && (
+                            <div className="absolute top-11 left-0 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-50 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100 max-h-60">
+                              {/* Dropdown Search Box */}
+                              <div className="p-2 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
+                                <LuSearch className="text-gray-400 text-sm shrink-0" />
+                                <input
+                                  type="text"
+                                  placeholder="Search batch or category..."
+                                  value={categoryDropdownSearch}
+                                  onChange={(e) => {
+                                    setCategoryDropdownSearch(e.target.value);
+                                    setActiveCategoryIndex(0);
+                                  }}
+                                  onKeyDown={handleCategoryKeyDown}
+                                  className="w-full bg-transparent text-xs focus:outline-none placeholder-gray-400 text-textColor"
+                                />
+                              </div>
+
+                              {/* Dropdown Options List */}
+                              <div className="overflow-y-auto divide-y divide-gray-50">
+                                {filteredBatches.length > 0 ? (
+                                  filteredBatches.map((b, index) => (
+                                    <button
+                                      key={`batch-opt-${b.id}-${index}`}
+                                      id={`category-opt-${index}`}
+                                      type="button"
+                                      onClick={() => {
+                                        setFormData(prev => ({
+                                          ...prev,
+                                          roadProject: b.project,
+                                          routeSection: b.project,
+                                          batchId: b.id,
+                                          category: b.rawName || b.name,
+                                          subSection: b.totalPages ? `Pages 1-${b.totalPages}` : 'Pages 1-15'
+                                        }));
+                                        setIsCategoryDropdownOpen(false);
+                                        setCategoryDropdownSearch('');
+                                      }}
+                                      className={`w-full text-left px-3 py-2.5 text-xs transition-colors font-medium flex items-center justify-between gap-2 ${formData.batchId === b.id || formData.category === b.name
+                                          ? 'bg-green-50 text-green-600'
+                                          : activeCategoryIndex === index
+                                            ? 'bg-gray-50 text-textColor'
+                                            : 'hover:bg-green-50/50 text-textColor'
+                                        }`}
+                                    >
+                                      <span className={`truncate ${formData.batchId === b.id || formData.category === b.name ? 'text-green-600 font-semibold' : 'text-gray-800'}`}>
+                                        {b.displayName}
+                                      </span>
+                                      <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
+                                        Active
+                                      </span>
+                                    </button>
+                                  ))
+                                ) : (
+                                  <div className="p-3 text-center text-xs text-gray-400 font-medium">No batches found</div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Sub Section / Pages */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-textColor">
+                          Sub Section / Pages <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={formData.subSection}
+                          onChange={handlePagesChange}
+                          placeholder="Enter Page Number(s)"
+                          className="h-10 px-3 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 text-textColor font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Priority & Due Date */}
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Priority */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-textColor">
+                          Priority <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="flex items-center gap-4 mt-2">
+                          {['Low', 'Medium', 'High'].map((p) => {
+                            const isChecked = formData.priority === p;
+                            return (
+                              <label key={p} className="flex items-center gap-1.5 text-sm text-textColor font-semibold cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name="priorityRadio"
+                                  checked={isChecked}
+                                  onChange={() => setFormData(prev => ({ ...prev, priority: p }))}
+                                  className="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500 focus:ring-1 cursor-pointer"
+                                />
+                                {p}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Due */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-textColor">
+                          Due <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="date"
+                          required
+                          value={formData.dueDate}
+                          onChange={(e) => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
+                          className="h-10 px-3 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 text-textColor font-semibold"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Remarks */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-textColor">
+                        Instructions / Remarks
+                      </label>
+                      <textarea
+                        value={formData.remarks}
+                        onChange={(e) => setFormData(prev => ({ ...prev, remarks: e.target.value }))}
+                        placeholder="Please complete the rating for the HO process images. Ensure accuracy and submit before the due date."
+                        className="h-20 p-3.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 text-textColor placeholder-gray-400 transition-colors resize-none"
+                      />
                     </div>
                   </div>
 
-                  {/* Category & Sub Section */}
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Category */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-bold text-textColor">
-                        Category <span className="text-rose-500">*</span>
-                      </label>
-                      <select
-                        required
-                        value={formData.category}
-                        onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                        className="h-10 px-3 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 text-textColor font-medium cursor-pointer"
+                  {/* Bottom Buttons - Reset/Cancel on left, Assign/Update on right */}
+                  <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                    {editingAssignmentId ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingAssignmentId(null);
+                          handleResetForm();
+                        }}
+                        className="px-5 h-10 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 active:bg-gray-100 transition-colors cursor-pointer"
                       >
-                        {categories.map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
-                    </div>
+                        Cancel
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleResetForm}
+                        className="px-5 h-10 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 active:bg-gray-100 transition-colors cursor-pointer"
+                      >
+                        Reset
+                      </button>
+                    )}
 
-                    {/* Sub Section / Pages */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-bold text-textColor">
-                        Sub Section / Pages <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.subSection}
-                        onChange={handlePagesChange}
-                        placeholder="Enter Page Number(s)"
-                        className="h-10 px-3 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 text-textColor font-medium"
+                    {editingAssignmentId ? (
+                      <button
+                        type="submit"
+                        className="px-6 h-10 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold shadow-sm transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                      >
+                        Update Assignment
+                      </button>
+                    ) : (
+                      <AnimatedAssignButton
+                        type="submit"
+                        disabled={saving}
+                        onClick={handleAssignWork}
                       />
-                    </div>
+                    )}
                   </div>
+                </form>
+              </div>
 
-                  {/* Priority & Due Date */}
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Priority */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-bold text-textColor">
-                        Priority <span className="text-rose-500">*</span>
-                      </label>
-                      <div className="flex items-center gap-4 mt-2">
-                        {['Low', 'Medium', 'High'].map((p) => {
-                          const isChecked = formData.priority === p;
-                          return (
-                            <label key={p} className="flex items-center gap-1.5 text-sm text-textColor font-semibold cursor-pointer">
-                              <input
-                                type="radio"
-                                name="priorityRadio"
-                                checked={isChecked}
-                                onChange={() => setFormData(prev => ({ ...prev, priority: p }))}
-                                className="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500 focus:ring-1 cursor-pointer"
-                              />
-                              {p}
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Due */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-bold text-textColor">
-                        Due <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        required
-                        value={formData.dueDate}
-                        onChange={(e) => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
-                        className="h-10 px-3 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 text-textColor font-semibold"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Remarks */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold text-textColor">
-                      Instructions / Remarks <span className="text-rose-500">*</span>
-                    </label>
-                    <textarea
-                      required
-                      value={formData.remarks}
-                      onChange={(e) => setFormData(prev => ({ ...prev, remarks: e.target.value }))}
-                      placeholder="Please complete the rating for the HO process images. Ensure accuracy and submit before the due date."
-                      className="h-20 p-3.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 text-textColor placeholder-gray-400 transition-colors resize-none"
-                    />
-                  </div>
-                </div>
-
-                {/* Bottom Buttons - Reset/Cancel on left, Assign/Update on right */}
-                <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                  {editingAssignmentId ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingAssignmentId(null);
-                        handleResetForm();
-                      }}
-                      className="px-5 h-10 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 active:bg-gray-100 transition-colors cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleResetForm}
-                      className="px-5 h-10 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 active:bg-gray-100 transition-colors cursor-pointer"
-                    >
-                      Reset
-                    </button>
-                  )}
-
-                  {editingAssignmentId ? (
-                    <button
-                      type="submit"
-                      className="px-6 h-10 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold shadow-sm transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
-                    >
-                      Update Assignment
-                    </button>
-                  ) : (
-                    <AnimatedAssignButton
-                      type="submit"
-                      disabled={saving}
-                      onClick={(e) => {
-                        if (!selectedEmployee) {
-                          alert("Please select a user from the table first.");
-                          e.preventDefault();
-                          return false;
-                        }
-                        if (!formData.routeSection) {
-                          alert("Please select an Inspection Batch.");
-                          e.preventDefault();
-                          return false;
-                        }
-                        return true;
-                      }}
-                    />
-                  )}
-                </div>
-              </form>
             </div>
-
-          </div>
           )}
 
           {/* Bottom Table Section: Recent Assigned Tasks */}
@@ -1214,153 +1421,155 @@ const NotificationPage = () => {
                     <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-gray-400 text-center w-36">ACTION</th>
                   </tr>
                 </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {assignments.length > 0 ? (
-                        assignments.map((item, index) => {
-                          const userName = item.assignedTo?.name;
-                          const project = item.project;
-                          const routeSectionName = item.batchId 
-                            ? `${item.batchId.project} - ${new Date(item.batchId.dateOfSurvey || item.batchId.createdAt).toLocaleDateString()}`
-                            : item.project;
-                          const subSection = item.pages;
-                          const category = item.category || 'Roadway';
+                <tbody className="divide-y divide-gray-100">
+                  {assignments.length > 0 ? (
+                    assignments.map((item, index) => {
+                      const userName = item.assignedTo?.name || item.assignedTo?.username || item.assignedTo?.email || (typeof item.assignedTo === 'string' ? item.assignedTo : 'Unassigned');
+                      const project = item.project;
+                      const routeSectionName = item.batchName || (item.batchId?.name ? item.batchId.name : `${item.project} - ${new Date(item.batchId?.dateOfSurvey || item.batchId?.createdAt || item.createdAt).toLocaleDateString()}`);
+                      const subSection = item.pages;
+                      const category = item.category || 'Roadway';
 
-                          return (
-                            <tr
-                              key={item._id}
-                              id={item._id}
-                              className={`hover:bg-gray-50/30 transition-colors duration-500 ${
-                                editingAssignmentId === item._id
-                                  ? 'bg-green-50/80 border-l-[3px] border-l-green-600 border-y border-y-green-100/50'
-                                  : item.status === 'Completed'
-                                    ? 'bg-green-50/20'
-                                    : index % 2 === 0
-                                      ? 'bg-white'
-                                      : 'bg-[#F4F8FB]/50'
-                              }`}
-                            >
-                              <td className="py-3.5 px-4 font-semibold text-gray-800">{userName}</td>
-                              <td className="py-3.5 px-4 font-medium text-gray-600">{project}</td>
-                              <td className="py-3.5 px-4 text-gray-600">{category}</td>
-                              <td className="py-3.5 px-4 text-gray-600 max-w-[200px] truncate" title={routeSectionName}>
-                                {routeSectionName}
-                              </td>
-                              <td className="py-3.5 px-4 text-gray-600 font-semibold">{subSection}</td>
-                              
-                              {/* Priority Badge */}
-                              <td className="py-3.5 px-4 text-center">
-                                <span className={`inline-flex px-2.5 py-0.5 rounded text-[10px] font-bold border ${
-                                  item.priority === 'High' || item.priority === 'Critical'
-                                    ? 'bg-rose-50 text-rose-600 border-rose-100'
-                                    : item.priority === 'Medium'
-                                      ? 'bg-amber-50 text-amber-600 border-amber-100'
-                                      : 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                                }`}>
-                                  {item.priority}
-                                </span>
-                              </td>
+                      return (
+                        <tr
+                          key={item._id}
+                          id={item._id}
+                          className={`hover:bg-gray-50/30 transition-colors duration-500 ${editingAssignmentId === item._id
+                              ? 'bg-green-50/80 border-l-[3px] border-l-green-600 border-y border-y-green-100/50'
+                              : item.status === 'Completed'
+                                ? 'bg-green-50/20'
+                                : index % 2 === 0
+                                  ? 'bg-white'
+                                  : 'bg-[#F4F8FB]/50'
+                            }`}
+                        >
+                          <td className="py-3.5 px-4 font-semibold text-gray-800">{userName}</td>
+                          <td className="py-3.5 px-4 font-medium text-gray-600">{project}</td>
+                          <td className="py-3.5 px-4 text-gray-600">{category}</td>
+                          <td className="py-3.5 px-4 text-gray-600 max-w-[200px] truncate" title={routeSectionName}>
+                            {routeSectionName}
+                          </td>
+                          <td className="py-3.5 px-4 text-gray-600 font-semibold">{subSection}</td>
 
-                              {/* Status Badge */}
-                              <td className="py-3.5 px-4 text-center">
-                                <span className={`inline-flex px-2.5 py-0.5 rounded text-[10px] font-bold border ${
-                                  item.status === 'Completed'
-                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                                    : item.status === 'In Progress'
-                                      ? 'bg-green-50 text-green-600 border-green-100'
-                                      : item.status === 'Pending' || item.status === 'Overdue'
-                                        ? 'bg-amber-50 text-amber-600 border-amber-100'
-                                        : 'bg-purple-50 text-purple-600 border-purple-100' // Assigned badge color
-                                }`}>
-                                  {item.status === 'Completed' ? '✅ Completed' : item.status}
-                                </span>
-                              </td>
+                          {/* Priority Badge */}
+                          <td className="py-3.5 px-4 text-center">
+                            <span className={`inline-flex px-2.5 py-0.5 rounded text-[10px] font-bold border ${item.priority === 'High' || item.priority === 'Critical'
+                                ? 'bg-rose-50 text-rose-600 border-rose-100'
+                                : item.priority === 'Medium'
+                                  ? 'bg-amber-50 text-amber-600 border-amber-100'
+                                  : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                              }`}>
+                              {item.priority}
+                            </span>
+                          </td>
 
-                              <td className="py-3.5 px-4 text-gray-600 font-semibold whitespace-nowrap">
-                                {formatDate(item.dueDate)}
-                              </td>
-                              <td className="py-3.5 px-4 text-gray-400 text-xs whitespace-nowrap">
-                                {formatDate(item.createdAt)}
-                              </td>
+                          {/* Status Badge */}
+                          <td className="py-3.5 px-4 text-center">
+                            <span className={`inline-flex px-2.5 py-0.5 rounded text-[10px] font-bold border ${item.status === 'Completed'
+                                ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                : item.status === 'In Progress'
+                                  ? 'bg-green-50 text-green-600 border-green-100'
+                                  : item.status === 'Pending' || item.status === 'Overdue'
+                                    ? 'bg-amber-50 text-amber-600 border-amber-100'
+                                    : 'bg-purple-50 text-purple-600 border-purple-100' // Assigned badge color
+                              }`}>
+                              {item.status === 'Completed' ? '✅ Completed' : item.status}
+                            </span>
+                          </td>
 
-                              {/* Actions (View, Edit, Delete) */}
-                              <td className="py-3.5 px-4 text-center">
-                                {isAdmin ? (
-                                  <div className="flex items-center justify-center gap-1.5">
-                                    <button
-                                      type="button"
-                                      onClick={() => setActiveTimelineAssignment(item)}
-                                      className="w-7 h-7 rounded-full border border-green-100 bg-green-50/50 hover:bg-green-100 text-green-600 flex items-center justify-center transition-colors cursor-pointer"
-                                      title="View Assignment Details"
-                                    >
-                                      <LuEye className="text-xs" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setEditingAssignmentId(item._id);
-                                        setFormData({
-                                          roadProject: project,
-                                          routeSection: item.batchId?._id || '',
-                                          category: 'Roadway',
-                                          subSection: subSection,
-                                          priority: item.priority,
-                                          dueDate: item.dueDate ? item.dueDate.split('T')[0] : '',
-                                          remarks: ''
-                                        });
-                                        if (item.assignedTo?._id) {
-                                          setSelectedUserId(item.assignedTo._id);
-                                        }
-                                      }}
-                                      className="w-7 h-7 rounded-full border border-green-100 bg-green-50/50 hover:bg-green-100 text-green-600 flex items-center justify-center transition-colors cursor-pointer"
-                                      title="Edit Assignment"
-                                    >
-                                      <LuPen className="text-xs" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDeleteAssignment(item._id)}
-                                      className="w-7 h-7 rounded-full border border-red-100 bg-red-50/50 hover:bg-red-100 text-red-600 flex items-center justify-center transition-colors cursor-pointer"
-                                      title="Delete Assignment"
-                                    >
-                                      <LuTrash2 className="text-xs" />
-                                    </button>
-                                    {item.status === 'Completed' ? (
-                                      <button
-                                        type="button"
-                                        disabled
-                                        className="w-7 h-7 rounded-full border border-gray-200 bg-gray-50 text-gray-400 flex items-center justify-center cursor-not-allowed"
-                                        title="Completed"
-                                      >
-                                        <LuCheck className="text-xs" />
-                                      </button>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleCompleteAssignment(item._id)}
-                                        className="w-7 h-7 rounded-full border border-green-200 bg-green-50/50 hover:bg-green-600 text-green-600 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                                        title="Mark as Completed"
-                                      >
-                                        <LuCheck className="text-xs" />
-                                      </button>
-                                    )}
-                                  </div>
+                          <td className="py-3.5 px-4 text-gray-600 font-semibold whitespace-nowrap">
+                            {formatDate(item.dueDate)}
+                          </td>
+                          <td className="py-3.5 px-4 text-gray-400 text-xs whitespace-nowrap">
+                            {formatDate(item.createdAt)}
+                          </td>
+
+                          {/* Actions (View, Edit, Delete) */}
+                          <td className="py-3.5 px-4 text-center">
+                            {isAdmin ? (
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveTimelineAssignment(item)}
+                                  className="w-7 h-7 rounded-full border border-green-100 bg-green-50/50 hover:bg-green-100 text-green-600 flex items-center justify-center transition-colors cursor-pointer"
+                                  title="View Assignment Details"
+                                >
+                                  <LuEye className="text-xs" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingAssignmentId(item._id);
+                                    setFormData({
+                                      roadProject: project,
+                                      routeSection: item.batchId?._id || '',
+                                      category: 'Roadway',
+                                      subSection: subSection,
+                                      priority: item.priority,
+                                      dueDate: item.dueDate ? item.dueDate.split('T')[0] : '',
+                                      remarks: ''
+                                    });
+                                    if (item.assignedTo?._id) {
+                                      setSelectedUserId(item.assignedTo._id);
+                                    }
+                                  }}
+                                  className="w-7 h-7 rounded-full border border-green-100 bg-green-50/50 hover:bg-green-100 text-green-600 flex items-center justify-center transition-colors cursor-pointer"
+                                  title="Edit Assignment"
+                                >
+                                  <LuPen className="text-xs" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteAssignment(item._id)}
+                                  className="w-7 h-7 rounded-full border border-red-100 bg-red-50/50 hover:bg-red-100 text-red-600 flex items-center justify-center transition-colors cursor-pointer"
+                                  title="Delete Assignment"
+                                >
+                                  <LuTrash2 className="text-xs" />
+                                </button>
+                                {item.status === 'Completed' ? (
+                                  <button
+                                    type="button"
+                                    disabled
+                                    className="w-7 h-7 rounded-full border border-gray-200 bg-gray-50 text-gray-400 flex items-center justify-center cursor-not-allowed"
+                                    title="Completed"
+                                  >
+                                    <LuCheck className="text-xs" />
+                                  </button>
                                 ) : (
-                                  <div className="flex items-center justify-center">
-                                    <button
-                                      type="button"
-                                      onClick={() => navigate(`/rating?batchId=${item.batchId?._id}`)}
-                                      className="h-8 px-3 rounded-lg border border-green-600 bg-green-600 text-white font-bold text-[10px] uppercase tracking-wider flex items-center gap-1.5 hover:bg-green-700 transition-colors"
-                                    >
-                                      <LuPlay className="text-xs" />
-                                      Start Rating
-                                    </button>
-                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCompleteAssignment(item._id)}
+                                    className="w-7 h-7 rounded-full border border-green-200 bg-green-50/50 hover:bg-green-600 text-green-600 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                    title="Mark as Completed"
+                                  >
+                                    <LuCheck className="text-xs" />
+                                  </button>
                                 )}
-                              </td>
-                            </tr>
-                          );
-                        })
-                      ) : (
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-center">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const bId = item.batchId?._id || item.batchId;
+                                    const queryParams = new URLSearchParams();
+                                    if (item._id || item.id) queryParams.set('assignmentId', item._id || item.id);
+                                    if (item.category) queryParams.set('category', item.category);
+                                    if (item.pages) queryParams.set('pages', item.pages);
+                                    navigate(`/rating/inspector/${bId}?${queryParams.toString()}`);
+                                  }}
+                                  className="h-8 px-3 rounded-lg border border-green-600 bg-green-600 text-white font-bold text-[10px] uppercase tracking-wider flex items-center gap-1.5 hover:bg-green-700 transition-colors"
+                                >
+                                  <LuPlay className="text-xs" />
+                                  Start Rating
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
                     <tr>
                       <td colSpan="10" className="py-12 text-center text-sm text-gray-400">
                         <div className="flex flex-col items-center justify-center gap-1.5">
@@ -1386,9 +1595,9 @@ const NotificationPage = () => {
               <span className="text-xl">⚠</span>
               <h3 className="text-md font-bold text-gray-900">Duplicate Assignment</h3>
             </div>
-            
+
             <p className="text-xs text-gray-500 font-medium">This work has already been assigned.</p>
-            
+
             <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-xs border border-gray-100 text-gray-700">
               <div>
                 <span className="font-bold text-gray-400 block uppercase tracking-wider text-[9px] mb-0.5">Assigned To:</span>
@@ -1411,15 +1620,14 @@ const NotificationPage = () => {
                 </div>
                 <div>
                   <span className="font-bold text-gray-400 block uppercase tracking-wider text-[9px] mb-0.5">Status:</span>
-                  <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold border mt-0.5 ${
-                    duplicateError.status === 'Completed'
+                  <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold border mt-0.5 ${duplicateError.status === 'Completed'
                       ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
                       : duplicateError.status === 'In Progress'
                         ? 'bg-green-50 text-green-600 border-green-100'
                         : duplicateError.status === 'Pending'
                           ? 'bg-amber-50 text-amber-600 border-amber-100'
                           : 'bg-purple-50 text-purple-600 border-purple-100'
-                  }`}>
+                    }`}>
                     {duplicateError.status}
                   </span>
                 </div>
@@ -1461,13 +1669,14 @@ const NotificationPage = () => {
       {activeTimelineAssignment && (
         <div className="fixed inset-0 z-50 flex justify-end">
           {/* Backdrop */}
-          <div 
+          <div
             className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity cursor-pointer"
             onClick={() => setActiveTimelineAssignment(null)}
           />
-          
+
           {/* Inject dynamic self-contained styles for slide-in animation */}
-          <style dangerouslySetInnerHTML={{ __html: `
+          <style dangerouslySetInnerHTML={{
+            __html: `
             @keyframes slideInRight {
               from { transform: translateX(100%); }
               to { transform: translateX(0); }
@@ -1522,16 +1731,15 @@ const NotificationPage = () => {
                     return (
                       <div key={idx} className="relative">
                         {/* Circle marker */}
-                        <span className={`absolute -left-[32px] top-1 w-4 h-4 rounded-full border-2 bg-white flex items-center justify-center ${
-                          isCompleted 
-                            ? 'border-emerald-500 text-emerald-500' 
-                            : isAssigned 
+                        <span className={`absolute -left-[32px] top-1 w-4 h-4 rounded-full border-2 bg-white flex items-center justify-center ${isCompleted
+                            ? 'border-emerald-500 text-emerald-500'
+                            : isAssigned
                               ? 'border-green-500 text-green-500'
                               : isOpened
                                 ? 'border-amber-500 text-amber-500'
                                 : 'border-purple-500 text-purple-500'
-                        }`} />
-                        
+                          }`} />
+
                         <div className="space-y-1">
                           <div className="flex items-start justify-between gap-2">
                             <span className="text-sm font-bold text-gray-900">{event.action}</span>
@@ -1564,7 +1772,7 @@ const NotificationPage = () => {
       {isBulkOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           {/* Backdrop */}
-          <div 
+          <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm cursor-pointer"
             onClick={() => setIsBulkOpen(false)}
           />
@@ -1605,7 +1813,7 @@ const NotificationPage = () => {
                       <span className="truncate">{bulkRouteDisplayValue}</span>
                       <LuChevronDown className="text-gray-400 text-base" />
                     </button>
-                    
+
                     {isBulkRouteOpen && (
                       <div className="absolute top-11 left-0 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-50 flex flex-col overflow-hidden max-h-48">
                         <div className="p-2 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
@@ -1628,24 +1836,28 @@ const NotificationPage = () => {
                               key={p.id}
                               id={`bulk-route-opt-${index}`}
                               type="button"
-                              disabled={!p.hasBatch}
                               onClick={() => {
-                                setBulkFormData(prev => ({ ...prev, routeSection: p.id }));
+                                const projBatches = availableBatches.filter(b => b.project.toLowerCase() === p.code.toLowerCase());
+                                const firstBatch = projBatches[0];
+                                setBulkFormData(prev => ({
+                                  ...prev,
+                                  routeSection: p.code,
+                                  totalPages: firstBatch && firstBatch.totalPages ? firstBatch.totalPages.toString() : ''
+                                }));
                                 setIsBulkRouteOpen(false);
                                 setBulkRouteSearch('');
                               }}
-                              className={`w-full text-left px-3 py-2 text-xs transition-colors font-medium flex items-center justify-between ${
-                                !p.hasBatch 
-                                  ? 'opacity-50 cursor-not-allowed bg-gray-50 text-gray-400'
-                                  : bulkFormData.routeSection === p.id 
-                                    ? 'bg-green-50 text-green-600 font-bold hover:bg-green-100' 
-                                    : bulkRouteActiveIndex === index 
-                                      ? 'bg-gray-50 text-textColor hover:bg-green-50/50'
-                                      : 'text-textColor hover:bg-green-50/50'
-                              }`}
+                              className={`w-full text-left px-3 py-2 text-xs transition-colors font-medium flex items-center justify-between ${bulkFormData.routeSection === p.code
+                                  ? 'bg-green-50 text-green-600 font-bold hover:bg-green-100'
+                                  : bulkRouteActiveIndex === index
+                                    ? 'bg-gray-50 text-textColor hover:bg-green-50/50'
+                                    : 'text-textColor hover:bg-green-50/50'
+                                }`}
                             >
                               <span className="truncate">{p.displayName}</span>
-                              {!p.hasBatch && <span className="text-[9px] px-1.5 py-0.5 bg-gray-200 text-gray-500 rounded shrink-0 ml-2">No Batch</span>}
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded shrink-0 ml-2 ${p.hasBatches ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}>
+                                {p.hasBatches ? 'Active' : 'Master'}
+                              </span>
                             </button>
                           ))}
                         </div>
@@ -1667,8 +1879,8 @@ const NotificationPage = () => {
                     onChange={(e) => setBulkFormData(prev => ({ ...prev, category: e.target.value }))}
                     className="h-10 px-3 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 text-textColor font-medium cursor-pointer"
                   >
-                    {categories.map((c) => (
-                      <option key={c} value={c}>{c}</option>
+                    {categories.map((c, idx) => (
+                      <option key={`${c}-${idx}`} value={c}>{c}</option>
                     ))}
                   </select>
                 </div>
@@ -1718,14 +1930,14 @@ const NotificationPage = () => {
                     {bulkFormData.selectedUserIds.length === activeBulkUsers.length ? 'Deselect All' : 'Select All Active'}
                   </button>
                 </div>
-                
+
                 <div className="border border-gray-100 rounded-lg divide-y divide-gray-50 max-h-40 overflow-y-auto bg-white p-1">
                   {activeBulkUsers.length > 0 ? (
                     activeBulkUsers.map(user => {
                       const uId = user._id || user.id || user.email;
                       const isChecked = bulkFormData.selectedUserIds.includes(uId);
                       return (
-                        <div 
+                        <div
                           key={uId}
                           onClick={() => toggleBulkUser(uId)}
                           className="flex items-center justify-between px-3 py-2 text-xs hover:bg-gray-50 cursor-pointer transition-colors"
@@ -1740,7 +1952,7 @@ const NotificationPage = () => {
                           <input
                             type="checkbox"
                             checked={isChecked}
-                            onChange={() => {}} // handled by click
+                            onChange={() => { }} // handled by click
                             className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500 pointer-events-none"
                           />
                         </div>

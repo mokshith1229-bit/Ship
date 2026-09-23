@@ -84,8 +84,14 @@ const RatingPage = () => {
     try {
       // Fetch all projects from master list and batches from rating service
       const [allProjectsRes, batches] = await Promise.all([
-        isAdmin ? projectService.getAllProjects() : Promise.resolve([]),
-        ratingService.getReadyBatches()
+        projectService.getAllProjects().catch(err => {
+          console.warn('Projects fetch fallback:', err);
+          return [];
+        }),
+        ratingService.getReadyBatches().catch(err => {
+          console.warn('Batches fetch fallback:', err);
+          return [];
+        })
       ]);
 
       const allProjects = allProjectsRes.data || allProjectsRes || [];

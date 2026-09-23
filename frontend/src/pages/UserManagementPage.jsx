@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
+import { useAuth } from '../context/AuthContext';
 import { workAssignmentService } from '../services/workAssignment.service';
 import { 
   LuUsers, 
@@ -14,13 +15,21 @@ import {
   LuUserPlus,
   LuPencil,
   LuTrash2,
-  LuLoader
+  LuLoader,
+  LuEye,
+  LuEyeOff
 } from 'react-icons/lu';
 
-const UserManagementPage = () => {
+const UserManagementPage = ({ defaultTab = 'all-users' }) => {
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
 
-  const [activePageTab, setActivePageTab] = useState('all-users');
+  const canCreate = hasPermission('Users', 'create');
+  const canEdit = hasPermission('Users', 'edit');
+  const canDelete = hasPermission('Users', 'delete');
+  const canViewInsights = hasPermission('User Insights', 'view');
+
+  const [activePageTab, setActivePageTab] = useState(defaultTab === 'add-user' && canCreate ? 'add-user' : 'all-users');
 
   // ── Live data state ────────────────────────────────────────────────────────
   const [users, setUsers] = useState([]);
@@ -49,6 +58,8 @@ const UserManagementPage = () => {
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
   const [editingUserId, setEditingUserId] = useState(null); // stores _id
+  const [editingUserOriginal, setEditingUserOriginal] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   // React state for deletion modal confirmation
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -87,6 +98,29 @@ const UserManagementPage = () => {
   };
 
   const handleReset = () => {
+    if (editingUserId && editingUserOriginal) {
+      setFormData(editingUserOriginal);
+    } else {
+      setFormData({
+        name: '',
+        email: '',
+        username: '',
+        role: 'User',
+        roadAssignment: '',
+        mobile: '',
+        manager: '',
+        designation: '',
+        password: '',
+        jobDescription: ''
+      });
+    }
+    setErrorMessage('');
+    setSuccessMessage('');
+  };
+
+  const handleCancel = () => {
+    setEditingUserId(null);
+    setEditingUserOriginal(null);
     setFormData({
       name: '',
       email: '',
@@ -101,11 +135,6 @@ const UserManagementPage = () => {
     });
     setErrorMessage('');
     setSuccessMessage('');
-  };
-
-  const handleCancel = () => {
-    handleReset();
-    setEditingUserId(null);
     setActivePageTab('all-users');
   };
 
@@ -152,7 +181,9 @@ const UserManagementPage = () => {
         designation: formData.designation.trim(),
         jobDescription: formData.jobDescription.trim(),
       };
-      if (formData.password) payload.password = formData.password;
+      if (formData.password && formData.password.trim()) {
+        payload.password = formData.password.trim();
+      }
 
       if (editingUserId) {
         await workAssignmentService.updateUser(editingUserId, payload);
@@ -165,6 +196,7 @@ const UserManagementPage = () => {
 
       await fetchUsers();
       setEditingUserId(null);
+      setEditingUserOriginal(null);
       setActivePageTab('all-users');
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
@@ -177,7 +209,7 @@ const UserManagementPage = () => {
 
   const handleEditClick = (user) => {
     setEditingUserId(user._id);
-    setFormData({
+    const initialData = {
       name: user.name || '',
       email: user.email || '',
       username: user.username || '',
@@ -188,7 +220,9 @@ const UserManagementPage = () => {
       designation: user.designation || '',
       password: '',
       jobDescription: user.jobDescription || ''
-    });
+    };
+    setEditingUserOriginal(initialData);
+    setFormData(initialData);
     setActivePageTab('add-user');
   };
 
@@ -272,29 +306,44 @@ const UserManagementPage = () => {
 
             {/* Top Action Bar */}
             <div className="flex items-center justify-between h-[46px] w-full shrink-0">
-              {/* Left: All Users tab */}
-              <button
-                onClick={() => {
-                  setActivePageTab('all-users');
-                  setEditingUserId(null);
-                  handleReset();
-                }}
-                className={`group relative flex items-center gap-3 h-full px-5 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer shadow-sm ${
-                  activePageTab === 'all-users'
-                    ? 'bg-[#2563EB] text-white border-none'
-                    : 'bg-white border border-borderColor border-l-4 border-l-[#2563EB] text-[#2563EB] hover:bg-[#EFF6FF] hover:-translate-y-0.5'
-                }`}
-              >
-                <LuUsers className={`text-[20px] transition-colors duration-200 ${
-                  activePageTab === 'all-users' ? 'text-white' : 'text-[#2563EB]'
-                }`} />
-                <span>All Users</span>
-              </button>
+              {/* Left: Tabs */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    setActivePageTab('all-users');
+                    setEditingUserId(null);
+                    setEditingUserOriginal(null);
+                    handleReset();
+                  }}
+                  className={`group relative flex items-center gap-3 h-[46px] px-5 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer shadow-sm ${
+                    activePageTab === 'all-users'
+                      ? 'bg-[#2563EB] text-white border-none'
+                      : 'bg-white border border-borderColor border-l-4 border-l-[#2563EB] text-[#2563EB] hover:bg-[#EFF6FF] hover:-translate-y-0.5'
+                  }`}
+                >
+                  <LuUsers className={`text-[20px] transition-colors duration-200 ${
+                    activePageTab === 'all-users' ? 'text-white' : 'text-[#2563EB]'
+                  }`} />
+                  <span>All Users</span>
+                </button>
+
+                {editingUserId && activePageTab === 'add-user' && (
+                  <div className="flex items-center gap-2 h-[46px] px-4 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm font-semibold shadow-sm">
+                    <LuPencil className="text-base" />
+                    <span>Editing User: {formData.name || 'User'}</span>
+                  </div>
+                )}
+              </div>
 
               {/* Right: Add User Button */}
-              {activePageTab === 'all-users' && (
+              {activePageTab === 'all-users' && canCreate && (
                 <button
-                  onClick={() => setActivePageTab('add-user')}
+                  onClick={() => {
+                    setEditingUserId(null);
+                    setEditingUserOriginal(null);
+                    handleReset();
+                    setActivePageTab('add-user');
+                  }}
                   className="group flex items-center gap-2 h-[46px] px-[26px] bg-white border border-[#2563EB] text-[#2563EB] rounded-xl text-sm font-medium shadow-sm hover:shadow hover:-translate-y-0.5 hover:bg-[#2563EB] hover:text-white transition-all duration-200 cursor-pointer"
                 >
                   <LuUserPlus className="text-[20px] text-[#2563EB] group-hover:text-white transition-colors duration-200" />
@@ -443,6 +492,7 @@ const UserManagementPage = () => {
                             key={index}
                             onClick={(e) => {
                               if (e.target.closest('button')) return;
+                              if (!canViewInsights) return;
                               localStorage.setItem('hirate-selected-user', JSON.stringify({
                                 name: user.name,
                                 role: user.role,
@@ -451,7 +501,7 @@ const UserManagementPage = () => {
                               }));
                               navigate('/user-insights');
                             }}
-                            className={`cursor-pointer border-b border-gray-100 hover:bg-gray-50 transition-colors duration-200 ${
+                            className={`${canViewInsights ? 'cursor-pointer hover:bg-gray-50' : 'cursor-default'} border-b border-gray-100 transition-colors duration-200 ${
                               index % 2 === 0 ? 'bg-white' : 'bg-[#F4F8FB]'
                             }`}
                           >
@@ -465,36 +515,57 @@ const UserManagementPage = () => {
                             <td className="px-4 py-3.5 font-medium text-gray-700 whitespace-nowrap">{user.role}</td>
                             <td className="px-4 py-3.5 text-center whitespace-nowrap">
                               {/* Toggle status button */}
-                              {(() => { const active = user.isActive !== undefined ? user.isActive : user.status === 'Active'; return (
-                                <button
-                                  onClick={() => handleStatusChange(user._id)}
-                                  className={`h-[34px] px-3.5 rounded-full text-xs font-bold border border-gray-200 transition-all duration-200 cursor-pointer ${
-                                    active ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-red-100 text-red-800 hover:bg-red-200'
-                                  }`}
-                                >
-                                  {active ? '🟢 Active' : '🔴 Inactive'}
-                                </button>
-                              ); })()}
+                              {(() => {
+                                const active = user.isActive !== undefined ? user.isActive : user.status === 'Active';
+                                if (!canEdit) {
+                                  return (
+                                    <span
+                                      className={`inline-flex items-center justify-center h-[34px] px-3.5 rounded-full text-xs font-bold border border-gray-200 cursor-default select-none ${
+                                        active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                      }`}
+                                    >
+                                      {active ? '🟢 Active' : '🔴 Inactive'}
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <button
+                                    onClick={() => handleStatusChange(user._id)}
+                                    className={`h-[34px] px-3.5 rounded-full text-xs font-bold border border-gray-200 transition-all duration-200 cursor-pointer ${
+                                      active ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-red-100 text-red-800 hover:bg-red-200'
+                                    }`}
+                                  >
+                                    {active ? '🟢 Active' : '🔴 Inactive'}
+                                  </button>
+                                );
+                              })()}
                             </td>
                             <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">
                               {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '—'}
                             </td>
                             <td className="px-4 py-3.5 text-center whitespace-nowrap">
                               <div className="flex items-center justify-center gap-2">
-                                <button
-                                  onClick={() => handleEditClick(user)}
-                                  className="w-[40px] h-[40px] flex items-center justify-center bg-white border border-[#2563EB] text-[#2563EB] rounded-lg shadow-sm hover:bg-[#2563EB] hover:text-white transition-all duration-200 cursor-pointer"
-                                  title="Edit User"
-                                >
-                                  <LuPencil className="text-base" />
-                                </button>
-                                <button
-                                  onClick={() => { setUserToDelete(user); setShowDeleteModal(true); }}
-                                  className="w-[40px] h-[40px] flex items-center justify-center bg-white border border-[#EF4444] text-[#EF4444] rounded-lg shadow-sm hover:bg-[#EF4444] hover:text-white transition-all duration-200 cursor-pointer"
-                                  title="Delete User"
-                                >
-                                  <LuTrash2 className="text-base" />
-                                </button>
+                                {canEdit && (
+                                  <button
+                                    onClick={() => handleEditClick(user)}
+                                    className="w-[40px] h-[40px] flex items-center justify-center bg-white border border-[#2563EB] text-[#2563EB] rounded-lg shadow-sm hover:bg-[#2563EB] hover:text-white transition-all duration-200 cursor-pointer"
+                                    title="Edit User"
+                                  >
+                                    <LuPencil className="text-base" />
+                                  </button>
+                                )}
+                                {canDelete && (
+                                  <button
+                                    onClick={() => { setUserToDelete(user); setShowDeleteModal(true); }}
+                                    className="w-[40px] h-[40px] flex items-center justify-center bg-white border border-[#EF4444] text-[#EF4444] rounded-lg shadow-sm hover:bg-[#EF4444] hover:text-white transition-all duration-200 cursor-pointer"
+                                    title="Delete User"
+                                  >
+                                    <LuTrash2 className="text-base" />
+                                  </button>
+                                )}
+                                {!canEdit && !canDelete && (
+                                  <span className="text-gray-400 text-xs">—</span>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -561,7 +632,6 @@ const UserManagementPage = () => {
                         placeholder="Enter Email"
                         className="h-[46px] px-4 border border-borderColor rounded-xl text-sm bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-textColor placeholder-gray-400 transition-all duration-200"
                         required
-                        disabled={!!editingUserId} // Disallow email editing as it is the unique key
                       />
                     </div>
 
@@ -591,6 +661,7 @@ const UserManagementPage = () => {
                       >
                         <option value="User">User</option>
                         <option value="Admin">Admin</option>
+                        <option value="HO">HO</option>
                         <option value="SPV">SPV</option>
                       </select>
                     </div>
@@ -657,17 +728,27 @@ const UserManagementPage = () => {
                     {/* Password */}
                     <div className="flex flex-col gap-1.5">
                       <label className="text-sm font-semibold text-textColor">
-                        Password {editingUserId ? '(Optional)' : '*'}
+                        Password {editingUserId ? '(Leave blank to keep unchanged)' : '*'}
                       </label>
-                      <input
-                        type="password"
-                        name="password"
-                        value={formData.password}
-                        onChange={handleInputChange}
-                        placeholder="Enter Password"
-                        className="h-[46px] px-4 border border-borderColor rounded-xl text-sm bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-textColor placeholder-gray-400 transition-all duration-200"
-                        required={!editingUserId}
-                      />
+                      <div className="relative flex items-center">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          name="password"
+                          value={formData.password}
+                          onChange={handleInputChange}
+                          placeholder={editingUserId ? "Enter new password to change" : "Enter Password"}
+                          className="w-full h-[46px] pl-4 pr-12 border border-borderColor rounded-xl text-sm bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-textColor placeholder-gray-400 transition-all duration-200"
+                          required={!editingUserId}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 p-1.5 text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer"
+                          title={showPassword ? "Hide Password" : "Show Password"}
+                        >
+                          {showPassword ? <LuEyeOff className="text-lg" /> : <LuEye className="text-lg" />}
+                        </button>
+                      </div>
                     </div>
 
                     {/* Job Description */}

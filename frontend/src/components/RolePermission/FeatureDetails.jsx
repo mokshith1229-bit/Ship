@@ -5,8 +5,8 @@ import { roleService } from '../../services/role.service';
 
 const FeatureDetails = ({ 
   selectedFeature, 
-  allPermissions, 
-  originalPermissions, 
+  allPermissions = [], 
+  originalPermissions = [], 
   setOriginalPermissions,
   onUpdatePermission,
   onBulkAction,
@@ -32,7 +32,8 @@ const FeatureDetails = ({
     : [];
 
   const arePermissionsEqual = (p1, p2) => {
-    if (!p1 || !p2) return p1 === p2;
+    if (!p1 && !p2) return true;
+    if (!p1 || !p2) return false;
     return !!p1.view === !!p2.view &&
            !!p1.create === !!p2.create &&
            !!p1.edit === !!p2.edit &&
@@ -41,12 +42,16 @@ const FeatureDetails = ({
   };
 
   // Check if ANY permissions across ANY feature have been modified
-  const hasUnsavedChanges = allPermissions.some((perm, index) => {
-    return !arePermissionsEqual(perm.permissions, originalPermissions[index]?.permissions);
+  const hasUnsavedChanges = allPermissions.some((perm) => {
+    const orig = originalPermissions.find(o => 
+      (o._id && perm._id && o._id === perm._id) || 
+      (o.roleId === perm.roleId && o.featureId === perm.featureId)
+    );
+    return !arePermissionsEqual(perm.permissions, orig?.permissions);
   });
 
-  const handleUpdatePermission = (permId, newPermissionsObj) => {
-    onUpdatePermission(permId, newPermissionsObj);
+  const handleUpdatePermission = (permId, newPermissionsObj, roleName, featureId) => {
+    onUpdatePermission(permId, newPermissionsObj, roleName, featureId);
   };
 
   const handleBulkAction = (enable) => {
@@ -61,26 +66,35 @@ const FeatureDetails = ({
     setMessage(null);
     try {
       // Find ALL modified permissions across all features
-      const updates = allPermissions.filter((perm, index) => {
-        return !arePermissionsEqual(perm.permissions, originalPermissions[index]?.permissions);
+      const updates = allPermissions.filter((perm) => {
+        const orig = originalPermissions.find(o => 
+          (o._id && perm._id && o._id === perm._id) || 
+          (o.roleId === perm.roleId && o.featureId === perm.featureId)
+        );
+        return !arePermissionsEqual(perm.permissions, orig?.permissions);
       });
 
       if (updates.length > 0) {
-        // Update them via API
-        await Promise.all(
-          updates.map(update => roleService.updateRolePermission(update._id, update.permissions))
-        );
+        // Bulk update via API
+        await roleService.bulkUpdatePermissions(updates);
 
-        // Update the original baseline so "Save Changes" button disables again
+        // Update baseline so "Save Changes" button disables
         setOriginalPermissions(JSON.parse(JSON.stringify(allPermissions)));
+        
+        // Notify any listeners (e.g. sidebar) of permissions update
+        window.dispatchEvent(new Event('permissions-updated'));
       }
       
       setSaving(false);
       setIsSaved(true);
-      setTimeout(() => setIsSaved(false), 3000);
+      setMessage({ type: 'success', text: 'Permissions saved successfully to MongoDB.' });
+      setTimeout(() => {
+        setIsSaved(false);
+        setMessage(null);
+      }, 3000);
     } catch (error) {
       console.error("Failed to save changes:", error);
-      setMessage({ type: 'error', text: 'Failed to save changes. Please try again.' });
+      setMessage({ type: 'error', text: 'Failed to save changes to database. Please try again.' });
       setSaving(false);
     }
   };
@@ -94,7 +108,7 @@ const FeatureDetails = ({
     try {
       const res = await roleService.getPermissionHistory(selectedFeature.featureId);
       if (res.success) {
-        setHistoryData(res.data);
+        setHistoryData(res.data || []);
         setShowHistory(true);
       }
     } catch (error) {
@@ -104,7 +118,7 @@ const FeatureDetails = ({
 
   if (!selectedFeature) {
     return (
-      <div className="bg-white border border-borderColor rounded-xl shadow-sm h-full flex items-center justify-center text-gray-500">
+      <div className="bg-white border border-[#E5E7EB] rounded-xl shadow-sm h-full flex items-center justify-center text-gray-500">
         Select a feature from the tree to view its details.
       </div>
     );
@@ -113,8 +127,8 @@ const FeatureDetails = ({
   const tabs = ['Role Permissions'];
 
   return (
-    <div className="bg-white border border-borderColor rounded-xl shadow-sm h-full flex flex-col overflow-hidden relative">
-      <div className="p-6 border-b border-borderColor bg-gray-50 flex justify-between items-start">
+    <div className="bg-white border border-[#E5E7EB] rounded-xl shadow-sm h-full flex flex-col overflow-hidden relative font-sans">
+      <div className="p-6 border-b border-[#E5E7EB] bg-gray-50 flex justify-between items-start">
         <div>
           <h2 className="text-xl font-bold text-gray-800">{selectedFeature.featureName}</h2>
           <p className="text-sm text-gray-500 mt-1">
@@ -125,7 +139,7 @@ const FeatureDetails = ({
         <div className="flex gap-2">
           <button 
             onClick={handleViewHistory}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-bold"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-bold shadow-sm"
           >
             <MdHistory className="text-lg" />
             {showHistory ? 'Hide History' : 'History'}
@@ -134,7 +148,7 @@ const FeatureDetails = ({
           <button 
             onClick={handleSaveChanges}
             disabled={!hasUnsavedChanges || saving}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-bold ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-bold shadow-sm ${
               isSaved && !hasUnsavedChanges
                 ? 'bg-green-600 text-white'
                 : hasUnsavedChanges && !saving 
@@ -195,7 +209,7 @@ const FeatureDetails = ({
         </div>
       ) : (
         <>
-          <div className="border-b border-borderColor px-6 flex justify-between items-end">
+          <div className="border-b border-[#E5E7EB] px-6 flex justify-between items-end">
             <div className="flex gap-6 mt-4">
               {tabs.map(tab => (
                 <button
@@ -217,13 +231,13 @@ const FeatureDetails = ({
               <div className="flex gap-2 pb-2">
                 <button
                   onClick={() => handleBulkAction(true)}
-                  className="text-xs font-bold text-green-600 bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded"
+                  className="text-xs font-bold text-green-600 bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded transition-colors"
                 >
                   Enable All Roles
                 </button>
                 <button
                   onClick={() => handleBulkAction(false)}
-                  className="text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded"
+                  className="text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded transition-colors"
                 >
                   Disable All Roles
                 </button>
@@ -239,7 +253,8 @@ const FeatureDetails = ({
                 {activeTab === 'Role Permissions' && (
                    <RoleTable 
                      featurePermissions={featurePermissions} 
-                     onUpdatePermission={handleUpdatePermission} 
+                     onUpdatePermission={handleUpdatePermission}
+                     selectedFeature={selectedFeature}
                    />
                 )}
               </>

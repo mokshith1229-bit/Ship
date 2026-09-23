@@ -4,7 +4,7 @@ import { MdEdit, MdDelete } from 'react-icons/md';
 import { masterListService } from '../../../services/masterList.service';
 import MasterListEditModal from './MasterListEditModal';
 
-const MasterListTable = ({ data, loading, onRefresh }) => {
+const MasterListTable = ({ data, loading, onRefresh, canEdit = true, canDelete = true }) => {
   const [editingItem, setEditingItem] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
 
@@ -53,7 +53,7 @@ const MasterListTable = ({ data, loading, onRefresh }) => {
                 <th className="px-5 py-4 font-medium">Parameter</th>
                 <th className="px-5 py-4 font-medium">Status</th>
                 <th className="px-5 py-4 font-medium">Created Date</th>
-                <th className="px-5 py-4 font-medium text-right">Actions</th>
+                {(canEdit || canDelete) && <th className="px-5 py-4 font-medium text-right">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -73,29 +73,35 @@ const MasterListTable = ({ data, loading, onRefresh }) => {
                   <td className="px-5 py-3 text-gray-500">
                     {new Date(item.createdAt).toLocaleDateString()}
                   </td>
-                  <td className="px-5 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button 
-                        onClick={() => setEditingItem(item)}
-                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                        title="Edit Item"
-                      >
-                        <MdEdit className="text-lg" />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(item._id)}
-                        disabled={deletingId === item._id}
-                        className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
-                        title="Delete Item"
-                      >
-                        {deletingId === item._id ? (
-                          <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-                        ) : (
-                          <MdDelete className="text-lg" />
+                  {(canEdit || canDelete) && (
+                    <td className="px-5 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {canEdit && (
+                          <button 
+                            onClick={() => setEditingItem(item)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            title="Edit Item"
+                          >
+                            <MdEdit className="text-lg" />
+                          </button>
                         )}
-                      </button>
-                    </div>
-                  </td>
+                        {canDelete && (
+                          <button 
+                            onClick={() => handleDelete(item._id)}
+                            disabled={deletingId === item._id}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+                            title="Delete Item"
+                          >
+                            {deletingId === item._id ? (
+                              <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                              <MdDelete className="text-lg" />
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import HiRateRoadLoader from '../components/common/HiRateRoadLoader';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
+import { useAuth } from '../context/AuthContext';
 import { masterListService } from '../services/masterList.service';
 import { surveyLibraryService } from '../services/surveyLibrary.service';
 import { surveyProcessingService } from '../services/surveyProcessing.service';
@@ -16,6 +17,11 @@ import CustomDropdown from '../components/common/CustomDropdown';
 
 const SurveyLibraryPage = () => {
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('Survey Library', 'create');
+  const canEdit = hasPermission('Survey Library', 'edit');
+  const canDelete = hasPermission('Survey Library', 'delete');
+  const canExtractImages = hasPermission('Survey Processing', 'create');
 
   // State
   const [projects, setProjects] = useState([]);
@@ -235,12 +241,14 @@ const SurveyLibraryPage = () => {
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-sm font-bold text-textColor">2. Survey Assets</h2>
-                    <Premium3DButton 
-                      onClick={openCreateModal}
-                      className="!w-auto !py-2 !h-auto min-h-[38px] text-xs"
-                    >
-                      <MdAdd className="text-base"/> Add Survey Asset
-                    </Premium3DButton>
+                    {canCreate && (
+                      <Premium3DButton 
+                        onClick={openCreateModal}
+                        className="!w-auto !py-2 !h-auto min-h-[38px] text-xs"
+                      >
+                        <MdAdd className="text-base"/> Add Survey Asset
+                      </Premium3DButton>
+                    )}
                   </div>
                   
                   <div className="overflow-x-auto">
@@ -254,14 +262,14 @@ const SurveyLibraryPage = () => {
                           <th className="py-3 px-4 font-semibold text-center">VTT</th>
                           <th className="py-3 px-4 font-semibold text-center">Pair Status</th>
                           <th className="py-3 px-4 font-semibold text-center">Coverage</th>
-                          <th className="py-3 px-4 font-semibold text-center">Actions</th>
+                          {(canEdit || canDelete) && <th className="py-3 px-4 font-semibold text-center">Actions</th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {!assets.length ? (
                           <tr>
-                            <td colSpan="6" className="py-8 text-center text-gray-400 text-sm">
-                              No survey assets found. Click "+ Add Survey Asset" to upload one.
+                            <td colSpan={canEdit || canDelete ? 8 : 7} className="py-8 text-center text-gray-400 text-sm">
+                              No survey assets found. {canCreate ? 'Click "+ Add Survey Asset" to upload one.' : ''}
                             </td>
                           </tr>
                         ) : (
@@ -299,16 +307,22 @@ const SurveyLibraryPage = () => {
                                   <span className="text-gray-400 italic">—</span>
                                 )}
                               </td>
-                              <td className="py-3 px-4">
-                                <div className="flex items-center justify-center gap-3">
-                                  <button onClick={() => openEditModal(asset)} className="text-gray-400 hover:text-blue-600 transition-colors" title="Edit">
-                                    <MdEdit className="text-lg" />
-                                  </button>
-                                  <button onClick={() => handleDeleteAsset(asset._id)} className="text-gray-400 hover:text-red-600 transition-colors" title="Delete">
-                                    <MdDelete className="text-lg" />
-                                  </button>
-                                </div>
-                              </td>
+                              {(canEdit || canDelete) && (
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center justify-center gap-3">
+                                    {canEdit && (
+                                      <button onClick={() => openEditModal(asset)} className="text-gray-400 hover:text-blue-600 transition-colors" title="Edit">
+                                        <MdEdit className="text-lg" />
+                                      </button>
+                                    )}
+                                    {canDelete && (
+                                      <button onClick={() => handleDeleteAsset(asset._id)} className="text-gray-400 hover:text-red-600 transition-colors" title="Delete">
+                                        <MdDelete className="text-lg" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              )}
                             </tr>
                           ))
                         )}
@@ -318,46 +332,48 @@ const SurveyLibraryPage = () => {
                 </div>
 
                 {/* Section 3: Extract Button */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col justify-center items-center text-center">
-                  <h2 className="text-sm font-bold text-textColor mb-2 w-full text-left">3. Extraction</h2>
-                  
-                  {extracting ? (
-                    <div className="w-full flex flex-col items-center py-4">
-                      <LuLoader className="animate-spin text-3xl text-primary mb-3" />
-                      <p className="text-sm font-bold text-textColor">Starting Extraction...</p>
-                    </div>
-                  ) : extractionResult ? (
-                    <div className={`w-full flex flex-col items-center py-4 animate-in fade-in zoom-in duration-300 ${extractionResult.type === 'error' ? 'text-red-500' : 'text-green-500'}`}>
-                      <MdCheckCircle className="text-4xl mb-2" />
-                      <p className={`text-sm font-bold ${extractionResult.type === 'error' ? 'text-red-700' : 'text-green-700'}`}>
-                        {extractionResult.message}
-                      </p>
-                      {extractionResult.type === 'success' && (
-                        <p className="text-xs text-gray-500 mt-2">You can navigate away. You will be notified when it completes.</p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="w-full py-6 flex flex-col items-center max-w-xl mx-auto">
-                      <p className="text-xs text-gray-500 mb-4 px-4 text-center">
-                        Extraction requires at least one Survey Asset to be fully uploaded, parsed, and READY.
-                      </p>
-                      
-                      {!canExtract && (
-                        <div className="mb-4 text-xs font-medium text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200 w-full text-center">
-                          ⚠️ Extraction is currently locked. No READY assets found.
-                        </div>
-                      )}
-                      
-                      <Premium3DButton 
-                        onClick={handleExtract}
-                        disabled={!canExtract}
-                        className="w-full !py-3 !h-auto rounded-xl shadow-sm text-base"
-                      >
-                        <LuPlay className="text-lg" /> Extract Images
-                      </Premium3DButton>
-                    </div>
-                  )}
-                </div>
+                {canExtractImages && (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col justify-center items-center text-center">
+                    <h2 className="text-sm font-bold text-textColor mb-2 w-full text-left">3. Extraction</h2>
+                    
+                    {extracting ? (
+                      <div className="w-full flex flex-col items-center py-4">
+                        <LuLoader className="animate-spin text-3xl text-primary mb-3" />
+                        <p className="text-sm font-bold text-textColor">Starting Extraction...</p>
+                      </div>
+                    ) : extractionResult ? (
+                      <div className={`w-full flex flex-col items-center py-4 animate-in fade-in zoom-in duration-300 ${extractionResult.type === 'error' ? 'text-red-500' : 'text-green-500'}`}>
+                        <MdCheckCircle className="text-4xl mb-2" />
+                        <p className={`text-sm font-bold ${extractionResult.type === 'error' ? 'text-red-700' : 'text-green-700'}`}>
+                          {extractionResult.message}
+                        </p>
+                        {extractionResult.type === 'success' && (
+                          <p className="text-xs text-gray-500 mt-2">You can navigate away. You will be notified when it completes.</p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="w-full py-6 flex flex-col items-center max-w-xl mx-auto">
+                        <p className="text-xs text-gray-500 mb-4 px-4 text-center">
+                          Extraction requires at least one Survey Asset to be fully uploaded, parsed, and READY.
+                        </p>
+                        
+                        {!canExtract && (
+                          <div className="mb-4 text-xs font-medium text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200 w-full text-center">
+                            ⚠️ Extraction is currently locked. No READY assets found.
+                          </div>
+                        )}
+                        
+                        <Premium3DButton 
+                          onClick={handleExtract}
+                          disabled={!canExtract}
+                          className="w-full !py-3 !h-auto rounded-xl shadow-sm text-base"
+                        >
+                          <LuPlay className="text-lg" /> Extract Images
+                        </Premium3DButton>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
