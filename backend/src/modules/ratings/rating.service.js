@@ -176,9 +176,47 @@ const getBatchTasks = async (batchId, user, options = {}) => {
     status: { $nin: ['EXTRACTION_FAILED', 'PENDING_IMAGE'] }
   };
 
-  if (options.category && options.category !== 'All') {
-    queryFilter.category = options.category;
+  // If assignmentId or user assignment exists, track status and filter by assigned questionIds if present
+  let assignment = null;
+  if (options.assignmentId) {
+    assignment = await WorkAssignment.findById(options.assignmentId);
+  } else if (user && user.role === 'User') {
+    assignment = await WorkAssignment.findOne({
+      batchId,
+      assignedTo: user._id
+    });
   }
+
+  if (assignment) {
+    if (assignment.status === 'Assigned') {
+      assignment.status = 'In Progress';
+      assignment.startedTime = new Date();
+      await assignment.save();
+    }
+    if (assignment.questionIds && assignment.questionIds.length > 0) {
+      queryFilter._id = { $in: assignment.questionIds };
+    }
+  }
+
+  // Handle category filter: only apply if valid standard category or matched
+  if (options.category && options.category !== 'All') {
+    const validCategories = ['Roadway', 'Structures', 'Project Facilities', 'ATMS'];
+    const matchedCategory = validCategories.find(c => c.toLowerCase() === options.category.toLowerCase());
+    if (matchedCategory) {
+      queryFilter.category = matchedCategory;
+    } else if (!assignment || !assignment.questionIds || assignment.questionIds.length === 0) {
+      if (/structure/i.test(options.category)) {
+        queryFilter.category = 'Structures';
+      } else if (/roadway/i.test(options.category)) {
+        queryFilter.category = 'Roadway';
+      } else if (/facilit/i.test(options.category)) {
+        queryFilter.category = 'Project Facilities';
+      } else if (/atms/i.test(options.category)) {
+        queryFilter.category = 'ATMS';
+      }
+    }
+  }
+
   if (options.direction && options.direction !== 'Choose Direction' && options.direction !== 'All') {
     queryFilter.direction = options.direction;
   }
@@ -195,23 +233,6 @@ const getBatchTasks = async (batchId, user, options = {}) => {
     queryFilter.chainage = {};
     if (options.minChainage) queryFilter.chainage.$gte = parseFloat(options.minChainage);
     if (options.maxChainage) queryFilter.chainage.$lte = parseFloat(options.maxChainage);
-  }
-
-  // If user is a 'User' and has an assignment, track progress
-  if (user && user.role === 'User') {
-    const assignment = await WorkAssignment.findOne({
-      batchId,
-      assignedTo: user._id
-    });
-    
-    if (assignment) {
-      // Update assignment status to In Progress if it was just Assigned
-      if (assignment.status === 'Assigned') {
-        assignment.status = 'In Progress';
-        assignment.startedTime = new Date();
-        await assignment.save();
-      }
-    }
   }
 
   // Pagination support — default: all tasks (limit=0 means no limit)

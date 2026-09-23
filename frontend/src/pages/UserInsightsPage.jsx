@@ -3,6 +3,7 @@ import Sidebar from '../components/Sidebar';
 import { useParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { workAssignmentService } from '../services/workAssignment.service';
+import { projectService } from '../services/project.service';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LuFolder,
@@ -36,9 +37,10 @@ import {
   Cell
 } from 'recharts';
 
-const projectOptions = [
+const defaultProjectOptions = [
   'All Projects',
   'ADTPL', 'APEL', 'BFHL', 'BWHPL', 'DATL', 'DHMEPL', 'FRHL', 'GAEPL',
+  'GMC - BS 2', 'GMC-BS', 'GMC-MH2', 'GMC-MH', 'BS',
   'JMTPL', 'JUHPL', 'KETPL', 'KHEPL', 'KMTPL', 'KTIPL', 'MBEL', 'MHPL',
   'MKTPL', 'MSHP', 'NAM', 'NDEPL', 'NKTPL', 'SIPL', 'SMTPL', 'SPPL',
   'WMPTL', 'WUPTL', 'WVEL'
@@ -58,65 +60,128 @@ const categoryMap = {
   'Landscaping': 'Landscaping'
 };
 
-const durationOptions = [
-  'This Month (July 2026)',
-  'Last Month (June 2026)',
-  'Last 3 Months',
-  'Last 6 Months',
-  'This Year (2026)'
-];
+// Generates dynamic duration options based on current date
+const getDurationOptions = () => {
+  const now = new Date();
+  const currentMonthName = now.toLocaleDateString('en-US', { month: 'long' });
+  const currentYear = now.getFullYear();
+
+  const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevMonthName = prevMonthDate.toLocaleDateString('en-US', { month: 'long' });
+  const prevMonthYear = prevMonthDate.getFullYear();
+
+  return [
+    `This Month (${currentMonthName} ${currentYear})`,
+    `Last Month (${prevMonthName} ${prevMonthYear})`,
+    'Last 3 Months',
+    'Last 6 Months',
+    `This Year (${currentYear})`,
+    'All Time'
+  ];
+};
+
+const computeDatesForDuration = (durationStr) => {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+
+  if (!durationStr || durationStr.startsWith('This Month')) {
+    return {
+      start: new Date(currentYear, currentMonth, 1),
+      end: new Date(currentYear, currentMonth + 1, 0, 23, 59, 59)
+    };
+  } else if (durationStr.startsWith('Last Month')) {
+    return {
+      start: new Date(currentYear, currentMonth - 1, 1),
+      end: new Date(currentYear, currentMonth, 0, 23, 59, 59)
+    };
+  } else if (durationStr === 'Last 3 Months') {
+    return {
+      start: new Date(currentYear, currentMonth - 2, 1),
+      end: new Date(currentYear, currentMonth + 1, 0, 23, 59, 59)
+    };
+  } else if (durationStr === 'Last 6 Months') {
+    return {
+      start: new Date(currentYear, currentMonth - 5, 1),
+      end: new Date(currentYear, currentMonth + 1, 0, 23, 59, 59)
+    };
+  } else if (durationStr.startsWith('This Year')) {
+    return {
+      start: new Date(currentYear, 0, 1),
+      end: new Date(currentYear, 11, 31, 23, 59, 59)
+    };
+  } else if (durationStr === 'All Time') {
+    return {
+      start: new Date(2020, 0, 1),
+      end: new Date(currentYear + 1, 11, 31, 23, 59, 59)
+    };
+  }
+  return null;
+};
 
 const fallbackUsersList = [
-  { name: 'Rahul Kumar', role: 'User', manager: 'Arun Kumar', status: 'Active' },
-  { name: 'Sravya', role: 'Administrator', manager: 'Arun Kumar', status: 'Active' },
-  { name: 'Kiran Reddy', role: 'User', manager: 'Arun Kumar', status: 'Active' },
-  { name: 'Anil Kumar', role: 'User', manager: 'Arun Kumar', status: 'Active' },
-  { name: 'Pooja Patel', role: 'Administrator', manager: 'Arun Kumar', status: 'Active' }
+  { name: 'System Admin', role: 'Admin', manager: 'Arun Kumar', status: 'Active' },
+  { name: 'Vijay', role: 'User', manager: 'Arun Kumar', status: 'Active' },
+  { name: 'SRAVYA', role: 'Admin', manager: 'Arun Kumar', status: 'Active' },
+  { name: 'Tillu', role: 'User', manager: 'Arun Kumar', status: 'Active' },
+  { name: 'sandeep', role: 'User', manager: 'Arun Kumar', status: 'Active' },
+  { name: 'Rahul Kumar', role: 'User', manager: 'Arun Kumar', status: 'Active' }
 ];
 
 // Formatting Helper for Dates (e.g. 01 Jul 2026)
 const formatDateLabel = (d) => {
   if (!d) return '';
-  const day = d.getDate().toString().padStart(2, '0');
+  const dateObj = d instanceof Date ? d : new Date(d);
+  if (isNaN(dateObj.getTime())) return '';
+  const day = dateObj.getDate().toString().padStart(2, '0');
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const month = months[d.getMonth()];
-  const year = d.getFullYear();
+  const month = months[dateObj.getMonth()];
+  const year = dateObj.getFullYear();
   return `${day} ${month} ${year}`;
 };
 
-// Parsing Date Strings to Date Objects (with timezone/time safety support)
+// Parsing Date Strings to Date Objects (handles ISO strings, timestamps, and formatted strings)
 const parseFlexibleDate = (dateStr) => {
   if (!dateStr) return new Date();
-  if (dateStr instanceof Date) return dateStr;
+  if (dateStr instanceof Date) return isNaN(dateStr.getTime()) ? new Date() : dateStr;
 
-  const datePart = dateStr.split(',')[0].trim();
-  const parts = datePart.split(' ');
+  const str = String(dateStr).trim();
+
+  // 1. Direct ISO / Standard parsing if valid and not a space-separated custom string
+  if (!str.includes(' ') || str.includes('T')) {
+    const direct = new Date(str);
+    if (!isNaN(direct.getTime())) return direct;
+  }
+
+  // 2. Custom formatted strings e.g. "01 Sep 2026, 05:28 PM" or "24 Jul 2026"
+  const datePart = str.split(',')[0].trim();
+  const parts = datePart.split(/\s+/);
 
   if (parts.length >= 3) {
     const day = parseInt(parts[0], 10);
-    const monthStr = parts[1];
+    const monthStr = parts[1].toLowerCase().slice(0, 3);
     const year = parseInt(parts[2], 10);
 
-    const months = {
-      'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
-      'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11,
-      'January': 0, 'February': 1, 'March': 2, 'April': 3, 'May': 4, 'June': 5,
-      'July': 6, 'August': 7, 'September': 8, 'October': 9, 'November': 10, 'December': 11
+    const monthMap = {
+      jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+      jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
     };
 
-    const monthKey = Object.keys(months).find(k => k.toLowerCase() === monthStr.toLowerCase());
-    const month = monthKey !== undefined ? months[monthKey] : 6;
+    const month = monthMap[monthStr] !== undefined ? monthMap[monthStr] : new Date().getMonth();
 
-    return new Date(year, month, day);
+    if (!isNaN(day) && !isNaN(year)) {
+      return new Date(year, month, day);
+    }
   }
 
-  const parsed = new Date(dateStr);
+  const parsed = new Date(str);
   return isNaN(parsed.getTime()) ? new Date() : parsed;
 };
 
 const parsePagesFromRange = (rangeStr) => {
+  if (typeof rangeStr === 'number') return rangeStr;
   if (!rangeStr) return 0;
-  const clean = rangeStr.replace(/[^\d-]/g, '');
+  const clean = String(rangeStr).replace(/[^\d-]/g, '');
   const parts = clean.split('-');
   if (parts.length === 2) {
     const start = parseInt(parts[0], 10);
@@ -388,11 +453,24 @@ const getCategoryColor = (cat) => {
 const UserProfileSummaryCard = ({ currentUserObj, assignments, parsePagesFromRange }) => {
   const firstLetter = currentUserObj?.name ? currentUserObj.name.charAt(0).toUpperCase() : '?';
 
-  const userAssignments = assignments.filter(a => a.userName.toLowerCase() === (currentUserObj?.name || '').toLowerCase());
+  const userAssignments = assignments.filter(a => {
+    if (!a) return false;
+    const targetName = (currentUserObj?.name || '').toLowerCase();
+    const targetUser = (currentUserObj?.username || '').toLowerCase();
+    const targetEmail = (currentUserObj?.email || '').toLowerCase();
+    const targetId = currentUserObj?.id || currentUserObj?._id;
+
+    if (targetId && (a.userId === targetId || a.assignedTo?._id === targetId)) return true;
+    if (a.userName && a.userName.toLowerCase() === targetName) return true;
+    if (a.userUsername && a.userUsername.toLowerCase() === targetName) return true;
+    if (targetUser && a.userName && a.userName.toLowerCase() === targetUser) return true;
+    if (targetEmail && a.userEmail && a.userEmail.toLowerCase() === targetEmail) return true;
+    return false;
+  });
   const uniqueProjects = [...new Set(userAssignments.map(a => a.routeSection || a.project).filter(p => p && p !== 'HO PROCESS' && p !== 'ON-GOING' && p !== 'SPV RATED' && p !== 'HO RATED' && p !== 'NOT RATED'))].length;
-  const totalAssigned = userAssignments.reduce((sum, a) => sum + parsePagesFromRange(a.subSection || a.pageRange || ''), 0);
+  const totalAssigned = userAssignments.reduce((sum, a) => sum + (a.pagesCount || parsePagesFromRange(a.subSection || a.pageRange || '')), 0);
   const completedAssignments = userAssignments.filter(a => a.status === 'Completed');
-  const totalCompleted = completedAssignments.reduce((sum, a) => sum + parsePagesFromRange(a.subSection || a.pageRange || ''), 0);
+  const totalCompleted = completedAssignments.reduce((sum, a) => sum + (a.pagesCount || parsePagesFromRange(a.subSection || a.pageRange || '')), 0);
   const completionRate = totalAssigned > 0 ? Math.round((totalCompleted / totalAssigned) * 100) : 0;
 
   return (
@@ -1437,6 +1515,9 @@ const DetailedProjectReportView = ({ projectName, userAssignments, currentUserOb
 const UserInsightsPage = () => {
   const { userId } = useParams();
   const [usersList, setUsersList] = useState(fallbackUsersList);
+  const [availableProjects, setAvailableProjects] = useState(defaultProjectOptions);
+  const durationOptions = getDurationOptions();
+
   const [selectedUser, setSelectedUser] = useState(() => {
     const saved = localStorage.getItem('hirate-selected-user');
     if (saved) {
@@ -1447,16 +1528,17 @@ const UserInsightsPage = () => {
       } catch (e) { }
       return { name: saved, role: 'User', manager: 'Arun Kumar', status: 'Active' };
     }
-    return { name: 'Rahul Kumar', role: 'User', manager: 'Arun Kumar', status: 'Active' };
+    return fallbackUsersList[0];
   });
   const [selectedProject, setSelectedProject] = useState('All Projects');
-  const [selectedDuration, setSelectedDuration] = useState('This Month (July 2026)');
+  const [selectedDuration, setSelectedDuration] = useState(durationOptions[0]);
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const [successToast, setSuccessToast] = useState("");
 
   // Date selection states
-  const [startDate, setStartDate] = useState(new Date(2026, 6, 1)); // 01 Jul 2026
-  const [endDate, setEndDate] = useState(new Date(2026, 6, 31)); // 31 Jul 2026
+  const initialDates = computeDatesForDuration(durationOptions[0]);
+  const [startDate, setStartDate] = useState(initialDates.start);
+  const [endDate, setEndDate] = useState(initialDates.end);
 
   // Dynamic applied filters
   const [appliedUser, setAppliedUser] = useState(() => {
@@ -1469,196 +1551,186 @@ const UserInsightsPage = () => {
       } catch (e) { }
       return { name: saved, role: 'User', manager: 'Arun Kumar', status: 'Active' };
     }
-    return { name: 'Rahul Kumar', role: 'User', manager: 'Arun Kumar', status: 'Active' };
+    return fallbackUsersList[0];
   });
   const [appliedProject, setAppliedProject] = useState('All Projects');
 
   // Tab Navigation Routing
   const [activeTab, setActiveTab] = useState('Overview');
-  const [currentMonthYear, setCurrentMonthYear] = useState('July 2026');
+  const [currentMonthDate, setCurrentMonthDate] = useState(() => new Date());
+  const currentMonthYear = currentMonthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const [hoveredDay, setHoveredDay] = useState(null);
   const [activeReportProject, setActiveReportProject] = useState(null);
 
-  // Live assignments state from localStorage
-  const [assignments, setAssignments] = useState(() => {
-    const saved = localStorage.getItem('hirate-assignments');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed && parsed.length > 0) return parsed;
-      } catch (e) { }
-    }
+  // Live assignments state from backend & localStorage
+  const [assignments, setAssignments] = useState([]);
 
-    // Seed same initial assignments to keep single source of truth initialized
-    const initialAssignments = [
-      {
-        id: 'task-1',
-        userName: 'Sravya',
-        project: 'APFI',
-        category: 'Roadway',
-        routeSection: 'APFI',
-        routeSectionName: 'Andhra Pradesh Expressway Limited (APFI)',
-        subSection: 'Pages 10-20',
-        priority: 'High',
-        status: 'Pending',
-        due: '2026-07-20',
-        assignedOn: '14 Jul 2026, 05:28 PM',
-        timeline: [
-          {
-            timestamp: '14 Jul 2026, 05:28 PM',
-            action: 'Assigned by Admin',
-            performedBy: 'Admin',
-            remarks: 'Please complete the rating for the HO process images. Ensure accuracy and submit before the due date.'
-          }
-        ]
-      },
-      {
-        id: 'task-2',
-        userName: 'Rahul Kumar',
-        project: 'SPPL',
-        category: 'Structures',
-        routeSection: 'SPPL',
-        routeSectionName: 'KNR Shankarampet Projects Private Limited (SPPL)',
-        subSection: 'Pages 5-10',
-        priority: 'Medium',
-        status: 'In Progress',
-        due: '2026-07-21',
-        assignedOn: '14 Jul 2026, 04:45 PM',
-        timeline: [
-          {
-            timestamp: '14 Jul 2026, 04:45 PM',
-            action: 'Assigned by Admin',
-            performedBy: 'Admin',
-            remarks: 'Verify structures rating.'
-          },
-          {
-            timestamp: '14 Jul 2026, 05:00 PM',
-            action: 'Opened by User',
-            performedBy: 'Rahul Kumar',
-            remarks: 'Task is visible on my dashboard.'
-          }
-        ]
-      },
-      {
-        id: 'task-3',
-        userName: 'Kiran Reddy',
-        project: 'JMTPL',
-        category: 'ATMS',
-        routeSection: 'JMTPL',
-        routeSectionName: 'Jaipur-Mahua Tollway Private Limited (JMTPL)',
-        subSection: 'Page 1',
-        priority: 'Low',
-        status: 'Completed',
-        due: '2026-07-13',
-        assignedOn: '13 Jul 2026, 11:20 AM',
-        completedOn: '13 Jul 2026, 12:25 PM',
-        timeline: [
-          {
-            timestamp: '13 Jul 2026, 11:20 AM',
-            action: 'Assigned by Admin',
-            performedBy: 'Admin',
-            remarks: 'Review ATMS images.'
-          },
-          {
-            timestamp: '13 Jul 2026, 11:35 AM',
-            action: 'Opened by User',
-            performedBy: 'Kiran Reddy',
-            remarks: 'Started rating images.'
-          },
-          {
-            timestamp: '13 Jul 2026, 12:25 PM',
-            action: 'Marked Completed',
-            performedBy: 'Kiran Reddy',
-            remarks: 'All rating details submitted.'
-          }
-        ]
-      },
-      // --- Rahul Kumar Completed Tasks ---
-      { id: 't-rahul-1', userName: 'Rahul Kumar', project: 'DATL', category: 'Roadway', routeSection: 'DATL', routeSectionName: 'Delhi Agra Tollway Limited (DATL)', subSection: 'Pages 81-120', priority: 'Medium', status: 'Completed', due: '2026-07-25', assignedOn: '23 Jul 2026, 10:00 AM', completedOn: '24 Jul 2026, 02:00 PM', timeline: [{ timestamp: '24 Jul 2026, 02:00 PM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-rahul-2', userName: 'Rahul Kumar', project: 'DATL', category: 'Drainage', routeSection: 'DATL', routeSectionName: 'Delhi Agra Tollway Limited (DATL)', subSection: 'Pages 41-80', priority: 'Medium', status: 'Completed', due: '2026-07-23', assignedOn: '21 Jul 2026, 10:00 AM', completedOn: '22 Jul 2026, 11:30 AM', timeline: [{ timestamp: '22 Jul 2026, 11:30 AM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-rahul-3', userName: 'Rahul Kumar', project: 'DATL', category: 'Roadway', routeSection: 'DATL', routeSectionName: 'Delhi Agra Tollway Limited (DATL)', subSection: 'Pages 1-40', priority: 'Medium', status: 'Completed', due: '2026-07-23', assignedOn: '21 Jul 2026, 10:00 AM', completedOn: '22 Jul 2026, 03:30 PM', timeline: [{ timestamp: '22 Jul 2026, 03:30 PM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-rahul-4', userName: 'Rahul Kumar', project: 'APFI', category: 'Structures', routeSection: 'APFI', routeSectionName: 'Andhra Pradesh Expressway Limited (APFI)', subSection: 'Pages 1-35', priority: 'Medium', status: 'Completed', due: '2026-07-24', assignedOn: '22 Jul 2026, 10:00 AM', completedOn: '23 Jul 2026, 01:00 PM', timeline: [{ timestamp: '23 Jul 2026, 01:00 PM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-rahul-5', userName: 'Rahul Kumar', project: 'NAM', category: 'Signage', routeSection: 'NAM', routeSectionName: 'N A M Expressway Limited (NAMEL)', subSection: 'Pages 1-24', priority: 'Medium', status: 'Completed', due: '2026-07-22', assignedOn: '20 Jul 2026, 10:00 AM', completedOn: '21 Jul 2026, 04:00 PM', timeline: [{ timestamp: '21 Jul 2026, 04:00 PM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-rahul-6', userName: 'Rahul Kumar', project: 'NAM', category: 'Signage', routeSection: 'NAM', routeSectionName: 'N A M Expressway Limited (NAMEL)', subSection: 'Pages 25-60', priority: 'Medium', status: 'Completed', due: '2026-07-26', assignedOn: '24 Jul 2026, 10:00 AM', completedOn: '25 Jul 2026, 05:00 PM', timeline: [{ timestamp: '25 Jul 2026, 05:00 PM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-rahul-7', userName: 'Rahul Kumar', project: 'NAM', category: 'Roadway', routeSection: 'NAM', routeSectionName: 'N A M Expressway Limited (NAMEL)', subSection: 'Pages 61-82', priority: 'Medium', status: 'Completed', due: '2026-07-27', assignedOn: '25 Jul 2026, 10:00 AM', completedOn: '26 Jul 2026, 10:00 AM', timeline: [{ timestamp: '26 Jul 2026, 10:00 AM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-rahul-8', userName: 'Rahul Kumar', project: 'APEL', category: 'Structures', routeSection: 'APEL', routeSectionName: 'Andhra Pradesh Expressway Limited (APEL)', subSection: 'Pages 1-13', priority: 'Medium', status: 'Completed', due: '2026-07-28', assignedOn: '26 Jul 2026, 10:00 AM', completedOn: '27 Jul 2026, 11:00 AM', timeline: [{ timestamp: '27 Jul 2026, 11:00 AM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-rahul-9', userName: 'Rahul Kumar', project: 'BFHL', category: 'Roadway', routeSection: 'BFHL', routeSectionName: 'Baharampore Farakka Highways Limited(BFHL)', subSection: 'Pages 1-50', priority: 'Medium', status: 'Completed', due: '2026-07-03', assignedOn: '01 Jul 2026, 10:00 AM', completedOn: '02 Jul 2026, 02:00 PM', timeline: [{ timestamp: '02 Jul 2026, 02:00 PM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-rahul-10', userName: 'Rahul Kumar', project: 'BFHL', category: 'Drainage', routeSection: 'BFHL', routeSectionName: 'Baharampore Farakka Highways Limited(BFHL)', subSection: 'Pages 51-120', priority: 'Medium', status: 'Completed', due: '2026-07-06', assignedOn: '04 Jul 2026, 10:00 AM', completedOn: '05 Jul 2026, 04:00 PM', timeline: [{ timestamp: '05 Jul 2026, 04:00 PM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-rahul-11', userName: 'Rahul Kumar', project: 'BWHPL', category: 'Roadway', routeSection: 'BWHPL', routeSectionName: 'DBL Borgaon Watambare Highways Private Limited(BWHPL)', subSection: 'Pages 1-60', priority: 'Medium', status: 'Completed', due: '2026-07-10', assignedOn: '08 Jul 2026, 10:00 AM', completedOn: '09 Jul 2026, 12:00 PM', timeline: [{ timestamp: '09 Jul 2026, 12:00 PM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-rahul-12', userName: 'Rahul Kumar', project: 'BWHPL', category: 'Landscaping', routeSection: 'BWHPL', routeSectionName: 'DBL Borgaon Watambare Highways Private Limited(BWHPL)', subSection: 'Pages 61-150', priority: 'Medium', status: 'Completed', due: '2026-07-13', assignedOn: '11 Jul 2026, 10:00 AM', completedOn: '12 Jul 2026, 03:00 PM', timeline: [{ timestamp: '12 Jul 2026, 03:00 PM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-rahul-13', userName: 'Rahul Kumar', project: 'DATL', category: 'Structures', routeSection: 'DATL', routeSectionName: 'Delhi Agra Tollway Limited (DATL)', subSection: 'Pages 121-200', priority: 'Medium', status: 'Completed', due: '2026-07-17', assignedOn: '15 Jul 2026, 10:00 AM', completedOn: '16 Jul 2026, 05:00 PM', timeline: [{ timestamp: '16 Jul 2026, 05:00 PM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-rahul-14', userName: 'Rahul Kumar', project: 'DHMEPL', category: 'Roadway', routeSection: 'DHMEPL', routeSectionName: 'Delhi Hapur Meerut Expressway Private Limited(DHMEPL)', subSection: 'Pages 1-92', priority: 'Medium', status: 'Completed', due: '2026-07-19', assignedOn: '17 Jul 2026, 10:00 AM', completedOn: '18 Jul 2026, 01:00 PM', timeline: [{ timestamp: '18 Jul 2026, 01:00 PM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-rahul-15', userName: 'Rahul Kumar', project: 'GAEPL', category: 'Roadway', routeSection: 'GAEPL', routeSectionName: 'Ghaziabad Aligarh Expressway Private Limited(GAEPL)', subSection: 'Pages 1-17', priority: 'Medium', status: 'Completed', due: '2026-07-30', assignedOn: '28 Jul 2026, 10:00 AM', completedOn: '29 Jul 2026, 04:00 PM', timeline: [{ timestamp: '29 Jul 2026, 04:00 PM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-
-      // --- Sravya Completed Tasks ---
-      { id: 't-sravya-1', userName: 'Sravya', project: 'DATL', category: 'Roadway', routeSection: 'DATL', routeSectionName: 'Delhi Agra Tollway Limited (DATL)', subSection: 'Pages 1-15', priority: 'Medium', status: 'Completed', due: '2026-07-22', assignedOn: '20 Jul 2026, 10:00 AM', completedOn: '21 Jul 2026, 10:00 AM', timeline: [{ timestamp: '21 Jul 2026, 10:00 AM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-sravya-2', userName: 'Sravya', project: 'DATL', category: 'Drainage', routeSection: 'DATL', routeSectionName: 'Delhi Agra Tollway Limited (DATL)', subSection: 'Pages 16-35', priority: 'Medium', status: 'Completed', due: '2026-07-23', assignedOn: '21 Jul 2026, 10:00 AM', completedOn: '22 Jul 2026, 11:30 AM', timeline: [{ timestamp: '22 Jul 2026, 11:30 AM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-sravya-3', userName: 'Sravya', project: 'DATL', category: 'Roadway', routeSection: 'DATL', routeSectionName: 'Delhi Agra Tollway Limited (DATL)', subSection: 'Pages 36-45', priority: 'Medium', status: 'Completed', due: '2026-07-24', assignedOn: '22 Jul 2026, 10:00 AM', completedOn: '23 Jul 2026, 03:00 PM', timeline: [{ timestamp: '23 Jul 2026, 03:00 PM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-sravya-4', userName: 'Sravya', project: 'APFI', category: 'Structures', routeSection: 'APFI', routeSectionName: 'Andhra Pradesh Expressway Limited (APFI)', subSection: 'Pages 1-25', priority: 'Medium', status: 'Completed', due: '2026-07-25', assignedOn: '23 Jul 2026, 10:00 AM', completedOn: '24 Jul 2026, 12:00 PM', timeline: [{ timestamp: '24 Jul 2026, 12:00 PM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-sravya-5', userName: 'Sravya', project: 'NAM', category: 'Signage', routeSection: 'NAM', routeSectionName: 'N A M Expressway Limited (NAMEL)', subSection: 'Pages 1-18', priority: 'Medium', status: 'Completed', due: '2026-07-26', assignedOn: '24 Jul 2026, 10:00 AM', completedOn: '25 Jul 2026, 02:00 PM', timeline: [{ timestamp: '25 Jul 2026, 02:00 PM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-sravya-6', userName: 'Sravya', project: 'NAM', category: 'Roadway', routeSection: 'NAM', routeSectionName: 'N A M Expressway Limited (NAMEL)', subSection: 'Pages 19-30', priority: 'Medium', status: 'Completed', due: '2026-07-27', assignedOn: '25 Jul 2026, 10:00 AM', completedOn: '26 Jul 2026, 03:00 PM', timeline: [{ timestamp: '26 Jul 2026, 03:00 PM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-sravya-7', userName: 'Sravya', project: 'APEL', category: 'Structures', routeSection: 'APEL', routeSectionName: 'Andhra Pradesh Expressway Limited (APEL)', subSection: 'Pages 1-8', priority: 'Medium', status: 'Completed', due: '2026-07-28', assignedOn: '26 Jul 2026, 10:00 AM', completedOn: '27 Jul 2026, 04:00 PM', timeline: [{ timestamp: '27 Jul 2026, 04:00 PM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-sravya-8', userName: 'Sravya', project: 'BFHL', category: 'Drainage', routeSection: 'BFHL', routeSectionName: 'Baharampore Farakka Highways Limited(BFHL)', subSection: 'Pages 1-40', priority: 'Medium', status: 'Completed', due: '2026-07-06', assignedOn: '04 Jul 2026, 10:00 AM', completedOn: '05 Jul 2026, 11:00 AM', timeline: [{ timestamp: '05 Jul 2026, 11:00 AM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-sravya-9', userName: 'Sravya', project: 'BWHPL', category: 'Roadway', routeSection: 'BWHPL', routeSectionName: 'DBL Borgaon Watambare Highways Private Limited(BWHPL)', subSection: 'Pages 1-50', priority: 'Medium', status: 'Completed', due: '2026-07-13', assignedOn: '11 Jul 2026, 10:00 AM', completedOn: '12 Jul 2026, 12:00 PM', timeline: [{ timestamp: '12 Jul 2026, 12:00 PM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-sravya-10', userName: 'Sravya', project: 'DHMEPL', category: 'Roadway', routeSection: 'DHMEPL', routeSectionName: 'Delhi Hapur Meerut Expressway Private Limited(DHMEPL)', subSection: 'Pages 1-60', priority: 'Medium', status: 'Completed', due: '2026-07-19', assignedOn: '17 Jul 2026, 10:00 AM', completedOn: '18 Jul 2026, 04:00 PM', timeline: [{ timestamp: '18 Jul 2026, 04:00 PM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] },
-      { id: 't-sravya-11', userName: 'Sravya', project: 'GAEPL', category: 'Roadway', routeSection: 'GAEPL', routeSectionName: 'Ghaziabad Aligarh Expressway Private Limited(GAEPL)', subSection: 'Pages 1-10', priority: 'Medium', status: 'Completed', due: '2026-07-30', assignedOn: '28 Jul 2026, 10:00 AM', completedOn: '29 Jul 2026, 01:00 PM', timeline: [{ timestamp: '29 Jul 2026, 01:00 PM', action: 'Marked Completed', performedBy: 'Admin', remarks: 'Task completed.' }] }
-    ];
-    localStorage.setItem('hirate-assignments', JSON.stringify(initialAssignments));
-    return initialAssignments;
-  });
-
-  // Load actual data from localStorage on mount & listen to updates
+  // Load actual data from backend API on mount & listen to updates
   useEffect(() => {
     const loadData = async () => {
       let currentUsers = fallbackUsersList;
+      let liveAssignments = [];
+      const projectNames = new Set(defaultProjectOptions);
+
       try {
-        const fetchedUsers = await workAssignmentService.getUsers();
-        if (fetchedUsers && fetchedUsers.length > 0) {
-          currentUsers = fetchedUsers;
+        // Fetch users, assignments, and projects from backend in parallel
+        const [usersRes, assignmentsRes, projectsRes] = await Promise.allSettled([
+          workAssignmentService.getUsers({ limit: 500 }),
+          workAssignmentService.getAll({ limit: 1000 }),
+          projectService.getAllProjects()
+        ]);
+
+        // Process users
+        if (usersRes.status === 'fulfilled' && Array.isArray(usersRes.value) && usersRes.value.length > 0) {
+          currentUsers = usersRes.value.map(u => ({
+            id: u._id,
+            _id: u._id,
+            name: u.name || u.username || u.email,
+            username: u.username,
+            email: u.email,
+            role: u.role || 'User',
+            manager: u.manager || 'Arun Kumar',
+            status: u.isActive !== false ? 'Active' : 'Inactive'
+          }));
+        } else {
+          const savedUsers = localStorage.getItem('hirate-users');
+          if (savedUsers) {
+            try { currentUsers = JSON.parse(savedUsers); } catch (e) { }
+          }
         }
-      } catch (err) {
-        console.error('Failed to fetch users from backend, using fallback:', err);
-        const savedUsers = localStorage.getItem('hirate-users');
-        if (savedUsers) {
-          try {
-            currentUsers = JSON.parse(savedUsers);
-          } catch (e) { }
+        setUsersList(currentUsers);
+
+        // Process projects
+        if (projectsRes.status === 'fulfilled' && Array.isArray(projectsRes.value)) {
+          projectsRes.value.forEach(p => {
+            const pName = p.name || p.projectCode || p.code;
+            if (pName) projectNames.add(pName);
+          });
         }
-      }
-      setUsersList(currentUsers);
-      const savedAssignments = localStorage.getItem('hirate-assignments');
-      if (savedAssignments) {
-        try {
-          setAssignments(JSON.parse(savedAssignments));
-        } catch (e) { }
-      }
-      if (userId) {
-        const matchedUser = currentUsers.find(u => u.name.toLowerCase() === userId.toLowerCase()) || {
-          name: userId,
-          role: 'User',
-          manager: 'Arun Kumar',
-          status: 'Active'
-        };
-        setSelectedUser(matchedUser);
-        setAppliedUser(matchedUser);
-        localStorage.setItem('hirate-selected-user', typeof matchedUser === 'object' ? JSON.stringify(matchedUser) : matchedUser);
-      } else {
-        const savedSelected = localStorage.getItem('hirate-selected-user');
-        if (savedSelected) {
-          let parsedSelected = savedSelected;
-          try {
-            if (savedSelected.trim().startsWith('{')) {
-              parsedSelected = JSON.parse(savedSelected);
+
+        // Process work assignments from live MongoDB
+        if (assignmentsRes.status === 'fulfilled' && Array.isArray(assignmentsRes.value)) {
+          liveAssignments = assignmentsRes.value.map(a => {
+            const assignedUser = a.assignedTo && typeof a.assignedTo === 'object' ? a.assignedTo : null;
+            const assignedUserName = assignedUser?.name || assignedUser?.username || assignedUser?.email || (typeof a.assignedTo === 'string' ? a.assignedTo : 'Unknown');
+            const assignedUserId = assignedUser?._id || (typeof a.assignedTo === 'string' ? a.assignedTo : '');
+
+            const pCount = parsePagesFromRange(a.pages) || (a.questionIds && a.questionIds.length) || 10;
+            const pStr = a.pages || (a.questionIds && a.questionIds.length > 0 ? `Pages 1-${a.questionIds.length}` : 'Pages 1-10');
+            const projName = a.project || a.batchId?.project || 'General';
+
+            if (projName && !['HO PROCESS', 'ON-GOING', 'SPV RATED', 'HO RATED', 'NOT RATED'].includes(projName)) {
+              projectNames.add(projName);
             }
-          } catch (e) { }
 
-          const userName = typeof parsedSelected === 'object' ? parsedSelected.name : parsedSelected;
-          const matchedUser = currentUsers.find(u => u.name === userName) ||
-            (typeof parsedSelected === 'object' ? parsedSelected : { name: userName, role: 'User', manager: 'Arun Kumar', status: 'Active' });
+            return {
+              id: a._id,
+              _id: a._id,
+              userName: assignedUserName,
+              userId: assignedUserId,
+              userUsername: assignedUser?.username || '',
+              userEmail: assignedUser?.email || '',
+              project: projName,
+              routeSection: projName,
+              routeSectionName: a.batchName || projName,
+              category: a.category || 'Roadway',
+              subSection: pStr,
+              pageRange: pStr,
+              pagesCount: pCount,
+              priority: a.priority || 'Medium',
+              status: a.status || 'Assigned',
+              due: a.dueDate ? formatDateLabel(new Date(a.dueDate)) : '',
+              assignedOn: a.createdAt ? formatDateLabel(new Date(a.createdAt)) + ', ' + new Date(a.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+              completedOn: a.completedTime
+                ? formatDateLabel(new Date(a.completedTime)) + ', ' + new Date(a.completedTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : (a.status === 'Completed' && a.updatedAt ? formatDateLabel(new Date(a.updatedAt)) + ', ' + new Date(a.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null),
+              timeline: Array.isArray(a.timeline) && a.timeline.length > 0 ? a.timeline.map(t => ({
+                timestamp: t.timestamp ? formatDateLabel(new Date(t.timestamp)) + ', ' + new Date(t.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+                action: t.action || 'Assignment Update',
+                performedBy: t.performedByName || (t.performedBy?.name ? t.performedBy.name : (t.performedBy === 'Admin' ? 'Admin' : 'System')),
+                remarks: t.remarks || ''
+              })) : [
+                {
+                  timestamp: a.createdAt ? formatDateLabel(new Date(a.createdAt)) + ', ' + new Date(a.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+                  action: 'Assigned by Admin',
+                  performedBy: a.assignedBy?.name || 'Admin',
+                  remarks: a.remarks || 'Task assigned.'
+                }
+              ]
+            };
+          });
+        }
 
+        if (liveAssignments.length > 0) {
+          setAssignments(liveAssignments);
+          localStorage.setItem('hirate-assignments', JSON.stringify(liveAssignments));
+        } else {
+          const savedAssignments = localStorage.getItem('hirate-assignments');
+          if (savedAssignments) {
+            try {
+              const parsed = JSON.parse(savedAssignments);
+              if (parsed && parsed.length > 0) setAssignments(parsed);
+            } catch (e) { }
+          }
+        }
+
+        setAvailableProjects(Array.from(projectNames));
+
+        // Determine initially selected user
+        let matchedUser = null;
+        if (userId) {
+          matchedUser = currentUsers.find(u =>
+            (u.id && u.id.toString() === userId) ||
+            (u.name && u.name.toLowerCase() === userId.toLowerCase()) ||
+            (u.username && u.username.toLowerCase() === userId.toLowerCase())
+          );
+        }
+
+        if (!matchedUser) {
+          const savedSelected = localStorage.getItem('hirate-selected-user');
+          if (savedSelected) {
+            let targetName = savedSelected;
+            try {
+              if (savedSelected.trim().startsWith('{')) {
+                const parsed = JSON.parse(savedSelected);
+                targetName = parsed.name || parsed.username || parsed.id;
+              }
+            } catch (e) { }
+            matchedUser = currentUsers.find(u => u.name === targetName || u.username === targetName || u.id === targetName);
+          }
+        }
+
+        if (!matchedUser) {
+          const authUserSaved = localStorage.getItem('user') || localStorage.getItem('hirate-user');
+          if (authUserSaved) {
+            try {
+              const authUser = JSON.parse(authUserSaved);
+              matchedUser = currentUsers.find(u =>
+                u.name?.toLowerCase() === authUser.name?.toLowerCase() ||
+                u.username?.toLowerCase() === authUser.username?.toLowerCase() ||
+                u.email?.toLowerCase() === authUser.email?.toLowerCase() ||
+                u.id === authUser._id || u.id === authUser.id
+              );
+            } catch (e) { }
+          }
+        }
+
+        if (!matchedUser && currentUsers.length > 0) {
+          // Priority to a user with assignments
+          const userWithWork = currentUsers.find(u =>
+            liveAssignments.some(a => a.userName?.toLowerCase() === u.name?.toLowerCase() || a.userId === u.id)
+          );
+          matchedUser = userWithWork || currentUsers[0];
+        }
+
+        if (matchedUser) {
           setSelectedUser(matchedUser);
           setAppliedUser(matchedUser);
+          localStorage.setItem('hirate-selected-user', typeof matchedUser === 'object' ? JSON.stringify(matchedUser) : matchedUser);
         }
+
+      } catch (err) {
+        console.error('Failed to load User Insights live data:', err);
       }
     };
 
@@ -1685,21 +1757,10 @@ const UserInsightsPage = () => {
 
     // Sync dropdown duration selector
     if (!selectedDuration.includes('→')) {
-      if (selectedDuration === 'This Month (July 2026)') {
-        setStartDate(new Date(2026, 6, 1));
-        setEndDate(new Date(2026, 6, 31));
-      } else if (selectedDuration === 'Last Month (June 2026)') {
-        setStartDate(new Date(2026, 5, 1));
-        setEndDate(new Date(2026, 5, 30));
-      } else if (selectedDuration === 'Last 3 Months') {
-        setStartDate(new Date(2026, 3, 1));
-        setEndDate(new Date(2026, 6, 31));
-      } else if (selectedDuration === 'Last 6 Months') {
-        setStartDate(new Date(2026, 0, 1));
-        setEndDate(new Date(2026, 6, 31));
-      } else if (selectedDuration === 'This Year (2026)') {
-        setStartDate(new Date(2026, 0, 1));
-        setEndDate(new Date(2026, 11, 31));
+      const dates = computeDatesForDuration(selectedDuration);
+      if (dates) {
+        setStartDate(dates.start);
+        setEndDate(dates.end);
       }
     }
   };
@@ -1713,19 +1774,37 @@ const UserInsightsPage = () => {
   };
 
   // Find currently applied user object details
-  const currentAppliedUserName = appliedUser?.name || appliedUser || '';
+  const currentAppliedUserName = appliedUser?.name || (typeof appliedUser === 'string' ? appliedUser : '');
+  const currentAppliedUserId = appliedUser?.id || appliedUser?._id || '';
 
-  const currentUserObj = usersList.find(u => u.name === currentAppliedUserName) || {
-    name: currentAppliedUserName,
-    role: appliedUser?.role || (currentAppliedUserName === 'Sravya' ? 'Administrator' : 'User'),
+  const currentUserObj = usersList.find(u =>
+    (currentAppliedUserId && u.id === currentAppliedUserId) ||
+    (currentAppliedUserName && u.name?.toLowerCase() === currentAppliedUserName.toLowerCase()) ||
+    (currentAppliedUserName && u.username?.toLowerCase() === currentAppliedUserName.toLowerCase())
+  ) || {
+    name: currentAppliedUserName || 'User',
+    role: appliedUser?.role || 'User',
     manager: appliedUser?.manager || 'Arun Kumar',
     status: appliedUser?.status || 'Active'
   };
 
-  // 1. Filter raw database by user, project, and dynamic custom date range
+  // User matching helper
+  const isMatchUser = (a) => {
+    if (!a) return false;
+    if (currentAppliedUserId && (a.userId === currentAppliedUserId || a.assignedTo?._id === currentAppliedUserId)) return true;
+    if (currentAppliedUserName) {
+      const targetLower = currentAppliedUserName.toLowerCase();
+      if (a.userName && a.userName.toLowerCase() === targetLower) return true;
+      if (a.userUsername && a.userUsername.toLowerCase() === targetLower) return true;
+      if (a.userEmail && a.userEmail.toLowerCase() === targetLower) return true;
+    }
+    return false;
+  };
+
+  // 1. Filter live database by user, project, and dynamic date range
   const filteredRecords = assignments.filter(a => {
-    const matchUser = a.userName.toLowerCase() === currentAppliedUserName.toLowerCase();
-    const matchProject = appliedProject === 'All Projects' || a.project === appliedProject;
+    const matchUser = isMatchUser(a);
+    const matchProject = appliedProject === 'All Projects' || a.project === appliedProject || a.routeSection === appliedProject;
 
     if (a.status !== 'Completed' || !a.completedOn) return false;
 
@@ -1735,8 +1814,8 @@ const UserInsightsPage = () => {
   });
 
   const allAssignedRecords = assignments.filter(a => {
-    const matchUser = a.userName.toLowerCase() === currentAppliedUserName.toLowerCase();
-    const matchProject = appliedProject === 'All Projects' || a.project === appliedProject;
+    const matchUser = isMatchUser(a);
+    const matchProject = appliedProject === 'All Projects' || a.project === appliedProject || a.routeSection === appliedProject;
 
     const dateStr = a.completedOn || a.assignedOn || '';
     const recDate = parseFlexibleDate(dateStr);
@@ -1744,7 +1823,7 @@ const UserInsightsPage = () => {
     return matchUser && matchProject && matchDate;
   });
 
-  const userAssignments = assignments.filter(a => a.userName.toLowerCase() === currentAppliedUserName.toLowerCase());
+  const userAssignments = assignments.filter(a => isMatchUser(a));
 
   // Determine active records based on priority fallback logic
   const hasFilteredCompleted = filteredRecords.length > 0;
@@ -2319,7 +2398,7 @@ const UserInsightsPage = () => {
 
   // --- DOUGHNUT CHART PROJECT GROUPS & HORIZONTAL BAR DATA ---
   // Get all assignments for the selected user, ignoring project/category filters
-  const userAllRecords = assignments.filter(a => a.userName.toLowerCase() === currentAppliedUserName.toLowerCase());
+  const userAllRecords = assignments.filter(a => isMatchUser(a));
 
   // 1. Group records by project (ignoring HO PROCESS / status labels)
   const projectRecordsMap = {};
@@ -2554,21 +2633,21 @@ const UserInsightsPage = () => {
   // --- CALENDAR TIMELINE BUSINESS LOGIC ---
   const getDayActivityDetails = (dayNum) => {
     const formattedDay = dayNum.toString().padStart(2, '0');
-    const targetMonthName = currentMonthYear.split(' ')[0]; // e.g. "July"
-    const targetYear = currentMonthYear.split(' ')[1]; // e.g. "2026"
+    const targetYear = currentMonthDate.getFullYear();
+    const targetMonthIdx = currentMonthDate.getMonth();
+    const targetMonthName = currentMonthDate.toLocaleDateString('en-US', { month: 'short' });
 
-    const dayRecords = filteredRecords.filter(r => {
-      const compDate = parseFlexibleDate(r.completedOn);
-      const mNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-      const compMonthName = mNames[compDate.getMonth()];
-
+    const dayRecords = userAllRecords.filter(r => {
+      const dateToUse = isUsingCompleted ? r.completedOn : (r.assignedOn || r.completedOn);
+      if (!dateToUse) return false;
+      const compDate = parseFlexibleDate(dateToUse);
       return compDate.getDate() === dayNum &&
-        compMonthName.toLowerCase() === targetMonthName.toLowerCase() &&
-        compDate.getFullYear().toString() === targetYear;
+        compDate.getMonth() === targetMonthIdx &&
+        compDate.getFullYear() === targetYear;
     });
 
-    const weekday = getWeekdayLabel(dayNum, currentMonthYear);
-    const dateStr = `${formattedDay} ${targetMonthName.slice(0, 3)} ${targetYear}`;
+    const weekday = getWeekdayLabel(dayNum, currentMonthDate);
+    const dateStr = `${formattedDay} ${targetMonthName} ${targetYear}`;
 
     if (dayRecords.length === 0) {
       return {
@@ -2578,13 +2657,14 @@ const UserInsightsPage = () => {
         category: 'N/A',
         pageRange: 'N/A',
         pagesCompleted: 0,
-        weekday
+        weekday,
+        isCompletedMode: isUsingCompleted
       };
     }
 
-    const projects = [...new Set(dayRecords.map(r => r.project))].join(', ');
-    const categories = [...new Set(dayRecords.map(r => r.category))].join(', ');
-    const totalCompleted = dayRecords.reduce((sum, r) => sum + parsePagesFromRange(r.subSection || r.pageRange || ''), 0);
+    const projects = [...new Set(dayRecords.map(r => r.routeSection || r.project))].join(', ');
+    const categories = [...new Set(dayRecords.map(r => categoryMap[r.category] || r.category))].join(', ');
+    const totalCompleted = dayRecords.reduce((sum, r) => sum + (r.pagesCount || parsePagesFromRange(r.subSection || r.pageRange || '')), 0);
     const pageRanges = dayRecords.map(r => r.subSection || r.pageRange).filter(Boolean).join(', ') || 'N/A';
 
     return {
@@ -2594,38 +2674,29 @@ const UserInsightsPage = () => {
       category: categories,
       pageRange: pageRanges,
       pagesCompleted: totalCompleted,
-      weekday
+      weekday,
+      isCompletedMode: isUsingCompleted
     };
   };
 
-  const getWeekdayLabel = (dayNum, monthYearStr) => {
-    const monthMap = { 'June': 5, 'July': 6, 'August': 7 };
-    const mStr = monthYearStr.split(' ')[0];
-    const monthIdx = monthMap[mStr] !== undefined ? monthMap[mStr] : 6;
-    const year = parseInt(monthYearStr.split(' ')[1], 10) || 2026;
-    const d = new Date(year, monthIdx, dayNum);
+  const getWeekdayLabel = (dayNum, dateObj) => {
+    const d = new Date(dateObj.getFullYear(), dateObj.getMonth(), dayNum);
     return d.toLocaleDateString('en-US', { weekday: 'short' });
   };
 
-  const getDaysInMonthCount = (monthYearStr) => {
-    const monthMap = { 'June': 5, 'July': 6, 'August': 7 };
-    const mStr = monthYearStr.split(' ')[0];
-    const monthIdx = monthMap[mStr] !== undefined ? monthMap[mStr] : 6;
-    const year = parseInt(monthYearStr.split(' ')[1], 10) || 2026;
-    return new Date(year, monthIdx + 1, 0).getDate();
+  const getDaysInMonthCount = (dateObj) => {
+    return new Date(dateObj.getFullYear(), dateObj.getMonth() + 1, 0).getDate();
   };
 
-  const daysInMonthCount = getDaysInMonthCount(currentMonthYear);
+  const daysInMonthCount = getDaysInMonthCount(currentMonthDate);
   const daysList = Array.from({ length: daysInMonthCount }, (_, i) => i + 1);
 
   const handlePrevMonth = () => {
-    if (currentMonthYear === 'July 2026') setCurrentMonthYear('June 2026');
-    else if (currentMonthYear === 'August 2026') setCurrentMonthYear('July 2026');
+    setCurrentMonthDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   };
 
   const handleNextMonth = () => {
-    if (currentMonthYear === 'July 2026') setCurrentMonthYear('August 2026');
-    else if (currentMonthYear === 'June 2026') setCurrentMonthYear('July 2026');
+    setCurrentMonthDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
 
   // Tabs navigation configuration
@@ -2835,7 +2906,7 @@ const UserInsightsPage = () => {
                           onChange={(e) => setSelectedProject(e.target.value)}
                           className="w-full h-[46px] pl-4 pr-10 border border-borderColor rounded-xl text-sm bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-textColor font-bold appearance-none cursor-pointer shadow-sm transition-all duration-200"
                         >
-                          {projectOptions.map((proj, idx) => (
+                          {availableProjects.map((proj, idx) => (
                             <option key={`${proj}-${idx}`} value={proj}>
                               {proj}
                             </option>

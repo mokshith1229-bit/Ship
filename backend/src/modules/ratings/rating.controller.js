@@ -106,7 +106,9 @@ const getBatchTasks = asyncHandler(async (req, res) => {
     direction: req.query.direction,
     roadType: req.query.roadType,
     minChainage: req.query.minChainage,
-    maxChainage: req.query.maxChainage
+    maxChainage: req.query.maxChainage,
+    assignmentId: req.query.assignmentId,
+    pages: req.query.pages
   };
   const data = await ratingService.getBatchTasks(req.params.batchId, req.user, options);
   return successResponse(res, data, 'Batch tasks retrieved');
