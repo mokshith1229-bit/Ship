@@ -22,7 +22,10 @@ import {
   LuTrash2,
   LuCheck,
   LuLoader,
-  LuPlay
+  LuPlay,
+  LuFolder,
+  LuLayoutGrid,
+  LuMapPin
 } from 'react-icons/lu';
 
 import AnimatedAssignButton from '../components/common/AnimatedAssignButton';
@@ -1687,82 +1690,126 @@ const NotificationPage = () => {
           `}} />
 
           {/* Drawer Panel */}
-          <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col z-10 animate-slide-in-right">
-            {/* Header */}
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">Assignment Timeline</h3>
-                <p className="text-xs text-gray-400 font-medium mt-1">Task history for {activeTimelineAssignment.assignedTo?.name}</p>
-              </div>
-              <button
-                onClick={() => setActiveTimelineAssignment(null)}
-                className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors cursor-pointer text-sm font-bold"
-              >
-                ✕
-              </button>
-            </div>
+          <div className="relative w-[500px] max-w-[90vw] bg-[#f8fafc] h-full shadow-2xl flex flex-col z-10 animate-slide-in-right">
+            {/* Header / Close Button */}
+            <button
+              onClick={() => setActiveTimelineAssignment(null)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-white shadow-sm border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors cursor-pointer text-sm font-bold z-20"
+            >
+              ✕
+            </button>
 
-            {/* Project Details Info Grid */}
-            <div className="p-6 bg-gray-50/50 border-b border-gray-100 grid grid-cols-2 gap-4 text-xs">
-              <div>
-                <span className="font-bold text-gray-400 block uppercase tracking-wider text-[9px] mb-0.5">Project</span>
-                <span className="font-semibold text-gray-800">{activeTimelineAssignment.batchId?.project || 'Unknown'}</span>
+            <div className="flex flex-col flex-1 overflow-y-auto px-6 pb-6 gap-8 custom-scrollbar">
+              
+              {/* Header Title */}
+              <div className="mt-[60px] pt-5">
+                <h3 className="text-2xl font-bold text-slate-900 leading-snug whitespace-nowrap flex items-baseline gap-2">
+                  Task history for <span className="uppercase text-green-600 text-3xl">{activeTimelineAssignment.assignedTo?.name}</span>
+                </h3>
               </div>
-              <div>
-                <span className="font-bold text-gray-400 block uppercase tracking-wider text-[9px] mb-0.5">Category</span>
-                <span className="font-semibold text-gray-800">Roadway</span>
-              </div>
-              <div className="col-span-2">
-                <span className="font-bold text-gray-400 block uppercase tracking-wider text-[9px] mb-0.5">Route / Section</span>
-                <span className="font-semibold text-gray-800 block truncate" title={activeTimelineAssignment.batchId?.project}>
-                  {activeTimelineAssignment.batchId?.project} - {activeTimelineAssignment.batchId?.dateOfSurvey ? new Date(activeTimelineAssignment.batchId.dateOfSurvey).toLocaleDateString() : 'Unknown'}
-                </span>
-              </div>
-            </div>
 
-            {/* Timeline Vertical Path */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              {activeTimelineAssignment.timeline && activeTimelineAssignment.timeline.length > 0 ? (
-                <div className="relative border-l border-gray-200 ml-3 pl-6 space-y-6 py-2">
-                  {activeTimelineAssignment.timeline.map((event, idx) => {
-                    const isCompleted = event.action.includes('Completed');
-                    const isAssigned = event.action.includes('Assigned');
-                    const isOpened = event.action.includes('Opened');
-                    return (
-                      <div key={idx} className="relative">
-                        {/* Circle marker */}
-                        <span className={`absolute -left-[32px] top-1 w-4 h-4 rounded-full border-2 bg-white flex items-center justify-center ${isCompleted
-                            ? 'border-emerald-500 text-emerald-500'
-                            : isAssigned
-                              ? 'border-green-500 text-green-500'
-                              : isOpened
-                                ? 'border-amber-500 text-amber-500'
-                                : 'border-purple-500 text-purple-500'
-                          }`} />
-
-                        <div className="space-y-1">
-                          <div className="flex items-start justify-between gap-2">
-                            <span className="text-sm font-bold text-gray-900">{event.action}</span>
-                            <span className="text-[10px] font-semibold text-gray-400 whitespace-nowrap pt-0.5">
-                              {formatDateTime(event.timestamp)}
-                            </span>
-                          </div>
-                          <div className="text-xs text-gray-500 font-medium">
-                            By {event.performedBy?.name || 'Unknown'}
-                          </div>
-                          {event.remarks && (
-                            <div className="mt-2 p-3 bg-gray-50 rounded border border-gray-100 text-xs text-gray-600 leading-relaxed font-medium">
-                              {event.remarks}
-                            </div>
-                          )}
-                        </div>
+              {/* Metadata Card */}
+              <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex flex-col gap-6">
+                <div className="flex flex-col gap-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
+                      <LuFolder size={18} />
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Project</div>
+                      <div className="text-sm font-bold text-slate-800">{activeTimelineAssignment.batchId?.project || 'Unknown'}</div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
+                      <LuLayoutGrid size={18} />
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Category</div>
+                      <div className="text-sm font-bold text-slate-800">Roadway</div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
+                      <LuMapPin size={18} />
+                    </div>
+                    <div className="overflow-hidden">
+                      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Route / Section</div>
+                      <div className="text-sm font-bold text-slate-800 truncate" title={`${activeTimelineAssignment.batchId?.project} - ${activeTimelineAssignment.batchId?.dateOfSurvey ? new Date(activeTimelineAssignment.batchId.dateOfSurvey).toLocaleDateString() : 'Unknown'}`}>
+                        {activeTimelineAssignment.batchId?.project} - {activeTimelineAssignment.batchId?.dateOfSurvey ? new Date(activeTimelineAssignment.batchId.dateOfSurvey).toLocaleDateString() : 'Unknown'}
                       </div>
-                    );
-                  })}
+                    </div>
+                  </div>
                 </div>
-              ) : (
-                <div className="text-center py-12 text-xs text-gray-400 font-medium">No timeline events recorded.</div>
-              )}
+              </div>
+
+              {/* Timeline Path */}
+              <div className="flex-1 mt-2">
+                {activeTimelineAssignment.timeline && activeTimelineAssignment.timeline.length > 0 ? (
+                  <div className="relative border-l border-gray-200 ml-4 pl-6 space-y-6 py-2">
+                    {activeTimelineAssignment.timeline.map((event, idx) => {
+                      const isCompleted = event.action.includes('Completed');
+                      const isAssigned = event.action.includes('Assigned');
+                      const isOpened = event.action.includes('Opened');
+                      const isOverdue = event.action.includes('Overdue');
+                      
+                      let circleColor = 'bg-slate-400';
+                      let badgeColor = 'bg-slate-100 text-slate-700';
+                      let badgeText = 'STATUS';
+                      
+                      if (isCompleted) {
+                        circleColor = 'bg-emerald-500';
+                        badgeColor = 'bg-emerald-100 text-emerald-700';
+                        badgeText = 'COMPLETED';
+                      } else if (isAssigned) {
+                        circleColor = 'bg-emerald-500';
+                        badgeColor = 'bg-emerald-100 text-emerald-700';
+                        badgeText = 'ASSIGNMENT';
+                      } else if (isOpened) {
+                        circleColor = 'bg-amber-500';
+                        badgeColor = 'bg-amber-100 text-amber-700';
+                        badgeText = 'OPENED';
+                      } else if (isOverdue) {
+                        circleColor = 'bg-purple-500';
+                        badgeColor = 'bg-purple-100 text-purple-700';
+                        badgeText = 'OVERDUE';
+                      }
+
+                      return (
+                        <div key={idx} className="relative">
+                          {/* Solid circle marker */}
+                          <span className={`absolute -left-[32px] top-4 w-4 h-4 rounded-full ring-4 ring-[#f8fafc] ${circleColor}`} />
+
+                          {/* Event Card */}
+                          <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex flex-col">
+                            <div className="flex justify-between items-center mb-3">
+                              <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${badgeColor}`}>
+                                {badgeText}
+                              </span>
+                              <span className="text-[11px] font-semibold text-gray-400">
+                                {formatDateTime(event.timestamp)}
+                              </span>
+                            </div>
+                            <h4 className="text-sm font-bold text-gray-900 mb-0.5">{event.action}</h4>
+                            <div className="text-xs font-medium text-gray-500 mb-1">
+                              By {event.performedBy?.name || 'Unknown'}
+                            </div>
+                            {event.remarks && (
+                              <div className="mt-3 p-3 bg-gray-50 rounded-lg text-xs text-gray-600 leading-relaxed font-medium">
+                                {event.remarks}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-xs text-gray-400 font-medium">No timeline events recorded.</div>
+                )}
+              </div>
             </div>
           </div>
         </div>

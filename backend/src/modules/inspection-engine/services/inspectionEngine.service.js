@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 const inspectionEngineRepository = require('../repositories/inspectionEngine.repository');
 const masterListRepository = require('../../master-list/masterList.repository');
@@ -150,8 +150,24 @@ class InspectionEngineService {
     return batch;
   }
 
-  _parseAllVttChainages(vttPath) {
+  _parseAllVttChainages(vttPath, assetCoverage = null) {
     try {
+      const fs = require('fs');
+      if (!fs.existsSync(vttPath)) {
+        console.warn(`VTT file missing: ${vttPath}. Falling back to coverage boundaries.`);
+        if (assetCoverage && assetCoverage.startChainage != null && assetCoverage.endChainage != null) {
+          const chainages = [];
+          const start = Math.min(assetCoverage.startChainage, assetCoverage.endChainage);
+          const end = Math.max(assetCoverage.startChainage, assetCoverage.endChainage);
+          // Generate a chainage every 10 meters (0.010 km) as a robust fallback
+          for (let c = start; c <= end; c += 0.010) {
+            chainages.push(parseFloat(c.toFixed(3)));
+          }
+          return chainages;
+        }
+        return [];
+      }
+
       const content = fs.readFileSync(vttPath, 'utf8');
       const blocks = content.trim().split(/\n\s*\n/);
       const metadataPattern = /Lat:\s*([0-9.-]+),\s*Lon:\s*([0-9.-]+),\s*Speed:\s*([0-9.-]+)[kK]m\/hr\s*chainage:\s*([0-9.-]+)/i;
@@ -165,7 +181,8 @@ class InspectionEngineService {
       }
       return chainages.sort((a, b) => a - b);
     } catch (e) {
-      throw new Error('Failed to parse VTT chainages');
+      console.error('Error parsing VTT chainages:', e.message);
+      return [];
     }
   }
 
@@ -199,7 +216,7 @@ class InspectionEngineService {
 
     for (const asset of assets) {
       try {
-        const assetChainages = this._parseAllVttChainages(asset.vtt.path);
+        const assetChainages = this._parseAllVttChainages(asset.vtt.path, asset.coverage);
         for (const c of assetChainages) {
           availableChainages.push(c);
           if (!chainageSourceMap.has(c)) {

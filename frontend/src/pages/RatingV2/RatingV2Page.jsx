@@ -7,6 +7,7 @@ import ImageViewer from '../../components/RatingV2/ImageViewer';
 import ImageThumbnailStrip from '../../components/RatingV2/ImageThumbnailStrip';
 import ParameterPanel from '../../components/RatingV2/ParameterPanel';
 import AddMissingQuestion from '../../components/RatingV2/AddMissingQuestion';
+import HiRateRoadLoader from '../../components/common/HiRateRoadLoader';
 
 const RatingV2Page = () => {
   const { batchId } = useParams();
@@ -160,6 +161,26 @@ const RatingV2Page = () => {
     });
   };
 
+  const handleUndoRating = (paramKey) => {
+    if (!currentTask) return;
+    setRatingsState(prev => {
+      const currentTaskRatings = { ...(prev[currentTask._id] || {}) };
+      const existing = currentTaskRatings[paramKey] || {};
+      
+      currentTaskRatings[paramKey] = {
+        ...existing,
+        score: 10,
+        remark: '',
+        isSkipped: false
+      };
+      
+      return {
+        ...prev,
+        [currentTask._id]: currentTaskRatings
+      };
+    });
+  };
+
   const handleSaveAndNavigate = async (direction) => {
     if (!currentTask || saving) return;
     setSaving(true);
@@ -284,7 +305,11 @@ const RatingV2Page = () => {
   }, [globalIndex, totalTasks, currentTask, ratingsState, saving, activeImageView]);
 
   if (loading && tasks.length === 0) {
-    return <div className="flex h-screen items-center justify-center bg-white text-gray-800">Loading Inspection Data...</div>;
+    return (
+      <div className="flex h-screen items-center justify-center bg-white">
+        <HiRateRoadLoader message="Loading Inspection Data..." />
+      </div>
+    );
   }
 
   if (tasks.length === 0) {
@@ -341,6 +366,7 @@ const RatingV2Page = () => {
               params={getParamsList(currentTask)}
               ratings={ratingsState[currentTask?._id] || {}}
               onChange={handleRatingChange}
+              onUndo={handleUndoRating}
               onOpenMissing={() => setIsMissingModalOpen(true)}
             />
           </div>

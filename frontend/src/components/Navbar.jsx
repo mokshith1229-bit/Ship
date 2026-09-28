@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { MdMenu, MdAccountCircle, MdCloudDownload, MdNotifications } from 'react-icons/md';
+import { MdMenu, MdAccountCircle, MdCloudDownload, MdNotifications, MdPowerSettingsNew } from 'react-icons/md';
 import logo from '../assets/editedlogo.PNG';
 import logoText from '../assets/HIRATE text.PNG';
 import { useAuth } from '../hooks/useAuth';
@@ -80,6 +80,25 @@ const Navbar = () => {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const notifRef = useRef(null);
+  
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileRef = useRef(null);
+  
+  const [focusedItem, setFocusedItem] = useState(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setShowProfileMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const [viewedNotifIds, setViewedNotifIds] = useState(() => {
     try {
       const stored = localStorage.getItem(`viewed_notifs_${user?.id || user?._id || 'user'}`);
@@ -222,6 +241,10 @@ const Navbar = () => {
     }
   };
 
+  const activeRouteItem = location.pathname.includes('/notifications') ? 'notification' : 
+                          location.pathname.includes('/profile') ? 'profile' : null;
+  const currentVisibleItem = focusedItem || activeRouteItem;
+
   return (
     <header className="h-[60px] bg-white border-b border-borderColor flex items-center justify-between px-4 shrink-0 relative z-[1000]">
       <div className="flex items-center gap-4">
@@ -244,109 +267,127 @@ const Navbar = () => {
           />
         </div>
       </div>
-      <div className="flex items-center gap-6">
-        <div className="relative" ref={notifRef}>
-          <button 
-            onClick={handleToggleNotifications}
-            className="relative text-green-800 hover:text-green-700 transition-colors cursor-pointer" 
-            title="Notifications"
-          >
-            <MdNotifications className="text-3xl" />
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-white">
-                {unreadCount}
-              </span>
-            )}
-          </button>
-
-          {/* Notification Dropdown */}
-          {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-[2000] overflow-hidden">
-              <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex justify-between items-center">
-                <span className="font-semibold text-gray-800 text-sm">Notifications</span>
-                {unreadCount > 0 ? (
-                  <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-0.5 rounded-full">{unreadCount} New</span>
-                ) : (
-                  <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{notifications.length} Total</span>
-                )}
-              </div>
-              <div className="max-h-[350px] overflow-y-auto custom-dropdown-scrollbar">
-                {notifications.length === 0 ? (
-                  <div className="p-6 text-center text-gray-500 text-sm">
-                    No notifications available.
-                  </div>
-                ) : (
-                  notifications.map((notif) => {
-                    const isUnviewed = !viewedNotifIds.includes(notif._id);
-                    return (
-                      <div
-                        key={notif._id}
-                        onClick={() => handleNotificationClick(notif)}
-                        className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer ${
-                          isUnviewed ? 'bg-green-50/20' : ''
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className={`font-bold text-sm ${
-                            notif.isOverdue ? 'text-red-600' : notif.isDueToday ? 'text-amber-600' : 'text-gray-900'
-                          }`}>
-                            {notif.title}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-600 mb-2">{notif.body}</p>
-                        
-                        <div className="flex justify-between items-center mt-2.5">
-                          <span className="text-[10px] text-gray-400 font-medium">
-                            {new Date(notif.createdAt).toLocaleDateString('en-GB')} {new Date(notif.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-
-              {/* Notification Footer Link */}
-              <div className="p-2.5 bg-gray-50 border-t border-gray-100 text-center">
-                <button
-                  onClick={() => {
-                    setShowNotifications(false);
-                    navigate('/notifications');
-                  }}
-                  className="text-xs font-bold text-green-700 hover:text-green-800 hover:underline transition-colors cursor-pointer"
-                >
-                  View all in Notification Center →
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-        <button className="text-green-800 hover:text-green-700 transition-colors" title="Download App">
-          <MdCloudDownload className="text-3xl" />
-        </button>
+      <div className="flex items-center">
         
-        {/* Profile and Logout */}
-        <div className="flex items-center gap-2 pl-4 border-l border-gray-200">
+        {/* GOOEY CUTOUT HEADER ACTIONS PILL */}
+        <div 
+          className="flex items-center justify-between bg-[#0B1210] rounded-[36px] px-4 shadow-[0_8px_24px_rgba(0,0,0,0.18)] mr-6 relative z-50 h-[48px] w-[220px]"
+          onMouseLeave={() => setFocusedItem(null)}
+        >
+          {/* Shared White Cutout Indicator (Bottom Edge Semi-Circle) */}
           <div 
-            onClick={() => navigate('/profile')}
-            className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 px-2 py-1.5 rounded-lg transition-colors"
-            title="Go to Profile"
+            className="absolute bottom-0 left-0 w-[52px] h-[26px] bg-white rounded-t-[26px] transition-all duration-[600ms] ease-[cubic-bezier(0.25,1,0.5,1)] z-0"
+            style={{
+              transform: `translateX(${
+                currentVisibleItem === 'notification' ? 8 : 
+                currentVisibleItem === 'download' ? 84 : 
+                currentVisibleItem === 'profile' ? 160 : 84
+              }px) scale(${currentVisibleItem ? 1 : 0.5})`,
+              transformOrigin: 'bottom center',
+              opacity: currentVisibleItem ? 1 : 0,
+              pointerEvents: currentVisibleItem ? 'auto' : 'none'
+            }}
+          />
+
+          {/* 1. Notification Button */}
+          <div 
+            className="relative w-[36px] h-[36px] z-10 flex items-center justify-center cursor-pointer" 
+            ref={notifRef}
+            onMouseEnter={() => setFocusedItem('notification')}
           >
-            <div className="flex flex-col items-end hidden sm:flex">
-              <span className="text-sm font-semibold text-gray-800">{user?.name || 'Admin User'}</span>
-              <span className="text-xs text-gray-500">{user?.role || 'Administrator'}</span>
-            </div>
-            <MdAccountCircle className="text-3xl text-green-800" />
+            <button 
+              type="button"
+              onClick={() => {
+                if (notifications.length > 0) {
+                  const allIds = notifications.map(n => n._id);
+                  const newViewed = Array.from(new Set([...viewedNotifIds, ...allIds]));
+                  setViewedNotifIds(newViewed);
+                  try {
+                    localStorage.setItem(`viewed_notifs_${user?.id || user?._id || 'user'}`, JSON.stringify(newViewed));
+                  } catch (e) {}
+                }
+                navigate('/notifications');
+              }}
+              className={`relative w-full h-full flex items-center justify-center transition-all duration-[600ms] ease-[cubic-bezier(0.25,1,0.5,1)] border-none outline-none rounded-full ${
+                currentVisibleItem === 'notification' ? 'text-[#16A05D] drop-shadow-[0_0_6px_rgba(22,160,93,0.7)]' : 'text-white opacity-60 hover:opacity-100'
+              }`}
+              style={{
+                transform: currentVisibleItem === 'notification' ? 'translateY(12px)' : 'translateY(0)'
+              }}
+              title="Notifications"
+              aria-label="Notifications"
+            >
+              <MdNotifications className="text-[20px]" />
+              {unreadCount > 0 && (
+                <span className={`absolute top-[-2px] right-[-2px] bg-red-500 text-white text-[8px] font-bold w-4 h-4 flex items-center justify-center rounded-full border-2 transition-all duration-[600ms] ${
+                  currentVisibleItem === 'notification' ? 'border-white' : 'border-[#0B1210]'
+                }`}>
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+
+
           </div>
-          
-          <button 
-            onClick={logout}
-            className="ml-2 px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
-            title="Logout"
+
+          {/* 2. Download Button */}
+          <div 
+            className="relative w-[36px] h-[36px] z-10 flex items-center justify-center cursor-pointer"
+            onMouseEnter={() => setFocusedItem('download')}
           >
-            Logout
-          </button>
+            <button 
+              type="button"
+              className={`relative w-full h-full flex items-center justify-center transition-all duration-[600ms] ease-[cubic-bezier(0.25,1,0.5,1)] border-none outline-none rounded-full ${
+                currentVisibleItem === 'download' ? 'text-[#16A05D] drop-shadow-[0_0_6px_rgba(22,160,93,0.7)]' : 'text-white opacity-60 hover:opacity-100'
+              }`}
+              style={{
+                transform: currentVisibleItem === 'download' ? 'translateY(12px)' : 'translateY(0)'
+              }}
+              title="Download"
+              aria-label="Download"
+            >
+              <MdCloudDownload className="text-[20px]" />
+            </button>
+          </div>
+
+          {/* 3. Profile Button */}
+          <div 
+            className="relative w-[36px] h-[36px] z-10 flex items-center justify-center cursor-pointer" 
+            ref={profileRef}
+            onMouseEnter={() => setFocusedItem('profile')}
+          >
+            <button 
+              type="button"
+              onClick={() => navigate('/profile')}
+              className={`relative w-full h-full rounded-full flex items-center justify-center transition-all duration-[600ms] ease-[cubic-bezier(0.25,1,0.5,1)] border-none outline-none ${
+                currentVisibleItem === 'profile' ? 'text-[#16A05D] drop-shadow-[0_0_6px_rgba(22,160,93,0.7)]' : 'text-white opacity-60 hover:opacity-100'
+              }`}
+              style={{
+                transform: currentVisibleItem === 'profile' ? 'translateY(12px)' : 'translateY(0)'
+              }}
+              title="Profile"
+              aria-label="Profile"
+            >
+              <MdAccountCircle className="text-[22px]" />
+            </button>
+
+
+          </div>
         </div>
+
+        {/* GLOSSY NEUMORPHIC LOGOUT BUTTON */}
+        <button 
+          onClick={logout}
+          className="relative group w-[40px] h-[40px] rounded-full flex items-center justify-center overflow-hidden transition-all duration-500 cursor-pointer border border-[#222] hover:border-red-400 bg-gradient-to-b from-[#333] via-[#111] to-[#050505] shadow-[0_6px_12px_rgba(0,0,0,0.4),inset_0_2px_4px_rgba(255,255,255,0.15)] hover:from-red-500 hover:via-red-600 hover:to-red-700 hover:shadow-[0_0_25px_rgba(239,68,68,0.8),inset_0_4px_8px_rgba(255,255,255,0.4)] z-50 shrink-0"
+          title="Logout"
+        >
+          {/* Top Glass Highlight */}
+          <div className="absolute top-[2px] left-1/2 -translate-x-1/2 w-[70%] h-[35%] bg-gradient-to-b from-white/40 to-transparent rounded-full opacity-30 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none z-0"></div>
+          
+          {/* Power Icon */}
+          <MdPowerSettingsNew className="text-[20px] text-red-500 transition-all duration-500 group-hover:text-white drop-shadow-[0_0_4px_rgba(239,68,68,0.6)] group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,1)] relative z-10" />
+        </button>
+
       </div>
     </header>
   );

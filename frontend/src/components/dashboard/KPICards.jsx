@@ -111,7 +111,7 @@ const KPICards = ({ selectedProject }) => {
       sparkline: data.sparklines?.monthlyProgress || [], color: '#a855f7'
     },
     { 
-      title: 'Last Updated', value: data.lastUpdated ? new Date(data.lastUpdated).toLocaleDateString() : 'N/A', trend: 'Live', isPositive: true, 
+      title: 'Last Updated', value: data.lastUpdated ? new Date(data.lastUpdated).toLocaleDateString('en-GB') : 'N/A', trend: 'Live', isPositive: true, 
       icon: <MdUpdate className="text-gray-500" />, bg: 'bg-gray-50', 
       sparkline: data.sparklines?.totalRatings || [], color: '#6b7280'
     },

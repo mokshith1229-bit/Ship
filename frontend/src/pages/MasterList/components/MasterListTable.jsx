@@ -42,7 +42,7 @@ const MasterListTable = ({ data, loading, onRefresh, canEdit = true, canDelete =
     <>
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left whitespace-nowrap">
+          <table className="w-full text-sm text-left">
             <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-100">
               <tr>
                 <th className="px-5 py-4 font-medium">Question ID</th>
@@ -64,7 +64,7 @@ const MasterListTable = ({ data, loading, onRefresh, canEdit = true, canDelete =
                   <td className="px-5 py-3 text-gray-600">{item.category}</td>
                   <td className="px-5 py-3 text-gray-600">{item.assetType}</td>
                   <td className="px-5 py-3 text-gray-600">{item.chainage}</td>
-                  <td className="px-5 py-3 text-gray-600 max-w-[200px] truncate" title={item.parameter}>{item.parameter}</td>
+                  <td className="px-5 py-3 text-gray-600" title={item.parameter}>{item.parameter}</td>
                   <td className="px-5 py-3">
                     <span className={`px-2 py-1 rounded text-xs font-medium ${item.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                       {item.status || 'Active'}

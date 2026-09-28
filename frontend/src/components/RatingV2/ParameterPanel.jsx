@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import CustomDropdown from '../common/CustomDropdown';
 import { resolveRemarkRating } from '../../utils/remarkRatingResolver';
-import { MdClose, MdEditRoad, MdStairs, MdChevronRight } from 'react-icons/md';
+import { MdClose, MdEditRoad, MdStairs, MdChevronRight, MdUndo } from 'react-icons/md';
 import { FaRoad, FaTree, FaLeaf, FaGripLines, FaMapMarkerAlt, FaPaintRoller } from 'react-icons/fa';
 import { FaBridge, FaRoadBarrier } from 'react-icons/fa6';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -25,7 +25,7 @@ const getGroupIcon = (groupName) => {
   return <FaMapMarkerAlt size={28} />;
 };
 
-const ParameterPanel = ({ task, params, ratings, onChange, onOpenMissing }) => {
+const ParameterPanel = ({ task, params, ratings, onChange, onUndo, onOpenMissing }) => {
   const [remarkMasterConfig, setRemarkMasterConfig] = useState({});
   const [customRemarkMode, setCustomRemarkMode] = useState({});
   const [activeGroup, setActiveGroup] = useState(null);
@@ -138,30 +138,42 @@ const ParameterPanel = ({ task, params, ratings, onChange, onOpenMissing }) => {
         <div className="flex justify-between items-start gap-2">
           <h3 className={`text-sm font-semibold leading-snug ${isSkipped ? 'text-gray-400' : 'text-gray-800'}`}>{param.parameterName || param.parameter}</h3>
           
-          {isSkipped ? (
-            <button 
-              onClick={() => onChange(pId, 10, '', false)} 
-              className="text-[11px] font-extrabold uppercase text-white hover:text-white bg-blue-600 hover:bg-blue-700 shadow-md border border-blue-700 px-3 py-1.5 rounded-md shrink-0 transition-all pointer-events-auto"
-            >
-              Undo Skip
-            </button>
-          ) : (
-            <div className="flex items-center gap-2 shrink-0 bg-gray-50/80 rounded-full px-2.5 py-1 border border-gray-200 shadow-sm">
-              <input 
-                type="checkbox" 
-                checked={!!selectedForSkip[pId]}
-                onChange={() => handleToggleSelectSkip(pId)}
-                className="w-3.5 h-3.5 rounded-full text-gray-600 focus:ring-gray-400 cursor-pointer"
-                title="Select for batch skip"
-              />
+          <div className="flex items-center gap-3 shrink-0">
+            {onUndo && r && !isSkipped && (String(r.score) !== '10' || (r.remark && r.remark.trim() !== '')) && (
               <button 
-                onClick={() => onChange(pId, null, 'Skipped', true)} 
-                className="text-[11px] font-bold uppercase text-gray-500 hover:text-red-500 transition-colors"
+                onClick={() => onUndo(pId)} 
+                className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full hover:bg-red-50" 
+                title="Clear rating"
               >
-                Skip
+                <MdUndo className="text-xl" />
               </button>
-            </div>
-          )}
+            )}
+
+            {isSkipped ? (
+              <button 
+                onClick={() => onChange(pId, 10, '', false)} 
+                className="text-[11px] font-extrabold uppercase text-white hover:text-white bg-blue-600 hover:bg-blue-700 shadow-md border border-blue-700 px-3 py-1.5 rounded-md shrink-0 transition-all pointer-events-auto"
+              >
+                Undo Skip
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 shrink-0 bg-gray-50/80 rounded-full px-2.5 py-1 border border-gray-200 shadow-sm">
+                <input 
+                  type="checkbox" 
+                  checked={!!selectedForSkip[pId]}
+                  onChange={() => handleToggleSelectSkip(pId)}
+                  className="w-3.5 h-3.5 rounded-full text-gray-600 focus:ring-gray-400 cursor-pointer"
+                  title="Select for batch skip"
+                />
+                <button 
+                  onClick={() => onChange(pId, null, 'Skipped', true)} 
+                  className="text-[11px] font-bold uppercase text-gray-500 hover:text-red-500 transition-colors"
+                >
+                  Skip
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className={`flex gap-2 mt-2 transition-opacity duration-300 ${isSkipped ? 'opacity-40 pointer-events-none' : ''}`}>
@@ -220,7 +232,7 @@ const ParameterPanel = ({ task, params, ratings, onChange, onOpenMissing }) => {
                 }
               }}
               placeholder="Add observation/remark (optional)..."
-              direction="up"
+              direction="down"
               searchable={true}
             />
           )}
@@ -271,7 +283,7 @@ const ParameterPanel = ({ task, params, ratings, onChange, onOpenMissing }) => {
           <motion.div 
             layout
             transition={{ layout: { duration: 0.6, ease: [0.25, 0.1, 0.25, 1] } }}
-            className={activeGroup ? "flex flex-wrap gap-3 pb-2 px-1" : "flex flex-col gap-3 w-full max-w-[280px]"}
+            className={activeGroup ? "grid grid-cols-3 gap-3 pb-2 px-1" : "flex flex-col gap-3 w-full max-w-[280px]"}
           >
             {groupNames.map(group => {
               const isActive = activeGroup === group;
@@ -426,7 +438,7 @@ const ParameterPanel = ({ task, params, ratings, onChange, onOpenMissing }) => {
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 50 }}
-            className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50"
+            className="absolute bottom-6 right-[5%] z-50"
           >
             <button 
               onClick={handleBatchSkip}

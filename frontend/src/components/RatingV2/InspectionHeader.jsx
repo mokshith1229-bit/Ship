@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { MdOutlineArrowBack, MdEdit } from 'react-icons/md';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -62,6 +62,9 @@ const InspectionHeader = ({ task }) => {
             hasRemark={headerRemarks[header.key] && headerRemarks[header.key].trim() !== ''}
             remarkValue={headerRemarks[header.key] || ''}
             onClick={() => handleCardClick(header.key)}
+            onClose={() => {
+              if (expandedCard === header.key) setExpandedCard(null);
+            }}
             onRemarkChange={(val) => setTaskRemarks(prev => ({ 
               ...prev, 
               [task._id]: { ...(prev[task._id] || {}), [header.key]: val } 
@@ -84,8 +87,22 @@ const InspectionHeader = ({ task }) => {
   );
 };
 
-const HeaderItem = ({ headerKey, label, value, highlight, isEditMode, isExpanded, hasRemark, remarkValue, onClick, onRemarkChange }) => (
+const HeaderItem = ({ headerKey, label, value, highlight, isEditMode, isExpanded, hasRemark, remarkValue, onClick, onClose, onRemarkChange }) => {
+  const itemRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isExpanded && itemRef.current && !itemRef.current.contains(event.target)) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isExpanded, onClose]);
+
+  return (
   <div 
+    ref={itemRef}
     className={`flex flex-col relative transition-all duration-300 p-2 rounded ${
       isEditMode 
         ? `cursor-pointer hover:shadow-md bg-gray-50 border ${hasRemark ? 'border-red-500' : 'border-[#5cb85c]'}` 
@@ -133,6 +150,7 @@ const HeaderItem = ({ headerKey, label, value, highlight, isEditMode, isExpanded
       )}
     </AnimatePresence>
   </div>
-);
+  );
+};
 
 export default InspectionHeader;

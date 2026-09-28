@@ -2,7 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LuSend, LuCheck } from 'react-icons/lu';
 
-const AnimatedAssignButton = ({ onClick, disabled, className = '', type = "button", ...props }) => {
+const AnimatedAssignButton = ({ 
+  onClick, 
+  disabled, 
+  className = '', 
+  type = "button",
+  text = "Assign Work",
+  successText = "Assigned",
+  flightDistance = 150,
+  startOffset = -46,
+  textClassName = "text-[15px]",
+  idleClassName = "border-black bg-white text-black",
+  successClassName = "border-[#2e8b57] bg-[#f0fbf4] text-[#2e8b57]",
+  ...props 
+}) => {
   const [status, setStatus] = useState('idle');
 
   // Animation sequence driven purely by time to guarantee visual continuity
@@ -23,9 +36,9 @@ const AnimatedAssignButton = ({ onClick, disabled, className = '', type = "butto
   // Determine button colors based on the exact image spec
   const getColorClasses = () => {
     if (status === 'success') {
-      return 'border-[#2e8b57] bg-[#f0fbf4] text-[#2e8b57]'; 
+      return successClassName; 
     }
-    return 'border-black bg-white text-black';
+    return idleClassName;
   };
 
   const handleClick = async (e) => {
@@ -56,7 +69,7 @@ const AnimatedAssignButton = ({ onClick, disabled, className = '', type = "butto
       whileTap={status === 'idle' ? { scale: 0.98 } : {}}
       disabled={disabled || status === 'sending'}
       onClick={handleClick}
-      className={`relative flex items-center justify-center h-[42px] min-w-[145px] px-5 rounded-full overflow-hidden border-[1.5px] transition-colors duration-500 ${getColorClasses()} ${className}`}
+      className={`relative flex items-center justify-center h-[42px] px-5 rounded-full overflow-hidden border-[1.5px] transition-colors duration-500 ${getColorClasses()} ${className}`}
       {...props}
     >
       <div className="relative flex items-center justify-center w-full h-full">
@@ -73,7 +86,7 @@ const AnimatedAssignButton = ({ onClick, disabled, className = '', type = "butto
               className="absolute flex items-center justify-center gap-2"
             >
               <div className="w-[18px]" /> {/* Spacer for the absolutely positioned rocket */}
-              <span className="font-bold text-[15px] whitespace-nowrap tracking-wide">Assign Work</span>
+              <span className={`font-bold whitespace-nowrap tracking-wide ${textClassName}`}>{text}</span>
             </motion.div>
           )}
 
@@ -87,7 +100,7 @@ const AnimatedAssignButton = ({ onClick, disabled, className = '', type = "butto
               className="absolute flex items-center justify-center gap-2"
             >
               <LuCheck className="text-[18px] stroke-[3]" />
-              <span className="font-bold text-[15px] whitespace-nowrap tracking-wide">Assigned</span>
+              <span className={`font-bold whitespace-nowrap tracking-wide ${textClassName}`}>{successText}</span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -97,9 +110,9 @@ const AnimatedAssignButton = ({ onClick, disabled, className = '', type = "butto
           {(status === 'idle' || status === 'sending') && (
             <motion.div
               key="plane"
-              initial={{ x: -46, opacity: 0 }}
+              initial={{ x: startOffset, opacity: 0 }}
               animate={{ 
-                x: status === 'idle' ? -46 : 150, 
+                x: status === 'idle' ? startOffset : flightDistance, 
                 opacity: 1
               }}
               exit={{ opacity: 0 }}

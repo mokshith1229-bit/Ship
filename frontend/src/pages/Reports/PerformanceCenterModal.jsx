@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { X, FileText, Loader2, AlertTriangle, MapPin, Target, Camera, Activity, ChevronDown, ChevronUp, Shield, Info, CheckCircle, Navigation, Layers, CheckSquare, Clock, ImageIcon, ImageOff, ClipboardCheck, ClipboardList, Folder, Route, ArrowLeftRight, Construction, Gauge, Lightbulb, TriangleAlert, ChevronRight, MapPinned, TrendingDown, CircleAlert, Image, ChartScatter, Percent } from 'lucide-react';
 import { reportService } from '../../services/report.service';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList, AreaChart, Area, Legend, PieChart, Pie, Cell, ScatterChart, Scatter, ZAxis } from 'recharts';
 import IssuePassport from './IssuePassport';
+import HiRateRoadLoader from '../../components/common/HiRateRoadLoader';
 
 // ─── Color Palette ────────────────────────────────────────────────────────────
 const COLORS = {
@@ -64,6 +66,7 @@ const PerformanceCenterModal = ({ isOpen, onClose, project, cycleId, roadType, d
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [expandedEvidence, setExpandedEvidence] = useState({});
   const [showAllEvidence, setShowAllEvidence] = useState(false);
+  const [activeTab, setActiveTab] = useState('Health');
 
   // Drill-down states
   const [expandedAsset, setExpandedAsset] = useState(null);
@@ -421,7 +424,7 @@ const PerformanceCenterModal = ({ isOpen, onClose, project, cycleId, roadType, d
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[9999] bg-slate-100 flex items-start justify-center overflow-y-auto" id="performance-center-overlay">
       <div className="w-full min-h-screen bg-slate-50 relative flex flex-col" id="performance-center-container">
 
@@ -435,8 +438,8 @@ const PerformanceCenterModal = ({ isOpen, onClose, project, cycleId, roadType, d
 
         {loading && (
           <div className="flex flex-col items-center justify-center py-40 h-screen">
-            <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
-            <p className="text-gray-500 font-medium">Analyzing highway asset intelligence...</p>
+            <HiRateRoadLoader size="large" />
+            <p className="text-gray-500 font-medium mt-6">Analyzing highway asset intelligence...</p>
           </div>
         )}
 
@@ -451,41 +454,47 @@ const PerformanceCenterModal = ({ isOpen, onClose, project, cycleId, roadType, d
         {data && !loading && (
           <>
             {/* ─── 1. HERO: PROJECT AT A GLANCE ─── */}
-            <div className="relative w-full bg-slate-900 text-white overflow-hidden pt-24 pb-16 px-8 md:px-16" style={{
-              background: 'linear-gradient(135deg, #0F172A 0%, #1E3A8A 100%)',
+            <div className="relative w-full text-white overflow-hidden pt-24 pb-16 px-8 md:px-16" style={{
+              background: 'linear-gradient(135deg, #021f10 0%, #083b20 100%)',
               minHeight: '600px'
             }}>
-              {/* Subtle grid pattern overlay */}
-              <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
+              {/* Hexagon SVG Overlay (CSS) */}
+              <div 
+                className="absolute inset-0 opacity-10" 
+                style={{
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg width='28' height='49' viewBox='0 0 28 49' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='1' fill-rule='evenodd'%3E%3Cg fill-rule='nonzero'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.65V49h-2z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+                  backgroundSize: '56px 98px'
+                }}
+              />
               
               <div className="relative z-10 max-w-7xl mx-auto h-full flex flex-col justify-center">
                 <div className="mb-12">
-                  <div className="text-blue-400 font-bold tracking-widest uppercase text-sm mb-4 flex items-center gap-2">
+                  <div className="text-emerald-400 font-bold tracking-widest uppercase text-sm mb-4 flex items-center gap-2">
                     <Shield className="w-4 h-4" /> HIGHWAY ASSET INTELLIGENCE REPORT
                   </div>
                   <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-tight">
                     {data.overview.projectName}
                   </h1>
-                  <p className="text-xl md:text-2xl text-blue-100 max-w-3xl font-light leading-relaxed">
+                  <p className="text-xl md:text-2xl text-slate-300 max-w-3xl font-light leading-relaxed">
                     Current inspection overview of network condition, asset performance and critical priorities.
                   </p>
                 </div>
 
                 {/* Context Badges */}
                 <div className="flex flex-wrap gap-4 mb-16">
-                  <div className="bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2 rounded-lg text-sm font-semibold">
-                    <span className="text-blue-300 mr-2">CYCLE</span> {data.overview.cycleName}
+                  <div className="bg-[#0b2917] border border-[#124225] px-4 py-2 rounded-lg text-sm font-semibold">
+                    <span className="text-emerald-500 mr-2">CYCLE</span> {data.overview.cycleName}
                   </div>
-                  <div className="bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2 rounded-lg text-sm font-semibold">
-                    <span className="text-blue-300 mr-2">SURVEY DATE</span> {data.overview.inspectionDateRange}
+                  <div className="bg-[#0b2917] border border-[#124225] px-4 py-2 rounded-lg text-sm font-semibold">
+                    <span className="text-emerald-500 mr-2">SURVEY DATE</span> {data.overview.inspectionDateRange}
                   </div>
-                  <div className="bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2 rounded-lg text-sm font-semibold">
-                    <span className="text-blue-300 mr-2">GENERATED</span> {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  <div className="bg-[#0b2917] border border-[#124225] px-4 py-2 rounded-lg text-sm font-semibold">
+                    <span className="text-emerald-500 mr-2">GENERATED</span> {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </div>
                   <button
                     onClick={handleGeneratePdf}
                     disabled={generatingPdf}
-                    className="bg-blue-600 hover:bg-blue-500 border border-blue-400/50 px-6 py-2 rounded-lg text-sm font-bold shadow-lg transition-colors flex items-center gap-2 ml-auto"
+                    className="bg-emerald-500 hover:bg-emerald-400 border border-emerald-400/50 px-6 py-2 rounded-lg text-sm font-bold shadow-lg transition-colors flex items-center gap-2 ml-auto text-slate-900"
                   >
                     {generatingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
                     EXPORT PDF
@@ -494,25 +503,54 @@ const PerformanceCenterModal = ({ isOpen, onClose, project, cycleId, roadType, d
 
                 {/* Hero Metrics */}
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-6">
-                  <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6 flex flex-col justify-between hover:bg-white/15 transition-colors">
-                    <div className="text-4xl md:text-5xl font-extrabold mb-3">{data.overview.totalRatings.toLocaleString()}</div>
-                    <div className="text-xs text-blue-200 font-bold uppercase tracking-wider">TOTAL AUDITS</div>
+                  <div className="bg-[#082a17] border border-[#114225] rounded-2xl p-6 flex flex-col justify-between hover:bg-[#0a331c] transition-colors relative overflow-hidden group">
+                    <div className="flex items-center gap-4 mb-3 relative z-10">
+                      <div className="w-10 h-10 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                        <ClipboardCheck className="w-5 h-5" />
+                      </div>
+                      <div className="text-3xl md:text-4xl font-extrabold">{data.overview.totalRatings.toLocaleString()}</div>
+                    </div>
+                    <div className="text-[11px] text-emerald-100/70 font-bold uppercase tracking-wider pl-14 relative z-10">TOTAL AUDITS</div>
                   </div>
-                  <div className="bg-red-500/20 backdrop-blur-md border border-red-400/30 rounded-2xl p-6 flex flex-col justify-between hover:bg-red-500/30 transition-colors">
-                    <div className="text-4xl md:text-5xl font-extrabold text-white mb-3">{data.overview.criticalIssues.toLocaleString()}</div>
-                    <div className="text-xs text-red-200 font-bold uppercase tracking-wider">CRITICAL AUDITS</div>
+                  
+                  <div className="bg-[#241313] border border-[#3d2020] rounded-2xl p-6 flex flex-col justify-between hover:bg-[#2e1919] transition-colors relative overflow-hidden group">
+                    <div className="flex items-center gap-4 mb-3 relative z-10">
+                      <div className="w-10 h-10 rounded-lg bg-red-500/20 text-red-500 flex items-center justify-center shrink-0">
+                        <TriangleAlert className="w-5 h-5" />
+                      </div>
+                      <div className="text-3xl md:text-4xl font-extrabold text-white">{data.overview.criticalIssues.toLocaleString()}</div>
+                    </div>
+                    <div className="text-[11px] text-red-200/70 font-bold uppercase tracking-wider pl-14 relative z-10">CRITICAL AUDITS</div>
                   </div>
-                  <div className="bg-amber-500/20 backdrop-blur-md border border-amber-400/30 rounded-2xl p-6 flex flex-col justify-between hover:bg-amber-500/30 transition-colors">
-                    <div className="text-4xl md:text-5xl font-extrabold text-white mb-3">{data.issueIntelligence.totalIssues.toLocaleString()}</div>
-                    <div className="text-xs text-amber-200 font-bold uppercase tracking-wider">ISSUES IDENTIFIED</div>
+
+                  <div className="bg-[#242211] border border-[#3b361a] rounded-2xl p-6 flex flex-col justify-between hover:bg-[#2b2914] transition-colors relative overflow-hidden group">
+                    <div className="flex items-center gap-4 mb-3 relative z-10">
+                      <div className="w-10 h-10 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                        <Construction className="w-5 h-5" />
+                      </div>
+                      <div className="text-3xl md:text-4xl font-extrabold text-white">{data.issueIntelligence.totalIssues.toLocaleString()}</div>
+                    </div>
+                    <div className="text-[11px] text-amber-200/70 font-bold uppercase tracking-wider pl-14 relative z-10">ISSUES IDENTIFIED</div>
                   </div>
-                  <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6 flex flex-col justify-between hover:bg-white/15 transition-colors">
-                    <div className="text-4xl md:text-5xl font-extrabold mb-3">{data.overview.ratedAssets.toLocaleString()}</div>
-                    <div className="text-xs text-blue-200 font-bold uppercase tracking-wider">ASSETS ASSESSED</div>
+
+                  <div className="bg-[#0f1f26] border border-[#17313b] rounded-2xl p-6 flex flex-col justify-between hover:bg-[#12252e] transition-colors relative overflow-hidden group">
+                    <div className="flex items-center gap-4 mb-3 relative z-10">
+                      <div className="w-10 h-10 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0">
+                        <Layers className="w-5 h-5" />
+                      </div>
+                      <div className="text-3xl md:text-4xl font-extrabold text-white">{data.overview.ratedAssets.toLocaleString()}</div>
+                    </div>
+                    <div className="text-[11px] text-sky-200/70 font-bold uppercase tracking-wider pl-14 relative z-10">ASSETS ASSESSED</div>
                   </div>
-                  <div className="bg-emerald-500/20 backdrop-blur-md border border-emerald-400/30 rounded-2xl p-6 flex flex-col justify-between hover:bg-emerald-500/30 transition-colors">
-                    <div className="text-4xl md:text-5xl font-extrabold text-white mb-3">{data.coverage.ratingCoverage}%</div>
-                    <div className="text-xs text-emerald-200 font-bold uppercase tracking-wider">NETWORK COVERAGE</div>
+
+                  <div className="bg-[#072e18] border border-[#0f4526] rounded-2xl p-6 flex flex-col justify-between hover:bg-[#09381e] transition-colors relative overflow-hidden group">
+                    <div className="flex items-center gap-4 mb-3 relative z-10">
+                      <div className="w-10 h-10 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                        <Activity className="w-5 h-5" />
+                      </div>
+                      <div className="text-3xl md:text-4xl font-extrabold text-white">{data.coverage.ratingCoverage}%</div>
+                    </div>
+                    <div className="text-[11px] text-emerald-200/70 font-bold uppercase tracking-wider pl-14 relative z-10">NETWORK COVERAGE</div>
                   </div>
                 </div>
               </div>
@@ -520,16 +558,25 @@ const PerformanceCenterModal = ({ isOpen, onClose, project, cycleId, roadType, d
 
             {/* ─── STORY NAVIGATION (STICKY) ─── */}
             <div className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm w-full">
-              <div className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-start gap-8 overflow-x-auto scrollbar-hide">
-                {['Health', 'Condition', 'Risk', 'Performance', 'Issues', 'Hotspots', 'Matrix', 'Attention', 'Evidence', 'Insights'].map((item) => (
-                  <a 
-                    key={item} 
-                    href={`#section-${item.toLowerCase().replace(' ', '-')}`}
-                    className="text-xs font-bold text-gray-500 hover:text-blue-700 uppercase tracking-wider whitespace-nowrap transition-colors"
-                  >
-                    {item}
-                  </a>
-                ))}
+              <div className="max-w-7xl mx-auto px-8 flex items-center justify-start gap-8 overflow-x-auto scrollbar-hide">
+                {['Health', 'Condition', 'Risk', 'Performance', 'Issues', 'Hotspots', 'Matrix', 'Attention', 'Evidence', 'Insights'].map((item) => {
+                  const isActive = activeTab === item; 
+                  return (
+                    <a 
+                      key={item} 
+                      href={`#section-${item.toLowerCase().replace(' ', '-')}`}
+                      onClick={() => setActiveTab(item)}
+                      className={`text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-colors relative py-5 ${
+                        isActive ? 'text-emerald-500' : 'text-gray-500 hover:text-emerald-500'
+                      }`}
+                    >
+                      {item}
+                      {isActive && (
+                        <div className="absolute bottom-0 left-0 w-full h-[3px] bg-emerald-500 rounded-t-sm" />
+                      )}
+                    </a>
+                  );
+                })}
               </div>
             </div>
 
@@ -1596,7 +1643,8 @@ const PerformanceCenterModal = ({ isOpen, onClose, project, cycleId, roadType, d
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

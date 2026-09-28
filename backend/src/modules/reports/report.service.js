@@ -190,27 +190,37 @@ class ReportService {
   }
 
   async getAssetTypes(project, cycleId, roadType, direction) {
-    const tasks = await this.getTasksForReport(project, cycleId, undefined, undefined, undefined, undefined, undefined, roadType, direction);
-    const allRatings = this.flattenRatingsForAnalysis(tasks);
+    const matchStage = { project, status: 'Active' };
+    if (roadType && roadType !== 'Both') matchStage.roadType = roadType;
+    if (direction && direction !== 'Both') matchStage.direction = direction;
 
-    const assetMap = {};
-    allRatings.forEach(r => {
-      if (r.assetType && r.assetType !== 'Unknown') {
-        if (!assetMap[r.assetType]) {
-          assetMap[r.assetType] = new Set();
+    const pipeline = [
+      { $match: matchStage },
+      {
+        $group: {
+          _id: { $cond: [{ $ifNull: ['$assetType', false] }, '$assetType', '$category'] },
+          parameters: { $addToSet: '$parameter' }
         }
-        if (r.parameter && r.parameter !== 'Unknown') {
-          assetMap[r.assetType].add(r.parameter);
+      },
+      {
+        $project: {
+          _id: 0,
+          assetType: '$_id',
+          parameters: 1
         }
+      },
+      { $sort: { assetType: 1 } }
+    ];
+
+    const results = await MasterList.aggregate(pipeline);
+    
+    results.forEach(r => {
+      if (r.parameters) {
+        r.parameters.sort();
       }
     });
 
-    const result = Object.keys(assetMap).map(asset => ({
-      assetType: asset,
-      parameters: Array.from(assetMap[asset]).sort()
-    })).sort((a, b) => a.assetType.localeCompare(b.assetType));
-
-    return result;
+    return results.filter(r => r.assetType && r.assetType !== 'Unknown');
   }
 
   flattenRatingsForAnalysis(tasks) {

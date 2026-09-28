@@ -311,12 +311,12 @@ const SurveyLibraryPage = () => {
                                 <td className="py-3 px-4">
                                   <div className="flex items-center justify-center gap-3">
                                     {canEdit && (
-                                      <button onClick={() => openEditModal(asset)} className="text-gray-400 hover:text-blue-600 transition-colors" title="Edit">
+                                      <button onClick={() => openEditModal(asset)} className="text-blue-500 hover:text-blue-600 transition-colors" title="Edit">
                                         <MdEdit className="text-lg" />
                                       </button>
                                     )}
                                     {canDelete && (
-                                      <button onClick={() => handleDeleteAsset(asset._id)} className="text-gray-400 hover:text-red-600 transition-colors" title="Delete">
+                                      <button onClick={() => handleDeleteAsset(asset._id)} className="text-red-500 hover:text-red-600 transition-colors" title="Delete">
                                         <MdDelete className="text-lg" />
                                       </button>
                                     )}

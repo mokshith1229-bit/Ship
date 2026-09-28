@@ -93,7 +93,7 @@ const Premium3DButton = ({
       type={type}
       disabled={disabled || loading}
       onClick={onClick}
-      className={`premium-3d-btn relative px-6 py-2 text-white font-medium rounded-lg disabled:opacity-50 h-[38px] overflow-visible outline-none group border border-transparent transition-all duration-300 flex items-center justify-center gap-2 ${className}`}
+      className={`premium-3d-btn relative px-6 py-2.5 text-white font-medium rounded-lg disabled:opacity-50 min-h-[44px] h-auto overflow-visible outline-none group border border-transparent transition-all duration-300 flex items-center justify-center gap-2 ${className}`}
       style={{
         '--shadow-x': '0px',
         '--shadow-y': '0px',

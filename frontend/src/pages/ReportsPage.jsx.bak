@@ -8,11 +8,7 @@ import DynamicStripChart from '../components/DynamicStripChart';
 import OverviewStripChart from '../components/OverviewStripChart';
 import PerformanceCenterModal from './Reports/PerformanceCenterModal';
 import { reportService } from '../services/report.service';
-import { Download, FileSpreadsheet, Loader2, BarChart2, AlertTriangle, Hash, MapPin, CheckCircle, Eye, ChevronDown, ChevronRight, X, TrendingUp, Calendar, ShieldCheck, Settings } from 'lucide-react';
-import CustomDropdown from '../components/common/CustomDropdown';
-import ProjectOverview from '../components/Reports/ProjectOverview/ProjectOverview';
-import highwayBg from '../assets/banner_bg.png';
-import AnimatedAssignButton from '../components/common/AnimatedAssignButton';
+import { Download, FileSpreadsheet, Loader2, BarChart2, AlertTriangle, Hash, MapPin, CheckCircle, Eye, ChevronDown, ChevronRight, X, TrendingUp } from 'lucide-react';
 
 const ReportsPage = () => {
   const [loading, setLoading] = useState(true);
@@ -307,28 +303,34 @@ const ReportsPage = () => {
                     
                     <div className="space-y-2 col-span-1">
                       <label className="text-sm font-semibold text-gray-700 tracking-wide">PROJECT</label>
-                      <CustomDropdown
+                      <select 
+                        className="w-full h-12 px-4 rounded-xl border-gray-200 bg-gray-50 text-gray-900 focus:ring-green-500 focus:border-green-500"
                         value={selectedProject}
-                        onChange={(val) => {
-                          setSelectedProject(val);
+                        onChange={(e) => {
+                          setSelectedProject(e.target.value);
                           setSelectedCycle('all');
                         }}
-                        options={config.projects.map(p => ({ label: p.name, value: p.id }))}
-                      />
+                      >
+                        {config.projects.map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
                     </div>
 
                     {reportType !== 'comparison' && reportType !== 'overview-strip-chart' && (
                       <div className="space-y-2 col-span-1">
                         <label className="text-sm font-semibold text-gray-700 tracking-wide">INSPECTION CYCLE</label>
-                        <CustomDropdown
+                        <select 
+                          className="w-full h-12 px-4 rounded-xl border-gray-200 bg-gray-50 text-gray-900 focus:ring-green-500 focus:border-green-500"
                           value={selectedCycle}
-                          onChange={(val) => setSelectedCycle(val)}
+                          onChange={(e) => setSelectedCycle(e.target.value)}
                           disabled={!activeProjectData}
-                          options={[
-                            { label: '[All Cycles]', value: 'all' },
-                            ...(activeProjectData?.cycles.map(c => ({ label: c.label, value: c.id })) || [])
-                          ]}
-                        />
+                        >
+                          <option value="all">[All Cycles]</option>
+                          {activeProjectData?.cycles.map(c => (
+                            <option key={c.id} value={c.id}>{c.label}</option>
+                          ))}
+                        </select>
                       </div>
                     )}
                     
@@ -336,61 +338,65 @@ const ReportsPage = () => {
                       <>
                         <div className="space-y-2 col-span-1">
                           <label className="text-sm font-semibold text-gray-700 tracking-wide">PREVIOUS CYCLE</label>
-                          <CustomDropdown
+                          <select 
+                            className="w-full h-12 px-4 rounded-xl border-gray-200 bg-gray-50 text-gray-900 focus:ring-green-500 focus:border-green-500"
                             value={previousCycle}
-                            onChange={(val) => setPreviousCycle(val)}
+                            onChange={(e) => setPreviousCycle(e.target.value)}
                             disabled={!activeProjectData}
-                            options={[
-                              { label: '[Select Previous Cycle]', value: '' },
-                              ...(activeProjectData?.cycles.map(c => ({ label: c.label, value: c.id })) || [])
-                            ]}
-                          />
+                          >
+                            <option value="">[Select Previous Cycle]</option>
+                            {activeProjectData?.cycles.map(c => (
+                              <option key={c.id} value={c.id}>{c.label}</option>
+                            ))}
+                          </select>
                         </div>
                         <div className="space-y-2 col-span-1">
                           <label className="text-sm font-semibold text-gray-700 tracking-wide">CURRENT CYCLE</label>
-                          <CustomDropdown
+                          <select 
+                            className="w-full h-12 px-4 rounded-xl border-gray-200 bg-gray-50 text-gray-900 focus:ring-green-500 focus:border-green-500"
                             value={currentCycle}
-                            onChange={(val) => setCurrentCycle(val)}
+                            onChange={(e) => setCurrentCycle(e.target.value)}
                             disabled={!activeProjectData}
-                            options={[
-                              { label: '[Select Current Cycle]', value: '' },
-                              ...(activeProjectData?.cycles.map(c => ({ label: c.label, value: c.id })) || [])
-                            ]}
-                          />
+                          >
+                            <option value="">[Select Current Cycle]</option>
+                            {activeProjectData?.cycles.map(c => (
+                              <option key={c.id} value={c.id}>{c.label}</option>
+                            ))}
+                          </select>
                         </div>
                       </>
                     )}
 
                     <div className="space-y-2 col-span-1">
                       <label className="text-sm font-semibold text-gray-700 tracking-wide">ROAD TYPE</label>
-                      <CustomDropdown
+                      <select 
+                        className="w-full h-12 px-4 rounded-xl border-gray-200 bg-gray-50 text-gray-900 focus:ring-green-500 focus:border-green-500"
                         value={roadType}
-                        onChange={(val) => setRoadType(val)}
-                        options={[
-                          { label: 'Both', value: 'Both' },
-                          { label: 'MCW', value: 'MCW' },
-                          { label: 'SR', value: 'SR' }
-                        ]}
-                      />
+                        onChange={(e) => setRoadType(e.target.value)}
+                      >
+                        <option value="Both">Both</option>
+                        <option value="MCW">MCW</option>
+                        <option value="SR">SR</option>
+                      </select>
                     </div>
 
                     <div className="space-y-2 col-span-1">
                       <label className="text-sm font-semibold text-gray-700 tracking-wide">DIRECTION</label>
-                      <CustomDropdown
+                      <select 
+                        className="w-full h-12 px-4 rounded-xl border-gray-200 bg-gray-50 text-gray-900 focus:ring-green-500 focus:border-green-500"
                         value={direction}
-                        onChange={(val) => setDirection(val)}
-                        options={[
-                          { label: 'Both', value: 'Both' },
-                          { label: 'LHS', value: 'LHS' },
-                          { label: 'RHS', value: 'RHS' }
-                        ]}
-                      />
+                        onChange={(e) => setDirection(e.target.value)}
+                      >
+                        <option value="Both">Both</option>
+                        <option value="LHS">LHS</option>
+                        <option value="RHS">RHS</option>
+                      </select>
                     </div>
 
                     <div className="space-y-2 relative col-span-1 md:col-span-2" ref={dropdownRef}>
                       <label className="text-sm font-semibold text-gray-700 tracking-wide">ASSET TYPE</label>
                       <div 
-                        className={`w-full flex items-center justify-between px-3 py-1.5 min-h-[34px] md:min-h-[38px] bg-white border rounded-md text-sm font-medium transition-all duration-200 outline-none ${loadingAssets || !activeProjectData ? 'opacity-50 cursor-not-allowed border-gray-200 text-gray-500' : 'cursor-pointer border-[#5cb85c] hover:shadow-[0_2px_8px_rgba(92,184,92,0.15)] text-gray-900 focus:ring-2 focus:ring-[#5cb85c]/20'}`}
+                        className={`w-full h-12 px-4 rounded-xl border bg-gray-50 flex items-center justify-between cursor-pointer ${loadingAssets || !activeProjectData ? 'opacity-50 cursor-not-allowed border-gray-200 text-gray-500' : 'border-gray-200 text-gray-900 focus:ring-green-500 focus:border-green-500'}`}
                         onMouseDown={(e) => {
                           if (!loadingAssets && activeProjectData) {
                             e.preventDefault();
@@ -476,34 +482,34 @@ const ReportsPage = () => {
 
                     <div className="space-y-2 col-span-1">
                       <label className="text-sm font-semibold text-gray-700 tracking-wide">REPORT TYPE</label>
-                      <CustomDropdown
+                      <select 
+                        className="w-full h-12 px-4 rounded-xl border-gray-200 bg-gray-50 text-gray-900 focus:ring-green-500 focus:border-green-500"
                         value={reportType}
-                        onChange={(val) => setReportType(val)}
-                        options={[
-                          { label: 'Detailed Excel Report', value: 'detailed' },
-                          { label: 'Comprehensive report - pdf', value: 'pdf' },
-                          { label: 'Summary Report - PDF', value: 'summary-pdf' },
-                          { label: 'Issue comparison report - pdf', value: 'comparison' },
-                          { label: 'Dynamic Strip Chart', value: 'dynamic-strip-chart' },
-                          { label: 'Overview Strip Chart', value: 'overview-strip-chart' }
-                        ]}
-                      />
+                        onChange={(e) => setReportType(e.target.value)}
+                      >
+                        <option value="detailed">Detailed Excel Report</option>
+                        <option value="pdf">Comprehensive report - pdf</option>
+                        <option value="summary-pdf">Summary Report - PDF</option>
+                        <option value="comparison">Issue comparison report - pdf</option>
+                        <option value="dynamic-strip-chart">Dynamic Strip Chart</option>
+                        <option value="overview-strip-chart">Overview Strip Chart</option>
+                      </select>
                     </div>
 
                     <div className={`space-y-2 relative col-span-1 md:col-span-2 ${chainageType === 'custom' ? 'xl:col-span-2' : 'xl:col-span-1'}`}>
                       <label className="text-sm font-semibold text-gray-700 tracking-wide">CHAINAGE</label>
                       <div className="flex gap-2 w-full">
-                        <CustomDropdown
+                        <select 
+                          className="w-full h-12 px-4 rounded-xl border-gray-200 bg-gray-50 text-gray-900 focus:ring-green-500 focus:border-green-500"
                           value={chainageType}
-                          onChange={(val) => {
-                            setChainageType(val);
+                          onChange={(e) => {
+                            setChainageType(e.target.value);
                             setChainageError('');
                           }}
-                          options={[
-                            { label: 'All', value: 'all' },
-                            { label: 'Custom', value: 'custom' }
-                          ]}
-                        />
+                        >
+                          <option value="all">All</option>
+                          <option value="custom">Custom</option>
+                        </select>
                         {chainageType === 'custom' && (
                           <>
                             <input 
@@ -546,11 +552,51 @@ const ReportsPage = () => {
                 </div>
 
                 {/* Summary Section */}
-                <ProjectOverview 
-                  summary={summary} 
-                  loadingSummary={loadingSummary} 
-                  selectedCycle={selectedCycle} 
-                />
+                {summary && !loadingSummary && (
+                  <div className="space-y-6 animate-fadeIn">
+                    <h2 className="text-xl font-bold text-gray-800">Project Overview</h2>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                      
+                      <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
+                        <div className="text-gray-500 mb-2"><Hash className="w-5 h-5" /></div>
+                        <div className="text-2xl font-bold text-gray-900">{summary.totalRatings}</div>
+                        <div className="text-sm font-medium text-gray-500">Total Ratings</div>
+                      </div>
+
+                      <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
+                        <div className="text-gray-500 mb-2"><MapPin className="w-5 h-5" /></div>
+                        <div className="text-2xl font-bold text-gray-900">{summary.uniqueChainages}</div>
+                        <div className="text-sm font-medium text-gray-500">Unique Chainages</div>
+                      </div>
+
+                      <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
+                        <div className="text-gray-500 mb-2"><BarChart2 className="w-5 h-5" /></div>
+                        <div className="text-2xl font-bold text-gray-900">{summary.parametersRated}</div>
+                        <div className="text-sm font-medium text-gray-500">Parameters Rated</div>
+                      </div>
+
+                      <div className="bg-red-50 p-5 rounded-2xl shadow-sm border border-red-100 flex flex-col justify-between">
+                        <div className="text-red-500 mb-2"><AlertTriangle className="w-5 h-5" /></div>
+                        <div className="text-2xl font-bold text-red-700">{summary.criticalRatings}</div>
+                        <div className="text-sm font-medium text-red-600">Critical Ratings</div>
+                      </div>
+
+                      <div className="bg-green-50 p-5 rounded-2xl shadow-sm border border-green-100 flex flex-col justify-between">
+                        <div className="text-green-500 mb-2"><BarChart2 className="w-5 h-5" /></div>
+                        <div className="text-2xl font-bold text-green-700">{summary.averageRating}</div>
+                        <div className="text-sm font-medium text-green-600">Average Rating</div>
+                      </div>
+
+                      <div className="bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-700 flex flex-col justify-between text-white">
+                        <div className="text-gray-400 mb-2"><CheckCircle className="w-5 h-5" /></div>
+                        <div className="text-lg font-bold truncate" title={summary.inspectionDateRange}>{summary.inspectionDateRange}</div>
+                        <div className="text-sm font-medium text-gray-400">Date Range</div>
+                      </div>
+
+                    </div>
+                  </div>
+                )}
 
                 {/* Preview Section */}
                 {previewUrl && (
@@ -622,85 +668,28 @@ const ReportsPage = () => {
                 {/* ═══ ASSET PERFORMANCE & DECISION CENTER ═══ */}
                 {selectedProject && (
                   <div className="mt-10 pt-8 border-t-2 border-gray-100">
-                    <div className="relative bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col lg:flex-row min-h-[160px]">
-                      
-                      {/* Exact Background Image from Figma with added gradient overlay for text readability */}
-                      <div className="absolute inset-0 z-0 pointer-events-none">
-                        <div 
-                          className="absolute inset-0"
-                          style={{
-                            backgroundImage: `url(${highwayBg})`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'right center',
-                            backgroundRepeat: 'no-repeat'
-                          }}
-                        />
-                        {/* Gradient overlay to ensure text is visible over the image */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-white via-white/80 to-transparent w-[70%]" />
-                      </div>
-
-                      <div className="flex-1 p-8 relative z-20">
-                        <div className="flex gap-6">
-                          {/* Left Logo Box */}
-                          <div className="w-16 h-16 bg-green-100/90 backdrop-blur-sm rounded-2xl flex items-center justify-center shrink-0 shadow-sm border border-green-200">
-                            {/* Road/Route Icon matching mockup */}
-                            <svg className="w-8 h-8 text-green-800" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M12 22V2M7 22l-4-8M17 22l4-8M5 8l4-4M19 8l-4-4" />
-                            </svg>
-                          </div>
-                          
-                          <div>
-                            <h2 className="text-xl font-bold text-slate-800 tracking-tight">ASSET PERFORMANCE & DECISION CENTER</h2>
-                            <p className="text-slate-500 text-sm mt-1 max-w-2xl leading-relaxed font-medium">
-                              Transform current inspection data into project-level condition, asset, risk and corridor intelligence.
-                            </p>
-                            
-                            {/* Feature Pills */}
-                            <div className="flex flex-wrap gap-4 mt-5">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-sm border border-gray-100 text-green-700"><BarChart2 className="w-4 h-4" /></div>
-                                <span className="text-[11px] font-bold text-slate-700 leading-tight">Data Driven<br/>Decisions</span>
-                              </div>
-                              <div className="flex items-center gap-3 ml-2">
-                                <div className="w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-sm border border-gray-100 text-green-700"><ShieldCheck className="w-4 h-4" /></div>
-                                <span className="text-[11px] font-bold text-slate-700 leading-tight">Asset<br/>Health</span>
-                              </div>
-                              <div className="flex items-center gap-3 ml-2">
-                                <div className="w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-sm border border-gray-100 text-green-700">
-                                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22V2M7 22l-4-8M17 22l4-8M5 8l4-4M19 8l-4-4" /></svg>
-                                </div>
-                                <span className="text-[11px] font-bold text-slate-700 leading-tight">Corridor<br/>Intelligence</span>
-                              </div>
-                              <div className="flex items-center gap-3 ml-2">
-                                <div className="w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-sm border border-gray-100 text-green-700"><Settings className="w-4 h-4" /></div>
-                                <span className="text-[11px] font-bold text-slate-700 leading-tight">Project<br/>Insights</span>
-                              </div>
+                    <div className="bg-gradient-to-br from-[#0F172A] to-[#1E3A8A] rounded-2xl shadow-lg p-8 text-white">
+                      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                        <div>
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
+                              <TrendingUp className="w-5 h-5 text-green-300" />
                             </div>
+                            <h2 className="text-xl font-bold tracking-tight">ASSET PERFORMANCE & DECISION CENTER</h2>
                           </div>
+                          <p className="text-slate-300 text-sm max-w-xl leading-relaxed">
+                            Transform current inspection data into project-level condition, asset, risk and corridor intelligence.
+                          </p>
                         </div>
-                      </div>
-
-                      {/* Right Action Section */}
-                      <div className="relative z-20 flex items-center justify-end p-8 lg:w-72 shrink-0 lg:pr-10">
-                        <AnimatedAssignButton
-                          onClick={() => {
-                            // Start animation immediately
-                            setTimeout(() => {
-                              setShowPerformanceCenter(true);
-                            }, 1500); // Open exactly when animation hits 'success' state
-                            return Promise.resolve();
-                          }}
+                        <button
+                          onClick={() => setShowPerformanceCenter(true)}
                           disabled={!selectedProject}
-                          text="OPEN PERFORMANCE CENTER"
-                          successText="OPENING..."
-                          flightDistance={250}
-                          startOffset={-95}
-                          textClassName="text-[11px] uppercase tracking-wider font-bold"
-                          idleClassName="bg-[#0a4d29] text-white border-transparent shadow-xl hover:bg-[#07361d]"
-                          successClassName="bg-[#0a4d29] text-white border-transparent shadow-xl"
-                          className="w-full lg:w-[250px] h-[46px] disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="px-6 py-3 bg-white text-[#0F172A] hover:bg-green-50 font-bold rounded-xl flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap text-sm"
                           id="open-performance-center-btn"
-                        />
+                        >
+                          <TrendingUp className="w-5 h-5" />
+                          OPEN PERFORMANCE CENTER
+                        </button>
                       </div>
                     </div>
                   </div>

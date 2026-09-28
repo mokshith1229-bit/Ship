@@ -37,7 +37,7 @@ const BatchListTable = ({ batches, loading, onDelete, onView, canDelete = true }
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm text-left whitespace-nowrap">
+        <table className="w-full text-sm text-left">
           <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-100">
             <tr>
               <th className="px-5 py-4 font-medium">Batch Name</th>

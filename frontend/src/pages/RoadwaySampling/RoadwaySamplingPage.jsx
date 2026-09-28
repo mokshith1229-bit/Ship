@@ -198,7 +198,7 @@ export default function RoadwaySamplingPage() {
                       type="checkbox"
                       checked={selectedStreams.includes(stream)}
                       onChange={() => handleStreamToggle(stream)}
-                      className="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
+                      className="w-4 h-4 accent-green-600 text-green-600 rounded border-gray-300 focus:ring-green-500"
                     />
                     <span className="text-sm font-medium text-gray-700">{stream}</span>
                   </label>
@@ -339,7 +339,7 @@ export default function RoadwaySamplingPage() {
                 <Premium3DButton
                   onClick={handleGenerateBatch}
                   disabled={loading}
-                  className="!w-auto flex items-center justify-center gap-2"
+                  className="!w-auto flex-shrink-0 whitespace-nowrap flex items-center justify-center gap-2"
                 >
                   {loading ? 'Creating Batch...' : 'Generate Roadway Batch'}
                 </Premium3DButton>
