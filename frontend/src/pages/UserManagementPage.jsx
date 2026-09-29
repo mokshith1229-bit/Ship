@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
-import Premium3DButton from '../components/common/Premium3DButton';
 import { useAuth } from '../context/AuthContext';
 import { workAssignmentService } from '../services/workAssignment.service';
 import { 
@@ -309,7 +308,7 @@ const UserManagementPage = ({ defaultTab = 'all-users' }) => {
             <div className="flex items-center justify-between h-[46px] w-full shrink-0">
               {/* Left: Tabs */}
               <div className="flex items-center gap-3">
-                <Premium3DButton
+                <button
                   onClick={() => {
                     setActivePageTab('all-users');
                     setEditingUserId(null);
@@ -326,7 +325,7 @@ const UserManagementPage = ({ defaultTab = 'all-users' }) => {
                     activePageTab === 'all-users' ? 'text-white' : 'text-[#2563EB]'
                   }`} />
                   <span>All Users</span>
-                </Premium3DButton>
+                </button>
 
                 {editingUserId && activePageTab === 'add-user' && (
                   <div className="flex items-center gap-2 h-[46px] px-4 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm font-semibold shadow-sm">
@@ -338,7 +337,7 @@ const UserManagementPage = ({ defaultTab = 'all-users' }) => {
 
               {/* Right: Add User Button */}
               {activePageTab === 'all-users' && canCreate && (
-                <Premium3DButton
+                <button
                   onClick={() => {
                     setEditingUserId(null);
                     setEditingUserOriginal(null);
@@ -349,7 +348,7 @@ const UserManagementPage = ({ defaultTab = 'all-users' }) => {
                 >
                   <LuUserPlus className="text-[20px] text-[#2563EB] group-hover:text-white transition-colors duration-200" />
                   <span>Add User</span>
-                </Premium3DButton>
+                </button>
               )}
             </div>
           </div>
@@ -421,13 +420,13 @@ const UserManagementPage = ({ defaultTab = 'all-users' }) => {
                       <option value="Active">Active</option>
                       <option value="Inactive">Inactive</option>
                     </select>
-                    <Premium3DButton
+                    <button
                       onClick={handleClearFilters}
                       className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-muted hover:text-green-600 hover:bg-green-50 rounded-xl transition-colors duration-200 border border-transparent hover:border-green-100 shadow-sm cursor-pointer"
                     >
                       <LuFilterX className="text-base" />
                       Clear Filters
-                    </Premium3DButton>
+                    </button>
                   </div>
                 </div>
 
@@ -477,13 +476,13 @@ const UserManagementPage = ({ defaultTab = 'all-users' }) => {
                               <p className="text-sm text-muted text-center mb-6 leading-relaxed">
                                 Try changing your search or filter criteria.
                               </p>
-                              <Premium3DButton
+                              <button
                                 onClick={handleClearFilters}
                                 className="flex items-center gap-2 px-4 py-2.5 bg-primary hover:bg-[#0056B3] text-white rounded-xl text-sm font-semibold shadow-sm transition-all duration-200 cursor-pointer"
                               >
                                 <LuFilterX className="text-base" />
                                 Reset Filters
-                              </Premium3DButton>
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -530,14 +529,14 @@ const UserManagementPage = ({ defaultTab = 'all-users' }) => {
                                   );
                                 }
                                 return (
-                                  <Premium3DButton
+                                  <button
                                     onClick={() => handleStatusChange(user._id)}
                                     className={`h-[34px] px-3.5 rounded-full text-xs font-bold border border-gray-200 transition-all duration-200 cursor-pointer ${
                                       active ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-red-100 text-red-800 hover:bg-red-200'
                                     }`}
                                   >
                                     {active ? '🟢 Active' : '🔴 Inactive'}
-                                  </Premium3DButton>
+                                  </button>
                                 );
                               })()}
                             </td>
@@ -547,22 +546,22 @@ const UserManagementPage = ({ defaultTab = 'all-users' }) => {
                             <td className="px-4 py-3.5 text-center whitespace-nowrap">
                               <div className="flex items-center justify-center gap-2">
                                 {canEdit && (
-                                  <Premium3DButton
+                                  <button
                                     onClick={() => handleEditClick(user)}
                                     className="w-[40px] h-[40px] flex items-center justify-center bg-white border border-[#2563EB] text-[#2563EB] rounded-lg shadow-sm hover:bg-[#2563EB] hover:text-white transition-all duration-200 cursor-pointer"
                                     title="Edit User"
                                   >
                                     <LuPencil className="text-base" />
-                                  </Premium3DButton>
+                                  </button>
                                 )}
                                 {canDelete && (
-                                  <Premium3DButton
+                                  <button
                                     onClick={() => { setUserToDelete(user); setShowDeleteModal(true); }}
                                     className="w-[40px] h-[40px] flex items-center justify-center bg-white border border-[#EF4444] text-[#EF4444] rounded-lg shadow-sm hover:bg-[#EF4444] hover:text-white transition-all duration-200 cursor-pointer"
                                     title="Delete User"
                                   >
                                     <LuTrash2 className="text-base" />
-                                  </Premium3DButton>
+                                  </button>
                                 )}
                                 {!canEdit && !canDelete && (
                                   <span className="text-gray-400 text-xs">—</span>
@@ -741,14 +740,14 @@ const UserManagementPage = ({ defaultTab = 'all-users' }) => {
                           className="w-full h-[46px] pl-4 pr-12 border border-borderColor rounded-xl text-sm bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-textColor placeholder-gray-400 transition-all duration-200"
                           required={!editingUserId}
                         />
-                        <Premium3DButton
+                        <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
                           className="absolute right-3 p-1.5 text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer"
                           title={showPassword ? "Hide Password" : "Show Password"}
                         >
                           {showPassword ? <LuEyeOff className="text-lg" /> : <LuEye className="text-lg" />}
-                        </Premium3DButton>
+                        </button>
                       </div>
                     </div>
 
@@ -770,30 +769,30 @@ const UserManagementPage = ({ defaultTab = 'all-users' }) => {
                 {/* Bottom Action Buttons */}
                 <div className="flex items-center justify-between pt-6 border-t border-borderColor mt-6">
                   <div className="flex items-center gap-3">
-                    <Premium3DButton
+                    <button
                       type="button"
                       onClick={handleCancel}
                       className="px-5 h-[46px] border border-borderColor rounded-xl text-sm font-semibold text-textColor hover:bg-gray-100 active:bg-gray-200 transition-colors"
                     >
                       Cancel
-                    </Premium3DButton>
-                    <Premium3DButton
+                    </button>
+                    <button
                       type="button"
                       onClick={handleReset}
                       className="px-5 h-[46px] border border-borderColor rounded-xl text-sm font-semibold text-textColor hover:bg-gray-100 active:bg-gray-200 transition-colors"
                     >
                       Reset
-                    </Premium3DButton>
+                    </button>
                   </div>
 
-                  <Premium3DButton
+                  <button
                     type="submit"
                     disabled={saving}
                     className="px-6 h-[46px] bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-xl text-sm font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
                   >
                     {saving && <LuLoader className="animate-spin" />}
                     {editingUserId ? 'Save Changes' : 'Create User'}
-                  </Premium3DButton>
+                  </button>
                 </div>
               </form>
             </div>
@@ -815,7 +814,7 @@ const UserManagementPage = ({ defaultTab = 'all-users' }) => {
               </p>
             </div>
             <div className="flex items-center justify-end gap-3 pt-2">
-              <Premium3DButton
+              <button
                 onClick={() => {
                   setShowDeleteModal(false);
                   setUserToDelete(null);
@@ -823,13 +822,13 @@ const UserManagementPage = ({ defaultTab = 'all-users' }) => {
                 className="px-4 py-2 border border-borderColor rounded-xl text-sm font-semibold text-textColor hover:bg-gray-100 transition-colors"
               >
                 Cancel
-              </Premium3DButton>
-              <Premium3DButton
+              </button>
+              <button
                 onClick={confirmDeleteUser}
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-semibold shadow-sm transition-colors"
               >
                 Delete
-              </Premium3DButton>
+              </button>
             </div>
           </div>
         </div>

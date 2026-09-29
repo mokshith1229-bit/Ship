@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from '../components/Sidebar';
 import { useParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import Premium3DButton from '../components/common/Premium3DButton';
 import { workAssignmentService } from '../services/workAssignment.service';
 import { projectService } from '../services/project.service';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -313,12 +312,12 @@ const DateRangePicker = ({ startDate, endDate, onRangeSelect }) => {
 
   return (
     <div className="relative" ref={containerRef}>
-      <Premium3DButton
+      <button
         onClick={() => setIsOpen(!isOpen)}
         className="w-9 h-9 rounded-xl border border-borderColor bg-white hover:bg-gray-50 flex items-center justify-center shadow-sm transition-colors text-gray-400 hover:text-primary cursor-pointer"
       >
         <MdOutlineCalendarToday className="text-base text-green-600" />
-      </Premium3DButton>
+      </button>
 
       {isOpen && (
         <motion.div
@@ -330,9 +329,9 @@ const DateRangePicker = ({ startDate, endDate, onRangeSelect }) => {
         >
           {/* Calendar Picker Header */}
           <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-3">
-            <Premium3DButton onClick={prevNavMonth} className="p-1 hover:bg-gray-100 rounded-lg cursor-pointer text-textColor">
+            <button onClick={prevNavMonth} className="p-1 hover:bg-gray-100 rounded-lg cursor-pointer text-textColor">
               <MdChevronLeft className="text-xl" />
-            </Premium3DButton>
+            </button>
             <div className="flex items-center gap-1">
               <select
                 value={navMonth}
@@ -353,9 +352,9 @@ const DateRangePicker = ({ startDate, endDate, onRangeSelect }) => {
                 ))}
               </select>
             </div>
-            <Premium3DButton onClick={nextNavMonth} className="p-1 hover:bg-gray-100 rounded-lg cursor-pointer text-textColor">
+            <button onClick={nextNavMonth} className="p-1 hover:bg-gray-100 rounded-lg cursor-pointer text-textColor">
               <MdChevronRight className="text-xl" />
-            </Premium3DButton>
+            </button>
           </div>
 
           {/* Weekday Labels */}
@@ -377,7 +376,7 @@ const DateRangePicker = ({ startDate, endDate, onRangeSelect }) => {
               const isInRange = checkIfInRange(currentDate);
 
               return (
-                <Premium3DButton
+                <button
                   key={day}
                   onClick={() => handleDateClick(currentDate)}
                   className={`p-1.5 rounded-lg text-xs font-semibold flex items-center justify-center transition-all duration-150 relative cursor-pointer text-textColor hover:bg-gray-100
@@ -387,7 +386,7 @@ const DateRangePicker = ({ startDate, endDate, onRangeSelect }) => {
                   `}
                 >
                   {day}
-                </Premium3DButton>
+                </button>
               );
             })}
           </div>
@@ -838,30 +837,30 @@ const WorkHistoryTableCard = ({ paginatedTableData, formattedWorkHistory, tableP
             Showing {(tablePage - 1) * TABLE_ITEMS_PER_PAGE + 1} to {Math.min(tablePage * TABLE_ITEMS_PER_PAGE, formattedWorkHistory.length)} of {formattedWorkHistory.length} entries
           </span>
           <div className="flex items-center gap-1">
-            <Premium3DButton
+            <button
               onClick={() => setTablePage(prev => Math.max(prev - 1, 1))}
               disabled={tablePage === 1}
               className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 active:bg-gray-100 disabled:opacity-40 transition-colors cursor-pointer"
             >
               <MdChevronLeft className="text-lg" />
-            </Premium3DButton>
+            </button>
             {Array.from({ length: totalTablePages }, (_, i) => i + 1).map((p) => (
-              <Premium3DButton
+              <button
                 key={p}
                 onClick={() => setTablePage(p)}
                 className={`w-8 h-8 rounded-lg text-xs font-bold transition-all duration-200 border cursor-pointer ${tablePage === p ? 'bg-green-600 text-white border-green-600' : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-600'
                   }`}
               >
                 {p}
-              </Premium3DButton>
+              </button>
             ))}
-            <Premium3DButton
+            <button
               onClick={() => setTablePage(prev => Math.min(prev + 1, totalTablePages))}
               disabled={tablePage === totalTablePages}
               className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 active:bg-gray-100 disabled:opacity-40 transition-colors cursor-pointer"
             >
               <MdChevronRight className="text-lg" />
-            </Premium3DButton>
+            </button>
           </div>
         </div>
       )}
@@ -1003,13 +1002,13 @@ const ActivityTimelineCard = ({
       <h3 className="text-xs font-bold text-textColor uppercase tracking-wider">Activity Timeline (This Month)</h3>
 
       <div className="flex items-center justify-between bg-gray-50/50 border border-gray-100 rounded-xl p-2.5 max-w-[400px] mx-auto w-full">
-        <Premium3DButton onClick={handlePrevMonth} className="w-7 h-7 rounded-lg border border-borderColor bg-white hover:bg-gray-50 flex items-center justify-center shadow-sm text-textColor cursor-pointer transition-colors">
+        <button onClick={handlePrevMonth} className="w-7 h-7 rounded-lg border border-borderColor bg-white hover:bg-gray-50 flex items-center justify-center shadow-sm text-textColor cursor-pointer transition-colors">
           <MdChevronLeft className="text-base" />
-        </Premium3DButton>
+        </button>
         <span className="text-sm font-extrabold text-textColor">{currentMonthYear}</span>
-        <Premium3DButton onClick={handleNextMonth} className="w-7 h-7 rounded-lg border border-borderColor bg-white hover:bg-gray-50 flex items-center justify-center shadow-sm text-textColor cursor-pointer transition-colors">
+        <button onClick={handleNextMonth} className="w-7 h-7 rounded-lg border border-borderColor bg-white hover:bg-gray-50 flex items-center justify-center shadow-sm text-textColor cursor-pointer transition-colors">
           <MdChevronRight className="text-base" />
-        </Premium3DButton>
+        </button>
       </div>
 
       <div className="relative flex-1 flex items-center w-full min-h-[100px]">
@@ -1200,25 +1199,25 @@ const DetailedProjectReportView = ({ projectName, userAssignments, currentUserOb
     <div className="flex flex-col gap-6 w-full print:p-0 print:m-0">
       {/* Top action bar */}
       <div className="flex items-center justify-between pb-4 border-b border-borderColor print:hidden">
-        <Premium3DButton
+        <button
           onClick={onClose}
           className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-gray-600 hover:text-primary border border-borderColor hover:border-primary rounded-xl bg-white shadow-sm transition-all duration-200 cursor-pointer"
         >
           <span>←</span> Back to Insights
-        </Premium3DButton>
+        </button>
         <div className="flex items-center gap-3">
-          <Premium3DButton
+          <button
             onClick={handleExportCSV}
             className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-gray-700 hover:text-textColor border border-borderColor bg-white hover:bg-gray-50 rounded-xl shadow-sm transition-all duration-200 cursor-pointer"
           >
             <span className="text-base">⤓</span> Export Report
-          </Premium3DButton>
-          <Premium3DButton
+          </button>
+          <button
             onClick={handlePrintPDF}
             className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-primary hover:bg-[#4cae4c] rounded-xl shadow-md transition-all duration-200 cursor-pointer"
           >
             <span className="text-base">⎙</span> Download PDF
-          </Premium3DButton>
+          </button>
         </div>
       </div>
 
@@ -1479,12 +1478,12 @@ const DetailedProjectReportView = ({ projectName, userAssignments, currentUserOb
                 <h4 className="text-base font-bold text-textColor">{selectedImage.category}</h4>
                 <p className="text-xs text-gray-400 font-semibold">Page {selectedImage.pageNumber} | Inspection Details</p>
               </div>
-              <Premium3DButton
+              <button
                 onClick={() => setSelectedImage(null)}
                 className="text-gray-400 hover:text-textColor text-xl font-bold cursor-pointer"
               >
                 ✕
-              </Premium3DButton>
+              </button>
             </div>
 
             <div className="w-full h-80 rounded-xl flex flex-col items-center justify-center text-white font-extrabold text-lg shadow-inner" style={{ backgroundColor: selectedImage.color }}>
@@ -2944,16 +2943,16 @@ const UserInsightsPage = () => {
                     </div>
 
                     {/* Apply Button */}
-                    <Premium3DButton
+                    <button
                       onClick={handleApply}
                       className="px-6 h-[46px] bg-[#5cb85c] hover:bg-[#4cae4c] text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm cursor-pointer flex items-center justify-center min-w-[88px] flex-1 sm:flex-initial"
                     >
                       Apply
-                    </Premium3DButton>
+                    </button>
 
                     {/* Export Report Dropdown Button */}
                     <div className="relative flex-1 sm:flex-initial">
-                      <Premium3DButton
+                      <button
                         onClick={() => setShowExportDropdown(!showExportDropdown)}
                         className="w-full sm:w-auto px-6 h-[46px] bg-primary hover:bg-[#4cae4c] text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm cursor-pointer flex items-center justify-center gap-2"
                       >
@@ -2961,11 +2960,11 @@ const UserInsightsPage = () => {
                           <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
                         </svg>
                         <span>Export Report</span>
-                      </Premium3DButton>
+                      </button>
 
                       {showExportDropdown && (
                         <div className="absolute right-0 mt-2 w-52 bg-white border border-borderColor rounded-xl shadow-lg z-50 py-1.5 overflow-hidden">
-                          <Premium3DButton
+                          <button
                             onClick={() => {
                               setShowExportDropdown(false);
                               handlePDFExport();
@@ -2973,8 +2972,8 @@ const UserInsightsPage = () => {
                             className="w-full text-left px-4 py-2.5 text-xs font-bold text-textColor hover:bg-gray-50 flex items-center gap-2 cursor-pointer transition-colors duration-150"
                           >
                             <span className="text-sm">📄</span> Download PDF Report
-                          </Premium3DButton>
-                          <Premium3DButton
+                          </button>
+                          <button
                             onClick={() => {
                               setShowExportDropdown(false);
                               handleExcelExport();
@@ -2982,7 +2981,7 @@ const UserInsightsPage = () => {
                             className="w-full text-left px-4 py-2.5 text-xs font-bold text-textColor hover:bg-gray-50 flex items-center gap-2 cursor-pointer transition-colors duration-150"
                           >
                             <span className="text-sm">📊</span> Download Excel Report
-                          </Premium3DButton>
+                          </button>
                         </div>
                       )}
                     </div>
@@ -2997,7 +2996,7 @@ const UserInsightsPage = () => {
                       const isActive = activeTab === tab.id;
 
                       return (
-                        <Premium3DButton
+                        <button
                           key={tab.id}
                           onClick={() => setActiveTab(tab.id)}
                           className={`relative flex items-center gap-2 py-4 text-sm font-medium transition-colors duration-200 cursor-pointer focus:outline-none select-none group
@@ -3014,7 +3013,7 @@ const UserInsightsPage = () => {
                               transition={{ type: "spring", stiffness: 380, damping: 30 }}
                             />
                           )}
-                        </Premium3DButton>
+                        </button>
                       );
                     })}
                   </div>
