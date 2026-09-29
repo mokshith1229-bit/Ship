@@ -312,12 +312,12 @@ const DateRangePicker = ({ startDate, endDate, onRangeSelect }) => {
 
   return (
     <div className="relative" ref={containerRef}>
-      <button
+      <Premium3DButton
         onClick={() => setIsOpen(!isOpen)}
         className="w-9 h-9 rounded-xl border border-borderColor bg-white hover:bg-gray-50 flex items-center justify-center shadow-sm transition-colors text-gray-400 hover:text-primary cursor-pointer"
       >
         <MdOutlineCalendarToday className="text-base text-green-600" />
-      </button>
+      </Premium3DButton>
 
       {isOpen && (
         <motion.div
@@ -329,9 +329,9 @@ const DateRangePicker = ({ startDate, endDate, onRangeSelect }) => {
         >
           {/* Calendar Picker Header */}
           <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-3">
-            <button onClick={prevNavMonth} className="p-1 hover:bg-gray-100 rounded-lg cursor-pointer text-textColor">
+            <Premium3DButton onClick={prevNavMonth} className="p-1 hover:bg-gray-100 rounded-lg cursor-pointer text-textColor">
               <MdChevronLeft className="text-xl" />
-            </button>
+            </Premium3DButton>
             <div className="flex items-center gap-1">
               <select
                 value={navMonth}
@@ -352,9 +352,9 @@ const DateRangePicker = ({ startDate, endDate, onRangeSelect }) => {
                 ))}
               </select>
             </div>
-            <button onClick={nextNavMonth} className="p-1 hover:bg-gray-100 rounded-lg cursor-pointer text-textColor">
+            <Premium3DButton onClick={nextNavMonth} className="p-1 hover:bg-gray-100 rounded-lg cursor-pointer text-textColor">
               <MdChevronRight className="text-xl" />
-            </button>
+            </Premium3DButton>
           </div>
 
           {/* Weekday Labels */}
@@ -376,7 +376,7 @@ const DateRangePicker = ({ startDate, endDate, onRangeSelect }) => {
               const isInRange = checkIfInRange(currentDate);
 
               return (
-                <button
+                <Premium3DButton
                   key={day}
                   onClick={() => handleDateClick(currentDate)}
                   className={`p-1.5 rounded-lg text-xs font-semibold flex items-center justify-center transition-all duration-150 relative cursor-pointer text-textColor hover:bg-gray-100
@@ -386,7 +386,7 @@ const DateRangePicker = ({ startDate, endDate, onRangeSelect }) => {
                   `}
                 >
                   {day}
-                </button>
+                </Premium3DButton>
               );
             })}
           </div>
@@ -837,30 +837,30 @@ const WorkHistoryTableCard = ({ paginatedTableData, formattedWorkHistory, tableP
             Showing {(tablePage - 1) * TABLE_ITEMS_PER_PAGE + 1} to {Math.min(tablePage * TABLE_ITEMS_PER_PAGE, formattedWorkHistory.length)} of {formattedWorkHistory.length} entries
           </span>
           <div className="flex items-center gap-1">
-            <button
+            <Premium3DButton
               onClick={() => setTablePage(prev => Math.max(prev - 1, 1))}
               disabled={tablePage === 1}
               className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 active:bg-gray-100 disabled:opacity-40 transition-colors cursor-pointer"
             >
               <MdChevronLeft className="text-lg" />
-            </button>
+            </Premium3DButton>
             {Array.from({ length: totalTablePages }, (_, i) => i + 1).map((p) => (
-              <button
+              <Premium3DButton
                 key={p}
                 onClick={() => setTablePage(p)}
                 className={`w-8 h-8 rounded-lg text-xs font-bold transition-all duration-200 border cursor-pointer ${tablePage === p ? 'bg-green-600 text-white border-green-600' : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-600'
                   }`}
               >
                 {p}
-              </button>
+              </Premium3DButton>
             ))}
-            <button
+            <Premium3DButton
               onClick={() => setTablePage(prev => Math.min(prev + 1, totalTablePages))}
               disabled={tablePage === totalTablePages}
               className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 active:bg-gray-100 disabled:opacity-40 transition-colors cursor-pointer"
             >
               <MdChevronRight className="text-lg" />
-            </button>
+            </Premium3DButton>
           </div>
         </div>
       )}
@@ -1002,13 +1002,13 @@ const ActivityTimelineCard = ({
       <h3 className="text-xs font-bold text-textColor uppercase tracking-wider">Activity Timeline (This Month)</h3>
 
       <div className="flex items-center justify-between bg-gray-50/50 border border-gray-100 rounded-xl p-2.5 max-w-[400px] mx-auto w-full">
-        <button onClick={handlePrevMonth} className="w-7 h-7 rounded-lg border border-borderColor bg-white hover:bg-gray-50 flex items-center justify-center shadow-sm text-textColor cursor-pointer transition-colors">
+        <Premium3DButton onClick={handlePrevMonth} className="w-7 h-7 rounded-lg border border-borderColor bg-white hover:bg-gray-50 flex items-center justify-center shadow-sm text-textColor cursor-pointer transition-colors">
           <MdChevronLeft className="text-base" />
-        </button>
+        </Premium3DButton>
         <span className="text-sm font-extrabold text-textColor">{currentMonthYear}</span>
-        <button onClick={handleNextMonth} className="w-7 h-7 rounded-lg border border-borderColor bg-white hover:bg-gray-50 flex items-center justify-center shadow-sm text-textColor cursor-pointer transition-colors">
+        <Premium3DButton onClick={handleNextMonth} className="w-7 h-7 rounded-lg border border-borderColor bg-white hover:bg-gray-50 flex items-center justify-center shadow-sm text-textColor cursor-pointer transition-colors">
           <MdChevronRight className="text-base" />
-        </button>
+        </Premium3DButton>
       </div>
 
       <div className="relative flex-1 flex items-center w-full min-h-[100px]">
@@ -1199,25 +1199,25 @@ const DetailedProjectReportView = ({ projectName, userAssignments, currentUserOb
     <div className="flex flex-col gap-6 w-full print:p-0 print:m-0">
       {/* Top action bar */}
       <div className="flex items-center justify-between pb-4 border-b border-borderColor print:hidden">
-        <button
+        <Premium3DButton
           onClick={onClose}
           className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-gray-600 hover:text-primary border border-borderColor hover:border-primary rounded-xl bg-white shadow-sm transition-all duration-200 cursor-pointer"
         >
           <span>←</span> Back to Insights
-        </button>
+        </Premium3DButton>
         <div className="flex items-center gap-3">
-          <button
+          <Premium3DButton
             onClick={handleExportCSV}
             className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-gray-700 hover:text-textColor border border-borderColor bg-white hover:bg-gray-50 rounded-xl shadow-sm transition-all duration-200 cursor-pointer"
           >
             <span className="text-base">⤓</span> Export Report
-          </button>
-          <button
+          </Premium3DButton>
+          <Premium3DButton
             onClick={handlePrintPDF}
             className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-primary hover:bg-[#4cae4c] rounded-xl shadow-md transition-all duration-200 cursor-pointer"
           >
             <span className="text-base">⎙</span> Download PDF
-          </button>
+          </Premium3DButton>
         </div>
       </div>
 
@@ -1478,12 +1478,12 @@ const DetailedProjectReportView = ({ projectName, userAssignments, currentUserOb
                 <h4 className="text-base font-bold text-textColor">{selectedImage.category}</h4>
                 <p className="text-xs text-gray-400 font-semibold">Page {selectedImage.pageNumber} | Inspection Details</p>
               </div>
-              <button
+              <Premium3DButton
                 onClick={() => setSelectedImage(null)}
                 className="text-gray-400 hover:text-textColor text-xl font-bold cursor-pointer"
               >
                 ✕
-              </button>
+              </Premium3DButton>
             </div>
 
             <div className="w-full h-80 rounded-xl flex flex-col items-center justify-center text-white font-extrabold text-lg shadow-inner" style={{ backgroundColor: selectedImage.color }}>
@@ -2943,16 +2943,16 @@ const UserInsightsPage = () => {
                     </div>
 
                     {/* Apply Button */}
-                    <button
+                    <Premium3DButton
                       onClick={handleApply}
                       className="px-6 h-[46px] bg-[#5cb85c] hover:bg-[#4cae4c] text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm cursor-pointer flex items-center justify-center min-w-[88px] flex-1 sm:flex-initial"
                     >
                       Apply
-                    </button>
+                    </Premium3DButton>
 
                     {/* Export Report Dropdown Button */}
                     <div className="relative flex-1 sm:flex-initial">
-                      <button
+                      <Premium3DButton
                         onClick={() => setShowExportDropdown(!showExportDropdown)}
                         className="w-full sm:w-auto px-6 h-[46px] bg-primary hover:bg-[#4cae4c] text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm cursor-pointer flex items-center justify-center gap-2"
                       >
@@ -2960,11 +2960,11 @@ const UserInsightsPage = () => {
                           <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
                         </svg>
                         <span>Export Report</span>
-                      </button>
+                      </Premium3DButton>
 
                       {showExportDropdown && (
                         <div className="absolute right-0 mt-2 w-52 bg-white border border-borderColor rounded-xl shadow-lg z-50 py-1.5 overflow-hidden">
-                          <button
+                          <Premium3DButton
                             onClick={() => {
                               setShowExportDropdown(false);
                               handlePDFExport();
@@ -2972,8 +2972,8 @@ const UserInsightsPage = () => {
                             className="w-full text-left px-4 py-2.5 text-xs font-bold text-textColor hover:bg-gray-50 flex items-center gap-2 cursor-pointer transition-colors duration-150"
                           >
                             <span className="text-sm">📄</span> Download PDF Report
-                          </button>
-                          <button
+                          </Premium3DButton>
+                          <Premium3DButton
                             onClick={() => {
                               setShowExportDropdown(false);
                               handleExcelExport();
@@ -2981,7 +2981,7 @@ const UserInsightsPage = () => {
                             className="w-full text-left px-4 py-2.5 text-xs font-bold text-textColor hover:bg-gray-50 flex items-center gap-2 cursor-pointer transition-colors duration-150"
                           >
                             <span className="text-sm">📊</span> Download Excel Report
-                          </button>
+                          </Premium3DButton>
                         </div>
                       )}
                     </div>
@@ -2996,7 +2996,7 @@ const UserInsightsPage = () => {
                       const isActive = activeTab === tab.id;
 
                       return (
-                        <button
+                        <Premium3DButton
                           key={tab.id}
                           onClick={() => setActiveTab(tab.id)}
                           className={`relative flex items-center gap-2 py-4 text-sm font-medium transition-colors duration-200 cursor-pointer focus:outline-none select-none group
@@ -3013,7 +3013,7 @@ const UserInsightsPage = () => {
                               transition={{ type: "spring", stiffness: 380, damping: 30 }}
                             />
                           )}
-                        </button>
+                        </Premium3DButton>
                       );
                     })}
                   </div>
