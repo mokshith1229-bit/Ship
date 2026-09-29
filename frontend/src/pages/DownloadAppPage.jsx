@@ -1,6 +1,7 @@
 import React from 'react';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
+import Premium3DButton from '../components/common/Premium3DButton';
 
 const DownloadAppPage = () => {
   const handleDownload = () => {
@@ -37,12 +38,12 @@ const DownloadAppPage = () => {
                     <td className="px-6 py-6 text-sm text-gray-700">8.8 MB</td>
                     <td className="px-6 py-6 text-sm text-gray-700">New Release</td>
                     <td className="px-6 py-6">
-                      <button 
+                      <Premium3DButton 
                         onClick={handleDownload}
-                        className="bg-[#0a4d29] hover:bg-[#07381d] text-white text-sm font-bold px-4 py-2 rounded shadow-sm transition-colors"
+                        className="!w-auto px-4 py-2"
                       >
                         Click To Download APP
-                      </button>
+                      </Premium3DButton>
                     </td>
                   </tr>
                 </tbody>
