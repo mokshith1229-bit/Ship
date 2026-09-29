@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { MdClose, MdUploadFile } from 'react-icons/md';
 import { masterListService } from '../../../services/masterList.service';
 import { projectService } from '../../../services/project.service';
+import CustomDropdown from '../../../components/common/CustomDropdown';
+import Premium3DButton from '../../../components/common/Premium3DButton';
 
 const MasterListImportModal = ({ onClose, onSuccess }) => {
   const [file, setFile] = useState(null);
@@ -123,21 +125,18 @@ const MasterListImportModal = ({ onClose, onSuccess }) => {
               )}
 
               {/* Project Input */}
-              <div>
+              <div className="z-20 relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
-                <select
-                  required
+                <CustomDropdown
                   value={project}
-                  onChange={(e) => setProject(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 uppercase"
-                >
-                  <option value="" disabled>Select a project</option>
-                  {projectsList.map((p, idx) => (
-                    <option key={`${p._id || p.code || idx}-${idx}`} value={p.code}>
-                      {p.code} - {p.fullName}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setProject}
+                  placeholder="SELECT A PROJECT"
+                  options={projectsList.map(p => ({
+                    label: `${p.code} - ${p.fullName}`,
+                    value: p.code
+                  }))}
+                  className="w-full"
+                />
               </div>
 
               {/* Import Mode */}
@@ -198,14 +197,14 @@ const MasterListImportModal = ({ onClose, onSuccess }) => {
                 >
                   Cancel
                 </button>
-                <button
+                <Premium3DButton
                   type="submit"
                   disabled={loading || !file || !project}
-                  className="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 transition-colors flex items-center gap-2"
+                  className="px-6"
                 >
                   {loading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
                   {loading ? 'Importing...' : 'Import Master List'}
-                </button>
+                </Premium3DButton>
               </div>
 
             </form>
