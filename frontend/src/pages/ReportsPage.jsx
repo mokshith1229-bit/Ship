@@ -13,6 +13,7 @@ import CustomDropdown from '../components/common/CustomDropdown';
 import ProjectOverview from '../components/Reports/ProjectOverview/ProjectOverview';
 import highwayBg from '../assets/banner_bg.png';
 import AnimatedAssignButton from '../components/common/AnimatedAssignButton';
+import GenerateBatchButton from './InspectionEngine/components/GenerateBatchButton';
 
 const ReportsPage = () => {
   const [loading, setLoading] = useState(true);
@@ -532,14 +533,16 @@ const ReportsPage = () => {
                         <span>PREVIEW</span>
                       </button>
                       
-                      <button
+                      <GenerateBatchButton
                         onClick={handleDownload}
                         disabled={generating || previewing || !selectedProject || loadingSummary || reportType === 'dynamic-strip-chart' || reportType === 'overview-strip-chart'}
-                        className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-medium rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-green-600/20"
+                        className="w-full h-12 rounded-xl"
                       >
-                        {generating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
-                        <span>DOWNLOAD</span>
-                      </button>
+                        <div className="flex items-center justify-center gap-2">
+                          {generating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+                          <span>DOWNLOAD</span>
+                        </div>
+                      </GenerateBatchButton>
                     </div>
 
                   </div>
