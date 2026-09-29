@@ -113,12 +113,12 @@ const ProfilePage = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-140px)] min-h-0 pb-4">
             
             {/* Left Column: Profile Card */}
-            <div className="lg:col-span-1 h-full">
+            <div className="w-full lg:w-[30%] flex-shrink-0 flex flex-col h-full min-h-0">
               <div 
-                className="rounded-[20px] shadow-sm relative overflow-hidden h-full min-h-[500px] flex flex-col"
+                className="rounded-[20px] shadow-sm relative overflow-hidden h-full flex flex-col"
                 style={{
                   backgroundImage: `url(${bannerBg})`,
                   backgroundSize: 'cover',
@@ -126,210 +126,213 @@ const ProfilePage = () => {
                 }}
               >
                 {/* Top content (centered) */}
-                <div className="flex flex-col items-center pt-12 px-6 z-10 flex-1">
+                <div className="flex flex-col items-center pt-8 px-4 z-10 flex-1">
                   
                   {/* Profile Avatar with double ring */}
-                  <div className="relative mb-6">
+                  <div className="relative mb-4 mt-2">
                     <div className="absolute inset-0 bg-white/30 rounded-full scale-125"></div>
-                    <div className="relative w-[110px] h-[110px] bg-white rounded-full flex items-center justify-center text-[#0a4d29] text-[60px] shadow-sm z-10">
+                    <div className="relative w-[90px] h-[90px] bg-white rounded-full flex items-center justify-center text-[#0a4d29] text-[50px] shadow-sm z-10">
                       <MdPerson />
                     </div>
                   </div>
                   
-                  <h2 className="text-[22px] font-extrabold uppercase tracking-wide text-gray-900 mt-2">
+                  <h2 className="text-[19px] font-extrabold uppercase tracking-wide text-gray-900 mt-2">
                     {user?.name || 'System Admin'}
                   </h2>
-                  <p className="text-gray-600 font-medium text-[15px] mt-1 mb-5">
+                  <p className="text-gray-600 font-medium text-[13px] mt-1 mb-3">
                     {user?.role || 'Admin'}
                   </p>
                   
-                  <div className="bg-[#16A05D]/20 text-[#0a4d29] px-5 py-1.5 rounded-full flex items-center gap-2 mb-8 font-bold text-sm">
-                    <div className="w-2.5 h-2.5 bg-[#16A05D] rounded-full"></div>
+                  <div className="bg-[#16A05D]/20 text-[#0a4d29] px-4 py-1.5 rounded-full flex items-center gap-2 mb-5 font-bold text-xs">
+                    <div className="w-2 h-2 bg-[#16A05D] rounded-full"></div>
                     Active
                   </div>
                   
-                  <div className="flex items-center gap-3 mt-2">
-                    <MdHistory className="text-gray-500 text-xl" />
+                  <div className="flex items-center gap-2 mt-1">
+                    <MdHistory className="text-white text-lg" />
                     <div className="flex flex-col text-left">
-                      <span className="text-[11px] text-gray-500 uppercase font-bold tracking-wider leading-tight">Last Login</span>
-                      <span className="text-[13px] font-bold text-gray-900">{formatLastLoginShort(user?.lastLogin)}</span>
+                      <span className="text-[10px] text-white uppercase font-bold tracking-wider leading-tight">Last Login</span>
+                      <span className="text-[12px] font-bold text-white">{formatLastLoginShort(user?.lastLogin)}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Bottom Text */}
-                <div className="p-8 z-10 mt-auto pb-10">
-                  <h3 className="text-white text-xl font-bold leading-snug">
+                <div className="p-6 z-10 mt-auto pb-6">
+                  <h3 className="text-black text-lg font-bold leading-snug">
                     Building <br />
                     Safer Roads <br />
                     for a Stronger <br />
                     Tomorrow
                   </h3>
-                  <div className="w-10 h-1 bg-[#16A05D] mt-4 rounded-full"></div>
+                  <div className="w-8 h-1 bg-[#16A05D] mt-3 rounded-full"></div>
                 </div>
               </div>
             </div>
 
-            {/* Right Column: Personal Information */}
-            <div className="lg:col-span-2">
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 h-full">
-                <h3 className="text-base font-bold text-gray-800 mb-6 border-b border-gray-100 pb-4">Personal Information</h3>
+            {/* Right Column */}
+            <div className="flex-1 flex flex-col gap-4 min-w-0 min-h-0 h-full">
+              
+              {/* Personal Information */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 shrink-0">
+                <h3 className="text-sm font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3">Personal Information</h3>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-8 gap-x-12">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-green-50 text-green-600 flex items-center justify-center shrink-0">
-                      <MdPerson className="text-xl" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-8">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-green-50 text-green-600 flex items-center justify-center shrink-0">
+                      <MdPerson className="text-lg" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-gray-400 mb-1">Full Name</p>
-                      <p className="text-sm font-bold text-gray-800">{user?.name || 'SRAVYA'}</p>
+                      <p className="text-[11px] font-bold text-gray-400 mb-0.5">Full Name</p>
+                      <p className="text-[13px] font-bold text-gray-800">{user?.name || 'System Admin'}</p>
                     </div>
                   </div>
                   
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-green-50 text-green-600 flex items-center justify-center shrink-0">
-                      <MdBadge className="text-xl" />
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-green-50 text-green-600 flex items-center justify-center shrink-0">
+                      <MdBadge className="text-lg" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-gray-400 mb-1">Employee ID</p>
-                      <p className="text-sm font-bold text-gray-800">EMP-1024</p>
+                      <p className="text-[11px] font-bold text-gray-400 mb-0.5">Employee ID</p>
+                      <p className="text-[13px] font-bold text-gray-800">EMP-1024</p>
                     </div>
                   </div>
                   
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-green-50 text-green-600 flex items-center justify-center shrink-0">
-                      <MdEmail className="text-xl" />
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-green-50 text-green-600 flex items-center justify-center shrink-0">
+                      <MdEmail className="text-lg" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-gray-400 mb-1">Email Address</p>
-                      <p className="text-sm font-bold text-gray-800">{user?.email || 'sravya@hirate.in'}</p>
+                      <p className="text-[11px] font-bold text-gray-400 mb-0.5">Email Address</p>
+                      <p className="text-[13px] font-bold text-gray-800">{user?.email || 'admin@hirate.in'}</p>
                     </div>
                   </div>
                   
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-green-50 text-green-600 flex items-center justify-center shrink-0">
-                      <MdBusiness className="text-xl" />
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-green-50 text-green-600 flex items-center justify-center shrink-0">
+                      <MdBusiness className="text-lg" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-gray-400 mb-1">Department</p>
-                      <p className="text-sm font-bold text-gray-800">Operations</p>
+                      <p className="text-[11px] font-bold text-gray-400 mb-0.5">Department</p>
+                      <p className="text-[13px] font-bold text-gray-800">Operations</p>
                     </div>
                   </div>
                   
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-green-50 text-green-600 flex items-center justify-center shrink-0">
-                      <MdPhone className="text-xl" />
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-green-50 text-green-600 flex items-center justify-center shrink-0">
+                      <MdPhone className="text-lg" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-gray-400 mb-1">Mobile Number</p>
-                      <p className="text-sm font-bold text-gray-800">{user?.mobile || 'N/A'}</p>
+                      <p className="text-[11px] font-bold text-gray-400 mb-0.5">Mobile Number</p>
+                      <p className="text-[13px] font-bold text-gray-800">{user?.mobile || 'N/A'}</p>
                     </div>
                   </div>
                   
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-green-50 text-green-600 flex items-center justify-center shrink-0">
-                      <MdWork className="text-xl" />
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-green-50 text-green-600 flex items-center justify-center shrink-0">
+                      <MdWork className="text-lg" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-gray-400 mb-1">Designation</p>
-                      <p className="text-sm font-bold text-gray-800">{user?.designation || user?.role || 'Admin'}</p>
+                      <p className="text-[11px] font-bold text-gray-400 mb-0.5">Designation</p>
+                      <p className="text-[13px] font-bold text-gray-800">{user?.designation || user?.role || 'System Administrator'}</p>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Bottom Left: Account Security */}
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 flex flex-col h-full">
-                <div className="flex items-center gap-2 mb-6">
-                  <MdSecurity className="text-green-600 text-xl" />
-                  <h3 className="text-base font-bold text-gray-800">Account Security</h3>
-                </div>
+              {/* Bottom Row: Account Security & Recent Activity */}
+              <div className="flex flex-col md:flex-row gap-4 flex-1 min-h-0">
                 
-                <div className="flex flex-col gap-5 flex-1">
-                  <div className="flex items-center justify-between pb-4 border-b border-gray-50">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
-                        <MdHistory />
-                      </div>
-                      <span className="text-sm font-medium text-gray-600">Last Login</span>
-                    </div>
-                    <span className="text-sm font-bold text-gray-800">{formatLastLogin(user?.lastLogin)}</span>
+                {/* Account Security */}
+                <div className="w-full md:w-[45%] bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col min-h-0">
+                  <div className="flex items-center gap-2 mb-4 shrink-0">
+                    <MdSecurity className="text-green-600 text-lg" />
+                    <h3 className="text-sm font-bold text-gray-800">Account Security</h3>
                   </div>
                   
-                  <div className="flex items-center justify-between pb-4 border-b border-gray-50">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
-                        <MdDevices />
+                  <div className="flex flex-col gap-3.5 flex-1 overflow-y-auto custom-dropdown-scrollbar pr-2">
+                    <div className="flex items-center justify-between pb-3 border-b border-gray-50">
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
+                          <MdHistory className="text-sm" />
+                        </div>
+                        <span className="text-xs font-medium text-gray-600">Last Login</span>
                       </div>
-                      <span className="text-sm font-medium text-gray-600">Login Device</span>
+                      <span className="text-[11px] font-bold text-gray-800">{formatLastLogin(user?.lastLogin)}</span>
                     </div>
-                    <span className="text-sm font-bold text-gray-800">Windows Chrome</span>
+                    
+                    <div className="flex items-center justify-between pb-3 border-b border-gray-50">
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
+                          <MdDevices className="text-sm" />
+                        </div>
+                        <span className="text-xs font-medium text-gray-600">Login Device</span>
+                      </div>
+                      <span className="text-[11px] font-bold text-gray-800">Windows Chrome</span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between pb-3 border-b border-gray-50">
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
+                          <MdSecurity className="text-sm" />
+                        </div>
+                        <span className="text-xs font-medium text-gray-600">Account Status</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                        <span className="text-[11px] font-bold text-green-600">Active</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between pb-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
+                          <MdLockOutline className="text-sm" />
+                        </div>
+                        <span className="text-xs font-medium text-gray-600">Password</span>
+                      </div>
+                      <span className="text-[11px] font-bold text-gray-500">Last changed 30 days ago</span>
+                    </div>
                   </div>
                   
-                  <div className="flex items-center justify-between pb-4 border-b border-gray-50">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
-                        <MdSecurity />
-                      </div>
-                      <span className="text-sm font-medium text-gray-600">Account Status</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="text-sm font-bold text-green-600">Active</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between pb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
-                        <MdLockOutline />
-                      </div>
-                      <span className="text-sm font-medium text-gray-600">Password</span>
-                    </div>
-                    <span className="text-sm font-bold text-gray-500">Last changed 30 days ago</span>
-                  </div>
-                </div>
-                
-                <button className="w-full mt-4 flex items-center justify-center gap-2 border border-green-200 text-green-600 hover:bg-green-50 py-3 rounded-xl font-bold text-sm transition-colors">
-                  <MdLockOutline className="text-lg" />
-                  Change Password
-                </button>
-              </div>
-            </div>
-
-            {/* Bottom Right: Recent Activity */}
-            <div className="lg:col-span-2">
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 h-full">
-                <div className="flex items-center justify-between mb-8">
-                  <div className="flex items-center gap-2">
-                    <MdHistory className="text-green-600 text-xl" />
-                    <h3 className="text-base font-bold text-gray-800">Recent Activity</h3>
-                  </div>
-                  <button className="text-sm font-bold text-green-600 hover:text-green-700 flex items-center gap-1">
-                    View All <span>&rsaquo;</span>
+                  <button className="w-full mt-3 flex items-center justify-center gap-2 border border-green-200 text-green-600 hover:bg-green-50 py-2 rounded-xl font-bold text-xs transition-colors shrink-0">
+                    <MdLockOutline className="text-base" />
+                    Change Password
                   </button>
                 </div>
-                
-                <div className="relative pl-3 space-y-8">
-                  {/* Vertical Line */}
-                  <div className="absolute left-[15px] top-2 bottom-2 w-px bg-gray-100 z-0"></div>
-                  
-                  {recentActivities.map((act, index) => (
-                    <div key={index} className="relative z-10 flex items-start gap-12">
-                      <div className="flex items-center gap-4 w-32 shrink-0 pt-1">
-                        <div className="w-2 h-2 bg-green-500 rounded-full outline outline-4 outline-white"></div>
-                        <span className="text-xs font-bold text-green-600">{act.dateLabel}</span>
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="text-sm font-bold text-gray-800">{act.title}</h4>
-                        <p className="text-xs font-medium text-gray-500 mt-0.5">{act.subtitle}</p>
-                      </div>
-                      <span className="text-xs font-medium text-gray-400 whitespace-nowrap pt-1">{act.timeAgo}</span>
+
+                {/* Recent Activity */}
+                <div className="flex-1 bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col min-h-0">
+                  <div className="flex items-center justify-between mb-4 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <MdHistory className="text-green-600 text-lg" />
+                      <h3 className="text-sm font-bold text-gray-800">Recent Activity</h3>
                     </div>
-                  ))}
+                    <button className="text-[11px] font-bold text-green-600 hover:text-green-700 flex items-center gap-1">
+                      View All <span>&rsaquo;</span>
+                    </button>
+                  </div>
+                  
+                  <div className="relative pl-3 space-y-5 flex-1 overflow-y-auto custom-dropdown-scrollbar pr-2 pb-2">
+                    {/* Vertical Line */}
+                    <div className="absolute left-[15px] top-2 bottom-2 w-px bg-gray-100 z-0"></div>
+                    
+                    {recentActivities.map((act, index) => (
+                      <div key={index} className="relative z-10 flex items-start gap-6">
+                        <div className="flex items-center gap-3 w-24 shrink-0 pt-0.5">
+                          <div className="w-1.5 h-1.5 bg-green-500 rounded-full outline outline-[3px] outline-white"></div>
+                          <span className="text-[10px] font-bold text-green-600 leading-tight">{act.dateLabel}</span>
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="text-[11px] font-bold text-gray-800 leading-tight">{act.title}</h4>
+                          <p className="text-[10px] font-medium text-gray-500 mt-0.5 leading-tight">{act.subtitle}</p>
+                        </div>
+                        <span className="text-[10px] font-medium text-gray-400 whitespace-nowrap pt-0.5">{act.timeAgo}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+
               </div>
             </div>
             
