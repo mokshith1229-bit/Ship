@@ -3,6 +3,7 @@
 const ExcelJS = require('exceljs');
 const { drawDonutChart, drawHorizontalBarChart, drawParetoChart, drawScatterPlot, drawSimpleLegend, drawSectionBox, drawClusteredColumnChart, drawLineChart, drawTreemap } = require('./utils/pdfChart.util');
 const PDFDocument = require('pdfkit-table');
+const path = require('path');
 const InspectionBatch = require('../../models/InspectionBatch.model');
 const InspectionTask = require('../../models/InspectionTask.model');
 const Project = require('../../models/Project.model');
@@ -359,9 +360,9 @@ class ReportService {
     workbook.creator = 'HiRATE Reports Module';
     workbook.created = new Date();
 
-    // Reusable styles
-    const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } };
-    const headerFont = { color: { argb: 'FFFFFFFF' }, bold: true };
+    // Reusable styles matching the new professional branding
+    const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE3ECD2' } };
+    const headerFont = { color: { argb: 'FF111827' }, bold: true };
     const borderAll = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
 
     const allRatings = this.flattenRatingsForAnalysis(tasks);
@@ -384,12 +385,29 @@ class ReportService {
     sheet.getColumn('A').width = 30;
     sheet.getColumn('B').width = 30;
     sheet.getColumn('C').width = 30;
+    sheet.getColumn('D').width = 20;
 
-    sheet.mergeCells('A1:C1');
+    sheet.mergeCells('A1:C2');
     const titleCell = sheet.getCell('A1');
     titleCell.value = `COMPREHENSIVE AUDIT REPORT: ${summary.projectName}`;
-    titleCell.font = { size: 16, bold: true, color: { argb: 'FF1F4E78' } };
+    titleCell.font = { size: 16, bold: true, color: { argb: 'FF111827' } }; // Dark font
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE3ECD2' } }; // Light green fill
     titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+    
+    // Add Logo
+    try {
+      const logoPath = path.join(__dirname, '../../../../frontend/src/assets/logos1/cube-tech-logo.png');
+      const imageId = workbook.addImage({
+        filename: logoPath,
+        extension: 'png',
+      });
+      sheet.addImage(imageId, {
+        tl: { col: 3, row: 0 },
+        ext: { width: 120, height: 40 }
+      });
+    } catch (e) {
+      console.error('Could not add logo to Excel:', e);
+    }
 
     // Asset Audited vs Observation calculation
     const assetStats = {};
@@ -861,11 +879,20 @@ class ReportService {
 
       pageDoc.save();
       // Header Banner
-      pageDoc.rect(0, 0, width, 75).fill(primaryColor);
-      pageDoc.fillColor('white').fontSize(16).font('Helvetica-Bold')
+      const headerBgColor = '#E3ECD2'; // Light green representing the gradient
+      pageDoc.rect(0, 0, width, 75).fill(headerBgColor);
+      
+      const logoPath = path.join(__dirname, '../../../../frontend/src/assets/logos1/cube-tech-logo.png');
+      try {
+        pageDoc.image(logoPath, width - margins.right - 120, 15, { height: 45 });
+      } catch (e) {
+        console.error('Could not load logo image for PDF:', e);
+      }
+
+      pageDoc.fillColor('#111827').fontSize(16).font('Helvetica-Bold')
         .text('COMPREHENSIVE AUDIT REPORT', margins.left, 20, { align: 'left', lineBreak: false });
-      pageDoc.fontSize(11).font('Helvetica')
-        .text(`Project: ${summary.projectName}`, margins.left, 45, { align: 'left', width: width - margins.left - margins.right, lineBreak: false });
+      pageDoc.fillColor('#374151').fontSize(11).font('Helvetica')
+        .text(`Project: ${summary.projectName}`, margins.left, 45, { align: 'left', width: width - margins.left - margins.right - 130, lineBreak: false });
       pageDoc.restore();
 
       // Footer Banner
@@ -2592,13 +2619,57 @@ class ReportService {
     doc.pipe(res);
 
     const primaryThemeColor = '#1e3a8a';
+    
+    let pageCount = 0;
+    const drawHeaderAndFooter = (pageDoc) => {
+      const width = pageDoc.page.width;
+      const height = pageDoc.page.height;
+      const margins = pageDoc.page.margins;
+      const oldTop = margins.top;
+      const oldBottom = margins.bottom;
+      pageDoc.page.margins.top = 0;
+      pageDoc.page.margins.bottom = 0;
 
-    doc.fillColor(primaryThemeColor).font('Helvetica-Bold').fontSize(24).text('INSPECTION COMPARISON SUMMARY REPORT', { align: 'center' });
-    doc.moveDown(0.5);
-    doc.fillColor('#4b5563').font('Helvetica').fontSize(12).text(`Project: ${projName}`, { align: 'center' });
-    doc.text(`Previous Cycle: ${vAName} | Current Cycle: ${vBName}`, { align: 'center' });
-    doc.text(`Report Generated On: ${new Date().toLocaleString()}`, { align: 'center' });
-    doc.moveDown(2);
+      pageDoc.save();
+      const headerBgColor = '#E3ECD2';
+      pageDoc.rect(0, 0, width, 75).fill(headerBgColor);
+      
+      const logoPath = path.join(__dirname, '../../../../frontend/src/assets/logos1/cube-tech-logo.png');
+      try {
+        pageDoc.image(logoPath, width - margins.right - 120, 15, { height: 45 });
+      } catch (e) {
+        console.error('Could not load logo image for PDF:', e);
+      }
+
+      pageDoc.fillColor('#111827').fontSize(16).font('Helvetica-Bold')
+        .text('INSPECTION COMPARISON SUMMARY REPORT', margins.left, 15, { align: 'left', lineBreak: false });
+      pageDoc.fillColor('#374151').fontSize(10).font('Helvetica')
+        .text(`Project: ${projName}`, margins.left, 35, { align: 'left', lineBreak: false });
+      pageDoc.text(`Cycles: ${vAName} vs ${vBName}`, margins.left, 50, { align: 'left', lineBreak: false });
+      pageDoc.restore();
+
+      pageDoc.save();
+      pageDoc.rect(0, height - 35, width, 35).fill('#F3F4F6');
+      pageDoc.fillColor('#374151').fontSize(8).font('Helvetica')
+        .text(`Generated on: ${new Date().toLocaleString()}`, margins.left, height - 22, { align: 'left', lineBreak: false });
+      pageDoc.text(`Page ${pageCount}`, margins.left, height - 22, { align: 'right', width: width - margins.left - margins.right, lineBreak: false });
+      pageDoc.restore();
+
+      pageDoc.page.margins.top = oldTop;
+      pageDoc.page.margins.bottom = oldBottom;
+    };
+
+    doc.on('pageAdded', () => {
+      pageCount++;
+      drawHeaderAndFooter(doc);
+      doc.y = doc.page.margins.top;
+    });
+
+    pageCount++;
+    drawHeaderAndFooter(doc);
+    doc.y = doc.page.margins.top;
+
+    doc.moveDown(1);
 
     const kpiY = doc.y;
     const kpiWidth = 100;

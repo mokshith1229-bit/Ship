@@ -71,5 +71,14 @@ export const dashboardService = {
   getSkipGalleryTree: async (projectId = '') => {
     const response = await api.get(`/dashboard/skip-gallery-tree?projectId=${projectId}`);
     return response.data?.data || response.data;
+  },
+
+  getAdvancedAnalytics: async (projectId = '', filters = {}) => {
+    let url = `/dashboard/advanced-analytics?projectId=${projectId}`;
+    if (filters.assetType) url += `&assetType=${encodeURIComponent(filters.assetType)}`;
+    if (filters.issue) url += `&issue=${encodeURIComponent(filters.issue)}`;
+    
+    const response = await api.get(url);
+    return response.data?.data || response.data;
   }
 };

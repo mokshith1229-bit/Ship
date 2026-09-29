@@ -202,6 +202,12 @@ const getSkipAnalytics = asyncHandler(async (req, res) => {
   return successResponse(res, data, 'Skip analytics retrieved');
 });
 
+const getAdvancedAnalytics = asyncHandler(async (req, res) => {
+  const projectId = !req.query.projectId || req.query.projectId === 'null' || req.query.projectId === 'undefined' ? null : req.query.projectId;
+  const data = await dashboardService.getAdvancedAnalytics(projectId, req.query);
+  return successResponse(res, data, 'Advanced analytics retrieved');
+});
+
 module.exports = {
   getExecutiveKPIs,
   getUserKPIs,
@@ -214,5 +220,6 @@ module.exports = {
   getAllProjectsMapData,
   getChartsData,
   getSkipAnalytics,
-  getSkipGalleryTree
+  getSkipGalleryTree,
+  getAdvancedAnalytics
 };
