@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
 import Premium3DButton from '../components/common/Premium3DButton';
+import GenerateBatchButton from './InspectionEngine/components/GenerateBatchButton';
 import { useAuth } from '../context/AuthContext';
 import { workAssignmentService } from '../services/workAssignment.service';
 import { 
@@ -310,13 +311,14 @@ const UserManagementPage = ({ defaultTab = 'all-users' }) => {
               {/* Left: Tabs */}
               <div className="flex items-center gap-3">
                 {activePageTab === 'all-users' ? (
-                  <Premium3DButton
-                    color="blue"
+                  <GenerateBatchButton
                     className="h-[46px] px-5 shadow-sm text-[14px]"
                   >
-                    <LuUsers className="text-[20px] text-white" />
-                    <span>All Users</span>
-                  </Premium3DButton>
+                    <div className="flex items-center gap-2">
+                      <LuUsers className="text-[20px] text-white" />
+                      <span>All Users</span>
+                    </div>
+                  </GenerateBatchButton>
                 ) : (
                   <button
                     onClick={() => {
