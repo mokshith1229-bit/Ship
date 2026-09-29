@@ -536,7 +536,7 @@ const ReportsPage = () => {
                       <GenerateBatchButton
                         onClick={handleDownload}
                         disabled={generating || previewing || !selectedProject || loadingSummary || reportType === 'dynamic-strip-chart' || reportType === 'overview-strip-chart'}
-                        className="w-full h-12 rounded-xl"
+                        className="!w-full !h-12 !rounded-xl"
                       >
                         <div className="flex items-center justify-center gap-2">
                           {generating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
