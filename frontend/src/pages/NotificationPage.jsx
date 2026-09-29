@@ -1385,6 +1385,7 @@ const NotificationPage = () => {
                         type="submit"
                         disabled={saving}
                         onClick={handleAssignWork}
+                        className="min-w-[145px]"
                       />
                     )}
                   </div>

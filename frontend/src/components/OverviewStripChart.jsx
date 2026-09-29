@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { GitCompare, AlertTriangle, CheckCircle, Info, Compass, ArrowRight } from 'lucide-react';
+import cubeLogo from '../assets/logos1/cube-tech-logo.png';
 
 const OverviewStripChart = ({ data, summary }) => {
   const [selectedDirection, setSelectedDirection] = useState(null);
@@ -24,36 +25,40 @@ const OverviewStripChart = ({ data, summary }) => {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-6 space-y-6">
       {/* Header & Direction Switcher */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 pb-4 bg-gradient-to-r from-[#eaf3d4] to-[#f4f9e9] p-4 rounded-xl shadow-sm">
         <div>
           <div className="flex items-center gap-2">
-            <GitCompare className="w-5 h-5 text-indigo-600" />
-            <h3 className="text-lg font-bold text-gray-800">Overview / Comparison Strip Chart (500m Buckets)</h3>
+            <GitCompare className="w-5 h-5 text-gray-800" />
+            <h3 className="text-lg font-bold text-gray-900">Overview / Comparison Strip Chart (500m Buckets)</h3>
           </div>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-gray-700 mt-1">
             Tracking defect resolution and persistence between inspection cycles for <strong>{summary?.projectName || 'Project'}</strong>
           </p>
         </div>
 
-        {/* Direction Tabs */}
-        {directions.length > 1 && (
-          <div className="flex items-center gap-1.5 bg-gray-100/80 p-1 rounded-xl">
-            {directions.map((dir) => (
-              <button
-                key={dir}
-                onClick={() => setSelectedDirection(dir)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${
-                  activeDirection === dir
-                    ? 'bg-white text-indigo-700 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Compass className="w-3.5 h-3.5" />
-                {dir}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-4">
+          <img src={cubeLogo} alt="Cube Highways" className="h-10 object-contain mix-blend-multiply opacity-90" />
+
+          {/* Direction Tabs */}
+          {directions.length > 1 && (
+            <div className="flex items-center gap-1.5 bg-white/60 p-1 rounded-xl">
+              {directions.map((dir) => (
+                <button
+                  key={dir}
+                  onClick={() => setSelectedDirection(dir)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${
+                    activeDirection === dir
+                      ? 'bg-white text-gray-800 shadow-sm border border-gray-200/50'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Compass className="w-3.5 h-3.5" />
+                  {dir}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Legend & Stats */}

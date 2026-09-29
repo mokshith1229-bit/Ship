@@ -22,7 +22,7 @@ const getExecutiveKPIs = async (userId) => {
     userEvaluatedImagesCount
   ] = await Promise.all([
     Project.countDocuments({ isActive: true }),
-    InspectionTask.countDocuments({ status: { $in: ['READY_FOR_RATING', 'IN_PROGRESS', 'COMPLETED'] } }),
+    InspectionTask.countDocuments({ status: 'COMPLETED' }),
     InspectionTask.countDocuments({ status: 'COMPLETED' }),
     InspectionTask.aggregate([
       { $match: { status: 'COMPLETED' } },
@@ -119,7 +119,7 @@ const getProjectKPIs = async (projectId, batchId = null) => {
   if (batchId) filter.batchId = mongoose.Types.ObjectId(batchId);
 
   const [total, completed, paramStats, criticalCount, avgRatingResult, lastUpdated] = await Promise.all([
-    InspectionTask.countDocuments({ ...filter, status: { $in: ['READY_FOR_RATING', 'IN_PROGRESS', 'COMPLETED'] } }),
+    InspectionTask.countDocuments({ ...filter, status: 'COMPLETED' }),
     InspectionTask.countDocuments({ ...filter, status: 'COMPLETED' }),
     InspectionTask.aggregate([
       { $match: { ...filter, status: 'COMPLETED' } },
@@ -829,6 +829,271 @@ const getSkipGalleryTree = async (projectId) => {
   return await InspectionTask.aggregate(pipeline);
 };
 
+/**
+ * Advanced Analytics for Dashboard Redesign
+ */
+const getAdvancedAnalytics = async (projectId, filters = {}) => {
+  const matchFilter = { status: 'COMPLETED' };
+  if (projectId) matchFilter.project = projectId;
+  if (filters.assetType) matchFilter.assetType = filters.assetType;
+  if (filters.issue) matchFilter['ratings.parameterName'] = filters.issue;
+
+  const pipeline = [
+    { $match: matchFilter },
+    {
+      $facet: {
+        healthAndCondition: [
+          { $unwind: { path: '$ratings', preserveNullAndEmptyArrays: true } },
+          {
+            $group: {
+              _id: '$_id',
+              avgTaskScore: { $avg: '$ratings.score' },
+              worstTaskScore: { $min: '$ratings.score' }
+            }
+          },
+          {
+            $group: {
+              _id: null,
+              totalAudits: { $sum: 1 },
+              criticalAudits: {
+                $sum: { $cond: [{ $eq: ['$worstTaskScore', 1] }, 1, 0] }
+              },
+              avgRating: { $avg: '$avgTaskScore' },
+              excellent: { $sum: { $cond: [{ $eq: ['$worstTaskScore', 10] }, 1, 0] } },
+              needsAttention: { $sum: { $cond: [{ $eq: ['$worstTaskScore', 5] }, 1, 0] } },
+              critical: { $sum: { $cond: [{ $eq: ['$worstTaskScore', 1] }, 1, 0] } }
+            }
+          }
+        ],
+        assetPerformance: [
+          { $unwind: { path: '$ratings', preserveNullAndEmptyArrays: true } },
+          {
+            $group: {
+              _id: { taskId: '$_id', assetType: '$assetType' },
+              worstTaskScore: { $min: '$ratings.score' },
+              avgTaskScore: { $avg: '$ratings.score' }
+            }
+          },
+          {
+            $group: {
+              _id: '$_id.assetType',
+              totalAudits: { $sum: 1 },
+              criticalAudits: {
+                $sum: { $cond: [{ $eq: ['$worstTaskScore', 1] }, 1, 0] }
+              },
+              avgRating: { $avg: '$avgTaskScore' }
+            }
+          },
+          { $sort: { totalAudits: -1 } }
+        ],
+        issueIntelligence: [
+          { $unwind: '$ratings' },
+          {
+            $group: {
+              _id: { $ifNull: ['$ratings.parameterName', 'Unknown Parameter'] },
+              issueCount: { $sum: 1 },
+              criticalAudits: {
+                $sum: { $cond: [{ $eq: ['$ratings.score', 1] }, 1, 0] }
+              },
+              affectedAssetTypes: { $addToSet: '$assetType' }
+            }
+          },
+          { $sort: { issueCount: -1 } }
+        ],
+        criticalLocations: [
+          { $unwind: '$ratings' },
+          { $match: { 'ratings.score': 1 } },
+          {
+            $group: {
+              _id: '$chainage',
+              criticalAudits: { $sum: 1 },
+              assetTypes: { $addToSet: '$assetType' },
+              issues: { $addToSet: '$ratings.parameterName' },
+              roadTypes: { $addToSet: '$roadType' },
+              avgRating: { $avg: '$ratings.score' }
+            }
+          },
+          { $sort: { criticalAudits: -1 } },
+          { $limit: 100 }
+        ],
+        ratingProfile: [
+          { $unwind: { path: '$ratings', preserveNullAndEmptyArrays: true } },
+          {
+            $group: {
+              _id: '$_id',
+              worstTaskScore: { $min: '$ratings.score' }
+            }
+          },
+          { $match: { worstTaskScore: { $ne: null } } },
+          {
+            $group: {
+              _id: '$worstTaskScore',
+              count: { $sum: 1 }
+            }
+          },
+          { $sort: { _id: 1 } }
+        ],
+        roadChainageHealth: [
+          { $unwind: { path: '$ratings', preserveNullAndEmptyArrays: true } },
+          {
+            $group: {
+              _id: {
+                taskId: '$_id',
+                chainage: { $convert: { input: '$chainage', to: 'double', onError: null, onNull: null } }
+              },
+              worstTaskScore: { $min: '$ratings.score' },
+              avgTaskScore: { $avg: '$ratings.score' }
+            }
+          },
+          { $match: { '_id.chainage': { $ne: null } } },
+          {
+            $group: {
+              _id: {
+                $subtract: [
+                  '$_id.chainage',
+                  { $mod: ['$_id.chainage', 10] }
+                ]
+              },
+              totalAudits: { $sum: 1 },
+              criticalAudits: {
+                $sum: { $cond: [{ $eq: ['$worstTaskScore', 1] }, 1, 0] }
+              },
+              avgRating: { $avg: '$avgTaskScore' }
+            }
+          },
+          { $sort: { _id: 1 } }
+        ]
+      }
+    }
+  ];
+
+  const results = await InspectionTask.aggregate(pipeline);
+  const facet = results[0];
+
+  const hnc = facet.healthAndCondition[0] || {
+    totalAudits: 0, criticalAudits: 0, avgRating: 0,
+    excellent: 0, good: 0, needsAttention: 0, critical: 0
+  };
+
+  const projectHealth = {
+    totalAudits: hnc.totalAudits,
+    criticalAudits: hnc.criticalAudits,
+    criticalRate: hnc.totalAudits > 0 ? ((hnc.criticalAudits / hnc.totalAudits) * 100).toFixed(1) : 0,
+    avgRating: hnc.avgRating ? hnc.avgRating.toFixed(1) : 0
+  };
+
+  const conditionDistribution = [
+    { name: 'Critical', value: hnc.critical, rating: 1 },
+    { name: 'Needs Attention', value: hnc.needsAttention, rating: 5 },
+    { name: 'Excellent', value: hnc.excellent, rating: 10 }
+  ];
+
+  const assetPerformance = facet.assetPerformance.map(a => ({
+    assetType: a._id || 'Unknown',
+    totalAudits: a.totalAudits,
+    criticalAudits: a.criticalAudits,
+    criticalRate: a.totalAudits > 0 ? ((a.criticalAudits / a.totalAudits) * 100).toFixed(1) : 0,
+    avgRating: a.avgRating ? a.avgRating.toFixed(1) : 0
+  }));
+
+  const issueIntelligence = facet.issueIntelligence.map(i => ({
+    issue: i._id,
+    issueCount: i.issueCount,
+    criticalAudits: i.criticalAudits,
+    criticalRate: i.issueCount > 0 ? ((i.criticalAudits / i.issueCount) * 100).toFixed(1) : 0,
+    affectedAssetTypes: i.affectedAssetTypes
+  }));
+
+  const criticalLocations = facet.criticalLocations.map(l => ({
+    chainage: l._id || 'Unknown',
+    criticalAudits: l.criticalAudits,
+    assetTypes: l.assetTypes,
+    issues: l.issues.slice(0, 3), // Top 3
+    roadTypes: l.roadTypes,
+    avgRating: l.avgRating ? l.avgRating.toFixed(1) : 0
+  }));
+
+  const ratingProfile = facet.ratingProfile.map(r => ({
+    rating: r._id,
+    count: r.count
+  }));
+
+  const roadChainageHealth = facet.roadChainageHealth.map(c => ({
+    rangeStart: c._id,
+    rangeEnd: c._id + 10,
+    totalAudits: c.totalAudits,
+    criticalAudits: c.criticalAudits,
+    criticalRate: c.totalAudits > 0 ? ((c.criticalAudits / c.totalAudits) * 100).toFixed(1) : 0,
+    avgRating: c.avgRating ? c.avgRating.toFixed(1) : 0
+  }));
+
+  const keyFindings = [];
+  
+  if (assetPerformance.length > 0) {
+    const sortedAssets = [...assetPerformance].sort((a, b) => b.criticalAudits - a.criticalAudits);
+    if (sortedAssets[0].criticalAudits > 0) {
+      keyFindings.push({
+        number: `${sortedAssets[0].criticalAudits.toLocaleString()} Critical Audits`,
+        finding: `Highest critical volume is currently associated with ${sortedAssets[0].assetType}.`,
+        explanation: `Asset class requiring immediate review.`
+      });
+    }
+  }
+
+  if (issueIntelligence.length > 0) {
+    const sortedIssues = [...issueIntelligence].sort((a, b) => b.issueCount - a.issueCount);
+    if (sortedIssues[0].issueCount > 0) {
+      keyFindings.push({
+        number: `${sortedIssues[0].issueCount.toLocaleString()} Affected Audits`,
+        finding: `${sortedIssues[0].issue} is the most frequently affected issue.`,
+        explanation: `Most widespread defect type.`
+      });
+    }
+  }
+
+  if (criticalLocations.length > 0) {
+    const sortedLocations = [...criticalLocations].sort((a, b) => b.criticalAudits - a.criticalAudits);
+    if (sortedLocations[0].criticalAudits > 0) {
+      keyFindings.push({
+        number: `${sortedLocations[0].criticalAudits.toLocaleString()} Critical Audits`,
+        finding: `Highest critical concentration detected at chainage ${sortedLocations[0].chainage} km.`,
+        explanation: `Primary hotspot location.`
+      });
+    }
+  }
+
+  const finalKeyFindings = keyFindings.slice(0, 3);
+
+  const totalTasksFilter = { status: 'COMPLETED' };
+  if (projectId) totalTasksFilter.project = projectId;
+  if (filters.assetType) totalTasksFilter.assetType = filters.assetType;
+
+  const [totalInspections, completedInspections] = await Promise.all([
+    InspectionTask.countDocuments(totalTasksFilter),
+    InspectionTask.countDocuments(matchFilter)
+  ]);
+
+  const inspectionCoverage = {
+    totalAudits: totalInspections,
+    completedInspections,
+    pendingInspections: totalInspections - completedInspections,
+    assetsAssessed: assetPerformance.length,
+    completionRate: totalInspections > 0 ? ((completedInspections / totalInspections) * 100).toFixed(1) : 0
+  };
+
+  return {
+    projectHealth,
+    conditionDistribution,
+    assetPerformance,
+    issueIntelligence,
+    criticalLocations,
+    inspectionCoverage,
+    ratingProfile,
+    roadChainageHealth,
+    keyFindings: finalKeyFindings
+  };
+};
+
 module.exports = {
   getExecutiveKPIs,
   getUserKPIs,
@@ -841,5 +1106,6 @@ module.exports = {
   getAllProjectsMapData,
   getChartsData,
   getSkipAnalytics,
-  getSkipGalleryTree
+  getSkipGalleryTree,
+  getAdvancedAnalytics
 };

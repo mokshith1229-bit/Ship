@@ -4,19 +4,18 @@ import ProjectOverviewCards from './ProjectOverviewCards';
 const ProjectOverview = ({ summary, loadingSummary, selectedCycle }) => {
   const [animationState, setAnimationState] = useState('idle');
   const [displaySummary, setDisplaySummary] = useState(summary);
-  const previousCycleRef = useRef(selectedCycle);
+  const prevLoadingRef = useRef(loadingSummary);
   const revealTimeoutRef = useRef(null);
 
-  // Synchronize state changes when selectedCycle or loadingSummary changes
+  // Synchronize state changes when loadingSummary changes
   useEffect(() => {
-    // 1. Cycle Changed: Trigger Collapse
-    if (selectedCycle !== previousCycleRef.current) {
-      previousCycleRef.current = selectedCycle;
+    // 1. Loading Started: Trigger Collapse
+    if (loadingSummary && !prevLoadingRef.current) {
       setAnimationState('collapsing');
       // Do not update displaySummary yet; keep showing old data while collapsing
     } 
-    // 2. Data Arrived (After Collapse): Trigger Reveal
-    else if (animationState === 'collapsing' && !loadingSummary && summary) {
+    // 2. Data Arrived (Loading Ended, After Collapse): Trigger Reveal
+    else if (!loadingSummary && prevLoadingRef.current && animationState === 'collapsing' && summary) {
       // Small delay to ensure the collapse animation visually finishes (at least partially) 
       // before immediately exploding outward, making the transition feel smoother.
       clearTimeout(revealTimeoutRef.current);
@@ -29,7 +28,9 @@ const ProjectOverview = ({ summary, loadingSummary, selectedCycle }) => {
     else if (animationState === 'idle' && summary && !loadingSummary) {
       setDisplaySummary(summary);
     }
-  }, [selectedCycle, loadingSummary, summary, animationState]);
+    
+    prevLoadingRef.current = loadingSummary;
+  }, [loadingSummary, summary, animationState]);
 
   // 4. Return to Idle: Wait for reveal animation to finish before allowing normal hover states
   useEffect(() => {
