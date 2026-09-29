@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Premium3DButton from '../components/common/Premium3DButton';
 import Sidebar from '../components/Sidebar';
 import { useParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
@@ -1215,7 +1214,7 @@ const DetailedProjectReportView = ({ projectName, userAssignments, currentUserOb
           </Premium3DButton>
           <Premium3DButton
             onClick={handlePrintPDF}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-primary hover:bg-[#4cae4c] rounded-xl shadow-md transition-all duration-200 cursor-pointer"
+            className="!w-auto px-4 py-2"
           >
             <span className="text-base">⎙</span> Download PDF
           </Premium3DButton>
@@ -2946,7 +2945,7 @@ const UserInsightsPage = () => {
                     {/* Apply Button */}
                     <Premium3DButton
                       onClick={handleApply}
-                      className="px-6 h-[46px] bg-[#5cb85c] hover:bg-[#4cae4c] text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm cursor-pointer flex items-center justify-center min-w-[88px] flex-1 sm:flex-initial"
+                      className="!w-auto h-[46px] px-6 min-w-[88px] flex-1 sm:flex-initial"
                     >
                       Apply
                     </Premium3DButton>
@@ -2955,7 +2954,7 @@ const UserInsightsPage = () => {
                     <div className="relative flex-1 sm:flex-initial">
                       <Premium3DButton
                         onClick={() => setShowExportDropdown(!showExportDropdown)}
-                        className="w-full sm:w-auto px-6 h-[46px] bg-primary hover:bg-[#4cae4c] text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm cursor-pointer flex items-center justify-center gap-2"
+                        className="!w-auto h-[46px] w-full sm:w-auto px-6"
                       >
                         <svg className="w-4 h-4 text-white shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />

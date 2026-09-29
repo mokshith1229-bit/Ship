@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import Premium3DButton from '../components/common/Premium3DButton';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
@@ -345,9 +344,9 @@ const UserManagementPage = ({ defaultTab = 'all-users' }) => {
                     handleReset();
                     setActivePageTab('add-user');
                   }}
-                  className="group flex items-center gap-2 h-[46px] px-[26px] bg-white border border-[#2563EB] text-[#2563EB] rounded-xl text-sm font-medium shadow-sm hover:shadow hover:-translate-y-0.5 hover:bg-[#2563EB] hover:text-white transition-all duration-200 cursor-pointer"
+                  className="!w-auto h-[46px] px-[26px]"
                 >
-                  <LuUserPlus className="text-[20px] text-[#2563EB] group-hover:text-white transition-colors duration-200" />
+                  <LuUserPlus className="text-[20px]" />
                   <span>Add User</span>
                 </Premium3DButton>
               )}
