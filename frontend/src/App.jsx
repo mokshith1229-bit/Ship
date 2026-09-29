@@ -28,7 +28,7 @@ import SkipGalleryPage from './pages/SkipGalleryPage';
 import RatingV2Page from './pages/RatingV2/RatingV2Page';
 
 import UserInsightsPage from './pages/UserInsightsPage';
-
+import DownloadAppPage from './pages/DownloadAppPage';
 function App() {
   return (
     <Routes>
@@ -71,6 +71,7 @@ function App() {
       <Route path="/profile" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><ProfilePage /></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute moduleName="Reports"><ReportsPage /></ProtectedRoute>} />
       <Route path="/ship" element={<ProtectedRoute moduleName="SHIP"><ShipDashboard /></ProtectedRoute>} />
+      <Route path="/download" element={<ProtectedRoute allowedRoles={['Admin', 'Administrator', 'HO', 'SPV', 'User']}><DownloadAppPage /></ProtectedRoute>} />
     </Routes>
   );
 }

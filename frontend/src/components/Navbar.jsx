@@ -337,6 +337,7 @@ const Navbar = () => {
           >
             <button 
               type="button"
+              onClick={() => navigate('/download')}
               className={`relative w-full h-full flex items-center justify-center transition-all duration-[600ms] ease-[cubic-bezier(0.25,1,0.5,1)] border-none outline-none rounded-full ${
                 currentVisibleItem === 'download' ? 'text-[#16A05D] drop-shadow-[0_0_6px_rgba(22,160,93,0.7)]' : 'text-white opacity-60 hover:opacity-100'
               }`}
