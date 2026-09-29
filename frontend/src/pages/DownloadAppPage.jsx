@@ -39,7 +39,7 @@ const DownloadAppPage = () => {
                     <td className="px-6 py-6">
                       <button 
                         onClick={handleDownload}
-                        className="bg-[#0b66c2] hover:bg-[#004182] text-white text-sm font-medium px-4 py-2 rounded shadow-sm transition-colors"
+                        className="bg-[#0a4d29] hover:bg-[#07381d] text-white text-sm font-bold px-4 py-2 rounded shadow-sm transition-colors"
                       >
                         Click To Download APP
                       </button>

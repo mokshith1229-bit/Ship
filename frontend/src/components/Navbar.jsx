@@ -242,6 +242,7 @@ const Navbar = () => {
   };
 
   const activeRouteItem = location.pathname.includes('/notifications') ? 'notification' : 
+                          location.pathname.includes('/download') ? 'download' :
                           location.pathname.includes('/profile') ? 'profile' : null;
   const currentVisibleItem = focusedItem || activeRouteItem;
 
