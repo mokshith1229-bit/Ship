@@ -145,20 +145,7 @@ const ImageReviewDetailModal = ({ batch, onClose }) => {
 
   // Helper to infer DAY/NIGHT based on timestamp
   const getImageRequire = (task) => {
-    if (!task) return 'DAY';
-    if (task.metadata?.imageRequire) return task.metadata.imageRequire;
-    if (task.metadata?.extractedAt && task.metadata.extractedAt !== 'Unknown Timestamp') {
-      const timeParts = task.metadata.extractedAt.split(':');
-      if (timeParts.length >= 2) {
-        const hour = parseInt(timeParts[0], 10);
-        if (!isNaN(hour)) {
-          // Night time: 6 PM (18) to 6 AM (6)
-          if (hour >= 18 || hour < 6) return 'NIGHT';
-          return 'DAY';
-        }
-      }
-    }
-    return 'DAY';
+    return 'Day';
   };
 
   return (
@@ -334,7 +321,7 @@ const ImageReviewDetailModal = ({ batch, onClose }) => {
 
                 {/* Main Metadata Row */}
                 <div className="bg-white rounded-xl shadow-sm p-6 mb-4 shrink-0 w-full">
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-6 mb-6">
+                  <div className="grid grid-cols-3 gap-4 md:gap-6 mb-6">
                     <div>
                       <div className="text-xs text-gray-500 font-medium mb-1">Chainage</div>
                       <div className="text-xl font-bold text-gray-900">{selectedTask.chainage}</div>
@@ -343,17 +330,9 @@ const ImageReviewDetailModal = ({ batch, onClose }) => {
                       <div className="text-xs text-gray-500 font-medium mb-1">Params</div>
                       <div className="text-xl font-bold text-gray-900">{selectedTask.parameters?.length || 0}</div>
                     </div>
-                    <div className="col-span-2 md:col-span-1">
+                    <div>
                       <div className="text-xs text-gray-500 font-medium mb-1">Timestamp</div>
                       <div className="text-lg font-bold text-gray-900 truncate">{selectedTask.metadata?.extractedAt || 'Unknown Timestamp'}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-500 font-medium mb-1">Road Type</div>
-                      <div className="text-lg font-bold text-gray-900">{selectedTask.metadata?.roadType || 'MCW'}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-500 font-medium mb-1">Image Require</div>
-                      <div className="text-lg font-bold text-gray-900">{getImageRequire(selectedTask)}</div>
                     </div>
                   </div>
 
