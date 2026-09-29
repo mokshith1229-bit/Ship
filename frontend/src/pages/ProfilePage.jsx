@@ -8,6 +8,7 @@ import {
   MdHistory, MdDevices, MdSecurity, MdLockOutline, MdArrowBack,
   MdEdit
 } from 'react-icons/md';
+import bannerBg from '../assets/banner_bg.png';
 
 const ProfilePage = () => {
   const { user } = useAuth();
@@ -115,32 +116,56 @@ const ProfilePage = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
             {/* Left Column: Profile Card */}
-            <div className="lg:col-span-1">
-              <div className="bg-gradient-to-br from-green-600 via-green-700 to-green-900 rounded-2xl shadow-md p-8 text-white flex flex-col items-center relative overflow-hidden h-full min-h-[340px]">
-                {/* Decorative background circles */}
-                <div className="absolute -top-24 -right-24 w-48 h-48 bg-white opacity-5 rounded-full blur-2xl"></div>
-                <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-white opacity-10 rounded-full blur-2xl"></div>
-                
-                <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center text-green-700 text-6xl shadow-xl z-10 mb-6">
-                  <MdPerson />
-                </div>
-                
-                <h2 className="text-2xl font-bold uppercase tracking-wide z-10">{user?.name || 'SRAVYA'}</h2>
-                <p className="text-green-100 font-medium text-sm mt-1 mb-8 z-10">{user?.role || 'Admin'}</p>
-                
-                <div className="flex items-center gap-6 mt-auto z-10 w-full justify-center">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 bg-green-400 rounded-full shadow-[0_0_8px_rgba(74,222,128,0.8)]"></div>
-                    <span className="text-sm font-bold text-white">Active</span>
-                  </div>
-                  <div className="w-px h-4 bg-green-500/50"></div>
-                  <div className="flex items-center gap-2">
-                    <MdHistory className="text-green-200" />
-                    <div className="flex flex-col">
-                      <span className="text-[10px] text-green-200 uppercase font-bold tracking-wider leading-tight">Last Login</span>
-                      <span className="text-xs font-semibold text-white">{formatLastLoginShort(user?.lastLogin)}</span>
+            <div className="lg:col-span-1 h-full">
+              <div 
+                className="rounded-[20px] shadow-sm relative overflow-hidden h-full min-h-[500px] flex flex-col"
+                style={{
+                  backgroundImage: `url(${bannerBg})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }}
+              >
+                {/* Top content (centered) */}
+                <div className="flex flex-col items-center pt-12 px-6 z-10 flex-1">
+                  
+                  {/* Profile Avatar with double ring */}
+                  <div className="relative mb-6">
+                    <div className="absolute inset-0 bg-white/30 rounded-full scale-125"></div>
+                    <div className="relative w-[110px] h-[110px] bg-white rounded-full flex items-center justify-center text-[#0a4d29] text-[60px] shadow-sm z-10">
+                      <MdPerson />
                     </div>
                   </div>
+                  
+                  <h2 className="text-[22px] font-extrabold uppercase tracking-wide text-gray-900 mt-2">
+                    {user?.name || 'System Admin'}
+                  </h2>
+                  <p className="text-gray-600 font-medium text-[15px] mt-1 mb-5">
+                    {user?.role || 'Admin'}
+                  </p>
+                  
+                  <div className="bg-[#16A05D]/20 text-[#0a4d29] px-5 py-1.5 rounded-full flex items-center gap-2 mb-8 font-bold text-sm">
+                    <div className="w-2.5 h-2.5 bg-[#16A05D] rounded-full"></div>
+                    Active
+                  </div>
+                  
+                  <div className="flex items-center gap-3 mt-2">
+                    <MdHistory className="text-gray-500 text-xl" />
+                    <div className="flex flex-col text-left">
+                      <span className="text-[11px] text-gray-500 uppercase font-bold tracking-wider leading-tight">Last Login</span>
+                      <span className="text-[13px] font-bold text-gray-900">{formatLastLoginShort(user?.lastLogin)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Text */}
+                <div className="p-8 z-10 mt-auto pb-10">
+                  <h3 className="text-white text-xl font-bold leading-snug">
+                    Building <br />
+                    Safer Roads <br />
+                    for a Stronger <br />
+                    Tomorrow
+                  </h3>
+                  <div className="w-10 h-1 bg-[#16A05D] mt-4 rounded-full"></div>
                 </div>
               </div>
             </div>
