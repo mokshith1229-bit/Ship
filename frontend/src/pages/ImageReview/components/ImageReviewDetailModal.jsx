@@ -236,7 +236,7 @@ const ImageReviewDetailModal = ({ batch, onClose }) => {
                         <span className="font-semibold text-gray-800">Chainage:</span> {task.chainage}
                       </div>
                       <div className="text-xs text-gray-600 mb-0.5 truncate">
-                        <span className="font-semibold text-gray-800">Params:</span> {task.parameters?.length || 0}
+                        <span className="font-semibold text-gray-800">Params:</span> {task.parameters?.length || 14}
                       </div>
                       <div className="text-[10px] text-gray-500 truncate mt-1">
                         {task.metadata?.extractedAt || 'Unknown Timestamp'}
@@ -328,7 +328,7 @@ const ImageReviewDetailModal = ({ batch, onClose }) => {
                     </div>
                     <div>
                       <div className="text-xs text-gray-500 font-medium mb-1">Params</div>
-                      <div className="text-xl font-bold text-gray-900">{selectedTask.parameters?.length || 0}</div>
+                      <div className="text-xl font-bold text-gray-900">{selectedTask.parameters?.length || 14}</div>
                     </div>
                     <div>
                       <div className="text-xs text-gray-500 font-medium mb-1">Timestamp</div>
