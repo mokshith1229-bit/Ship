@@ -319,7 +319,19 @@ const Sidebar = () => {
         </div>
       )}
 
-      <div className="flex-1 py-6 px-3.5 relative z-50 overflow-y-auto custom-dropdown-scrollbar">
+      <div 
+        className="flex-1 py-6 px-3.5 relative z-50 overflow-y-auto custom-dropdown-scrollbar"
+        onScroll={(e) => sessionStorage.setItem('sidebarScrollPos', e.target.scrollTop)}
+        ref={(el) => {
+          if (el && !el.dataset.scrollRestored) {
+            const saved = sessionStorage.getItem('sidebarScrollPos');
+            if (saved) {
+              el.scrollTop = parseInt(saved, 10);
+            }
+            el.dataset.scrollRestored = "true";
+          }
+        }}
+      >
         <ul className="flex flex-col gap-3">
           {menuItems.filter(item => {
             if (!user) return false;
