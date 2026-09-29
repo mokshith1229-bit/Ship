@@ -113,10 +113,10 @@ const ProfilePage = () => {
             </button>
           </div>
 
-          <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-140px)] min-h-0 pb-4">
+          <div className="flex flex-col lg:flex-row gap-4 pb-4 items-stretch">
             
             {/* Left Column: Profile Card */}
-            <div className="w-full lg:w-[30%] flex-shrink-0 flex flex-col h-full min-h-0">
+            <div className="w-full lg:w-[30%] flex-shrink-0 flex flex-col">
               <div 
                 className="rounded-[20px] shadow-sm relative overflow-hidden h-full flex flex-col"
                 style={{
@@ -149,10 +149,10 @@ const ProfilePage = () => {
                   </div>
                   
                   <div className="flex items-center gap-2 mt-1">
-                    <MdHistory className="text-white text-lg" />
+                    <MdHistory className="text-gray-900 text-lg" />
                     <div className="flex flex-col text-left">
-                      <span className="text-[10px] text-white uppercase font-bold tracking-wider leading-tight">Last Login</span>
-                      <span className="text-[12px] font-bold text-white">{formatLastLoginShort(user?.lastLogin)}</span>
+                      <span className="text-[10px] text-gray-900 uppercase font-bold tracking-wider leading-tight">Last Login</span>
+                      <span className="text-[12px] font-bold text-gray-900">{formatLastLoginShort(user?.lastLogin)}</span>
                     </div>
                   </div>
                 </div>
@@ -171,7 +171,7 @@ const ProfilePage = () => {
             </div>
 
             {/* Right Column */}
-            <div className="flex-1 flex flex-col gap-4 min-w-0 min-h-0 h-full">
+            <div className="flex-1 flex flex-col gap-4 min-w-0">
               
               {/* Personal Information */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 shrink-0">
@@ -241,16 +241,16 @@ const ProfilePage = () => {
               </div>
 
               {/* Bottom Row: Account Security & Recent Activity */}
-              <div className="flex flex-col md:flex-row gap-4 flex-1 min-h-0">
+              <div className="flex flex-col md:flex-row gap-4 flex-1">
                 
                 {/* Account Security */}
-                <div className="w-full md:w-[45%] bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col min-h-0">
+                <div className="w-full md:w-[45%] bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col">
                   <div className="flex items-center gap-2 mb-4 shrink-0">
                     <MdSecurity className="text-green-600 text-lg" />
                     <h3 className="text-sm font-bold text-gray-800">Account Security</h3>
                   </div>
                   
-                  <div className="flex flex-col gap-3.5 flex-1 overflow-y-auto custom-dropdown-scrollbar pr-2">
+                  <div className="flex flex-col gap-3.5 flex-1 pr-1">
                     <div className="flex items-center justify-between pb-3 border-b border-gray-50">
                       <div className="flex items-center gap-3">
                         <div className="w-7 h-7 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
@@ -302,7 +302,7 @@ const ProfilePage = () => {
                 </div>
 
                 {/* Recent Activity */}
-                <div className="flex-1 bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col min-h-0">
+                <div className="flex-1 bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col">
                   <div className="flex items-center justify-between mb-4 shrink-0">
                     <div className="flex items-center gap-2">
                       <MdHistory className="text-green-600 text-lg" />
@@ -313,12 +313,12 @@ const ProfilePage = () => {
                     </button>
                   </div>
                   
-                  <div className="relative pl-3 space-y-5 flex-1 overflow-y-auto custom-dropdown-scrollbar pr-2 pb-2">
+                  <div className="relative pl-3 space-y-5 flex-1 pr-1 pb-2">
                     {/* Vertical Line */}
                     <div className="absolute left-[15px] top-2 bottom-2 w-px bg-gray-100 z-0"></div>
                     
                     {recentActivities.map((act, index) => (
-                      <div key={index} className="relative z-10 flex items-start gap-6">
+                      <div key={index} className="relative z-10 flex items-start gap-5">
                         <div className="flex items-center gap-3 w-24 shrink-0 pt-0.5">
                           <div className="w-1.5 h-1.5 bg-green-500 rounded-full outline outline-[3px] outline-white"></div>
                           <span className="text-[10px] font-bold text-green-600 leading-tight">{act.dateLabel}</span>
