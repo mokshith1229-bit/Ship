@@ -308,24 +308,28 @@ const UserManagementPage = ({ defaultTab = 'all-users' }) => {
             <div className="flex items-center justify-between h-[46px] w-full shrink-0">
               {/* Left: Tabs */}
               <div className="flex items-center gap-3">
-                <button
-                  onClick={() => {
-                    setActivePageTab('all-users');
-                    setEditingUserId(null);
-                    setEditingUserOriginal(null);
-                    handleReset();
-                  }}
-                  className={`group relative flex items-center gap-3 h-[46px] px-5 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer shadow-sm ${
-                    activePageTab === 'all-users'
-                      ? 'bg-[#2563EB] text-white border-none'
-                      : 'bg-white border border-borderColor border-l-4 border-l-[#2563EB] text-[#2563EB] hover:bg-[#EFF6FF] hover:-translate-y-0.5'
-                  }`}
-                >
-                  <LuUsers className={`text-[20px] transition-colors duration-200 ${
-                    activePageTab === 'all-users' ? 'text-white' : 'text-[#2563EB]'
-                  }`} />
-                  <span>All Users</span>
-                </button>
+                {activePageTab === 'all-users' ? (
+                  <Premium3DButton
+                    color="blue"
+                    className="h-[46px] px-5 shadow-sm text-[14px]"
+                  >
+                    <LuUsers className="text-[20px] text-white" />
+                    <span>All Users</span>
+                  </Premium3DButton>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setActivePageTab('all-users');
+                      setEditingUserId(null);
+                      setEditingUserOriginal(null);
+                      handleReset();
+                    }}
+                    className="group relative flex items-center gap-3 h-[46px] px-5 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer shadow-sm bg-white border border-borderColor border-l-4 border-l-[#2563EB] text-[#2563EB] hover:bg-[#EFF6FF] hover:-translate-y-0.5"
+                  >
+                    <LuUsers className="text-[20px] transition-colors duration-200 text-[#2563EB]" />
+                    <span>All Users</span>
+                  </button>
+                )}
 
                 {editingUserId && activePageTab === 'add-user' && (
                   <div className="flex items-center gap-2 h-[46px] px-4 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm font-semibold shadow-sm">

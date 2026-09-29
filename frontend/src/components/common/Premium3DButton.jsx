@@ -6,7 +6,8 @@ const Premium3DButton = ({
   disabled, 
   onClick, 
   type = "button",
-  className = ""
+  className = "",
+  color = "green"
 }) => {
   const buttonRef = useRef(null);
   
@@ -87,6 +88,32 @@ const Premium3DButton = ({
     };
   }, []);
 
+    const getColors = (color) => {
+      switch(color) {
+        case 'blue':
+          return {
+            '--btn-base': '#2563eb', // blue-600
+            '--btn-shadow': 'rgba(37, 99, 235, 0.4)',
+            '--btn-grad-light': '#60a5fa', // blue-400
+            '--btn-grad-mid': '#3b82f6', // blue-500
+            '--btn-disabled': '#1e3a8a', // blue-900
+            '--btn-reduced-hover': '#1d4ed8' // blue-700
+          };
+        case 'green':
+        default:
+          return {
+            '--btn-base': '#15803d', // green-700
+            '--btn-shadow': 'rgba(21, 128, 61, 0.4)',
+            '--btn-grad-light': '#4ade80', // green-400
+            '--btn-grad-mid': '#22c55e', // green-500
+            '--btn-disabled': '#166534', // green-800
+            '--btn-reduced-hover': '#16a34a' // green-600
+          };
+      }
+    };
+
+    const colorVars = getColors(color);
+
   return (
     <button
       ref={buttonRef}
@@ -100,7 +127,8 @@ const Premium3DButton = ({
         '--light-x': '50%',
         '--light-y': '50%',
         '--hover-opacity': '0',
-        willChange: 'transform, box-shadow, background'
+        willChange: 'transform, box-shadow, background',
+        ...colorVars
       }}
     >
       <style>
@@ -108,7 +136,7 @@ const Premium3DButton = ({
           .premium-3d-btn {
             /* Base static shadow when not hovered */
             box-shadow: 0 2px 6px rgba(0,0,0,0.12);
-            background: #15803d; /* Dark green base */
+            background: var(--btn-base);
           }
           
           /* The dynamic hover state with GPU acceleration */
@@ -119,34 +147,32 @@ const Premium3DButton = ({
             box-shadow: 
               inset calc(var(--shadow-x) * -0.6) calc(var(--shadow-y) * -0.6) 8px rgba(255, 255, 255, 0.4),
               inset calc(var(--shadow-x) * 0.4) calc(var(--shadow-y) * 0.4) 10px rgba(0, 0, 0, 0.2),
-              calc(var(--shadow-x) * 1.2) calc(var(--shadow-y) * 1.2 + 4px) 15px rgba(21, 128, 61, 0.4),
+              calc(var(--shadow-x) * 1.2) calc(var(--shadow-y) * 1.2 + 4px) 15px var(--btn-shadow),
               calc(var(--shadow-x) * 2) calc(var(--shadow-y) * 2) 40px rgba(248, 113, 113, calc(var(--hover-opacity) * 0.25)); 
             
             /* Dynamic radial gradient light effect tracking cursor */
             background: radial-gradient(
               circle 70px at var(--light-x) var(--light-y), 
-              #4ade80 0%,   /* Bright light green highlight at cursor */
-              #22c55e 40%,  /* Smooth light green glow */
-              #15803d 100%  /* Seamlessly blends into the base dark green */
+              var(--btn-grad-light) 0%,   /* Bright highlight at cursor */
+              var(--btn-grad-mid) 40%,  /* Smooth glow */
+              var(--btn-base) 100%  /* Seamlessly blends into the base */
             );
             border-color: rgba(255,255,255,0.3);
           }
           
           .premium-3d-btn:disabled {
             cursor: not-allowed;
-            background: #166534; /* Disabled dark green */
+            background: var(--btn-disabled);
           }
 
-
-          
           @media (prefers-reduced-motion: reduce) {
             .premium-3d-btn {
               transition: none !important;
               transform: none !important;
             }
             .premium-3d-btn:not(:disabled):hover {
-              box-shadow: 0 4px 12px rgba(21, 128, 61, 0.4) !important;
-              background: #16a34a !important;
+              box-shadow: 0 4px 12px var(--btn-shadow) !important;
+              background: var(--btn-reduced-hover) !important;
             }
           }
         `}

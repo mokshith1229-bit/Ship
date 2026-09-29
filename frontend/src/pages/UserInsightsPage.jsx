@@ -2943,24 +2943,26 @@ const UserInsightsPage = () => {
                     </div>
 
                     {/* Apply Button */}
-                    <button
+                    <Premium3DButton
                       onClick={handleApply}
-                      className="px-6 h-[46px] bg-[#5cb85c] hover:bg-[#4cae4c] text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm cursor-pointer flex items-center justify-center min-w-[88px] flex-1 sm:flex-initial"
+                      color="green"
+                      className="px-6 h-[46px] text-sm font-bold shadow-sm hover:shadow-md cursor-pointer flex items-center justify-center min-w-[88px] flex-1 sm:flex-initial"
                     >
                       Apply
-                    </button>
+                    </Premium3DButton>
 
                     {/* Export Report Dropdown Button */}
                     <div className="relative flex-1 sm:flex-initial">
-                      <button
+                      <Premium3DButton
                         onClick={() => setShowExportDropdown(!showExportDropdown)}
-                        className="w-full sm:w-auto px-6 h-[46px] bg-primary hover:bg-[#4cae4c] text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm cursor-pointer flex items-center justify-center gap-2"
+                        color="green"
+                        className="w-full sm:w-auto px-6 h-[46px] text-sm font-bold shadow-sm hover:shadow-md cursor-pointer flex items-center justify-center gap-2"
                       >
                         <svg className="w-4 h-4 text-white shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
                         </svg>
                         <span>Export Report</span>
-                      </button>
+                      </Premium3DButton>
 
                       {showExportDropdown && (
                         <div className="absolute right-0 mt-2 w-52 bg-white border border-borderColor rounded-xl shadow-lg z-50 py-1.5 overflow-hidden">
