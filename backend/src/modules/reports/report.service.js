@@ -9,6 +9,19 @@ const Project = require('../../models/Project.model');
 const MasterList = require('../../models/MasterList.model');
 
 class ReportService {
+  getParamDoc(t, masterListId) {
+    if (!t || !masterListId) return null;
+    if (!t._paramMap) {
+      t._paramMap = new Map();
+      if (t.parameters && Array.isArray(t.parameters)) {
+        t.parameters.forEach(p => {
+          if (p && p._id) t._paramMap.set(p._id.toString(), p);
+        });
+      }
+    }
+    return t._paramMap.get(masterListId.toString()) || null;
+  }
+
   async getConfig() {
     const batches = await InspectionBatch.find({}).sort({ createdAt: -1 }).lean();
 
@@ -177,7 +190,7 @@ class ReportService {
       tasks = tasks.map(t => {
         if (t.ratings && t.ratings.length > 0) {
           t.ratings = t.ratings.filter(r => {
-            const paramDoc = t.parameters && t.parameters.find(p => p && p._id && r.masterListId && p._id.toString() === r.masterListId.toString());
+            const paramDoc = this.getParamDoc(t, r.masterListId);
             const parameter = (paramDoc && paramDoc.parameter) || r.parameterName || r.parameterKey || 'Unknown';
             return parameter.trim().toLowerCase() === lowerParam;
           });
@@ -228,7 +241,7 @@ class ReportService {
     tasks.forEach(t => {
       if (t.ratings && t.ratings.length > 0) {
         t.ratings.forEach(r => {
-          const paramDoc = t.parameters && t.parameters.find(p => p && p._id && r.masterListId && p._id.toString() === r.masterListId.toString());
+          const paramDoc = this.getParamDoc(t, r.masterListId);
           const category = (paramDoc && paramDoc.category) || t.category || t.assetType || 'Unknown';
           const assetType = (paramDoc && paramDoc.assetType) || t.assetType || 'Unknown';
           const parameter = (paramDoc && paramDoc.parameter) || r.parameterName || r.parameterKey || 'Unknown';
@@ -281,7 +294,7 @@ class ReportService {
         }
         for (const r of t.ratings) {
           totalRatings++;
-          const paramDoc = t.parameters && t.parameters.find(p => p && p._id && r.masterListId && p._id.toString() === r.masterListId.toString());
+          const paramDoc = this.getParamDoc(t, r.masterListId);
           const parameter = (paramDoc && paramDoc.parameter) || r.parameterName || r.parameterKey || 'Unknown';
           parametersRated.add(parameter);
           const score = Number(r.score) || 0;
@@ -399,7 +412,7 @@ class ReportService {
     tasks.forEach(t => {
       if (t.ratings && t.ratings.length > 0) {
         const firstR = t.ratings[0];
-        const paramDoc = t.parameters && t.parameters.find(p => p && p._id && firstR.masterListId && p._id.toString() === firstR.masterListId.toString());
+        const paramDoc = this.getParamDoc(t, firstR.masterListId);
         const assetType = (paramDoc && paramDoc.assetType) || t.assetType || 'Unknown';
 
         if (!assetStats[assetType]) assetStats[assetType] = { audited: 0, observation: 0 };
@@ -529,7 +542,7 @@ class ReportService {
     tasks.forEach(t => {
       if (t.ratings && t.ratings.length > 0) {
         const firstR = t.ratings[0];
-        const paramDoc = t.parameters && t.parameters.find(p => p && p._id && firstR.masterListId && p._id.toString() === firstR.masterListId.toString());
+        const paramDoc = this.getParamDoc(t, firstR.masterListId);
         const category = (paramDoc && paramDoc.category) || t.category || t.assetType || 'Unknown';
         const assetType = (paramDoc && paramDoc.assetType) || t.assetType || 'Unknown';
 
@@ -833,7 +846,7 @@ class ReportService {
       return assetType !== 'mbcb' && assetType !== 'delineators';
     });
 
-    const summary = await this.getSummary(project, cycleId, chainageType, chainageFrom, chainageTo, selectedAssetType, selectedParameter, roadType, direction);
+    const summary = this.calculateSummaryStats(project, tasks, chainageType, chainageFrom, chainageTo);
 
     const PAGE_MARGINS = { top: 100, bottom: 50, left: 40, right: 40 };
     const doc = new PDFDocument({ margins: PAGE_MARGINS, size: 'A4' });
@@ -973,7 +986,7 @@ class ReportService {
         let cat = 'Unknown';
         if (t.ratings && t.ratings.length > 0) {
           const firstR = t.ratings[0];
-          const paramDoc = t.parameters && t.parameters.find(p => p && p._id && firstR.masterListId && p._id.toString() === firstR.masterListId.toString());
+          const paramDoc = this.getParamDoc(t, firstR.masterListId);
           cat = (paramDoc && paramDoc.category) || t.category || 'Unknown';
         } else {
           cat = t.category || 'Unknown';
@@ -1205,7 +1218,7 @@ class ReportService {
       tasks.forEach(t => {
         if (t.ratings && t.ratings.length > 0) {
           const firstR = t.ratings[0];
-          const paramDoc = t.parameters && t.parameters.find(p => p && p._id && firstR.masterListId && p._id.toString() === firstR.masterListId.toString());
+          const paramDoc = this.getParamDoc(t, firstR.masterListId);
           const assetType = (paramDoc && paramDoc.assetType) || t.assetType || 'Unknown';
 
           if (!assetStats[assetType]) assetStats[assetType] = { audited: 0, observation: 0 };
@@ -1468,7 +1481,7 @@ class ReportService {
             
             // To get direction, use the parameter of the rating that defined the score, or first rating
             let ratingForDir = t.ratings.find(r => Number(r.score) === imgScore) || t.ratings[0];
-            firstRatingParams = t.parameters && t.parameters.find(p => p && p._id && ratingForDir.masterListId && p._id.toString() === ratingForDir.masterListId.toString());
+            firstRatingParams = this.getParamDoc(t, ratingForDir.masterListId);
           }
 
           if (imgScore === 1) imgR1Count++;
@@ -1496,7 +1509,7 @@ class ReportService {
               t.ratings.forEach(r => {
                 const rScore = Number(r.score);
                 if (rScore === 1 || rScore === 5) {
-                  const rpDoc = t.parameters && t.parameters.find(p => p && p._id && r.masterListId && p._id.toString() === r.masterListId.toString());
+                  const rpDoc = this.getParamDoc(t, r.masterListId);
                   const tParam = (rpDoc && rpDoc.parameter) || r.parameterName || r.parameterKey || 'Unknown';
                   const aType = (rpDoc && rpDoc.assetType) || t.assetType || 'Unknown';
 
@@ -1730,7 +1743,7 @@ class ReportService {
 
             let pDoc = null;
             if (assetRatingDoc) {
-              pDoc = t.parameters && t.parameters.find(p => p && p._id && assetRatingDoc.masterListId && p._id.toString() === assetRatingDoc.masterListId.toString());
+              pDoc = this.getParamDoc(t, assetRatingDoc.masterListId);
             }
 
             // Count ALL unique parameters per image that have score 1 or 5 (consistent image-wise logic)
@@ -1739,7 +1752,7 @@ class ReportService {
               t.ratings.forEach(r => {
                 const rScore = Number(r.score);
                 if (rScore === 1 || rScore === 5) {
-                  const rpDoc = t.parameters && t.parameters.find(p => p && p._id && r.masterListId && p._id.toString() === r.masterListId.toString());
+                  const rpDoc = this.getParamDoc(t, r.masterListId);
                   const tParam = (rpDoc && rpDoc.parameter) || r.parameterName || r.parameterKey || 'Unknown';
                   const aType = (rpDoc && rpDoc.assetType) || t.assetType || 'Unknown';
 
@@ -2209,7 +2222,7 @@ class ReportService {
       tasks.forEach(t => {
         if (t.ratings && t.ratings.length > 0) {
           const firstR = t.ratings[0];
-          const paramDoc = t.parameters && t.parameters.find(p => p && p._id && firstR.masterListId && p._id.toString() === firstR.masterListId.toString());
+          const paramDoc = this.getParamDoc(t, firstR.masterListId);
           const category = (paramDoc && paramDoc.category) || t.category || t.assetType || 'Unknown';
           const assetType = (paramDoc && paramDoc.assetType) || t.assetType || 'Unknown';
 
@@ -2303,7 +2316,7 @@ class ReportService {
       tasks.forEach(t => {
         if (t.ratings && t.ratings.length > 0) {
           const firstR = t.ratings[0];
-          const paramDoc = t.parameters && t.parameters.find(p => p && p._id && firstR.masterListId && p._id.toString() === firstR.masterListId.toString());
+          const paramDoc = this.getParamDoc(t, firstR.masterListId);
           const category = (paramDoc && paramDoc.category) || t.category || t.assetType || 'Unknown';
           const assetType = (paramDoc && paramDoc.assetType) || t.assetType || 'Unknown';
 
@@ -2313,7 +2326,7 @@ class ReportService {
           badRatings.forEach(badRating => {
             if (!evsByAsset[assetType]) evsByAsset[assetType] = [];
 
-            const badParamDoc = t.parameters && t.parameters.find(p => p && p._id && badRating.masterListId && p._id.toString() === badRating.masterListId.toString());
+            const badParamDoc = this.getParamDoc(t, badRating.masterListId);
             const badParameter = (badParamDoc && badParamDoc.parameter) || badRating.parameterName || badRating.parameterKey || 'Unknown';
 
             evsByAsset[assetType].push({

@@ -40,12 +40,14 @@ const generateReport = asyncHandler(async (req, res) => {
 
 const generatePdfReport = asyncHandler(async (req, res, next) => {
   try {
-    req.setTimeout(0); // Prevent timeout for long-running report generation
+    req.setTimeout(600000); // 10 minutes
+    res.setTimeout(600000); // 10 minutes
     const { project, cycleId, chainageType, chainageFrom, chainageTo, assetType, parameter, roadType, direction, isSummary } = req.query;
     
     res.setHeader('Content-Type', 'application/pdf');
     const prefix = isSummary === 'true' ? 'Summary_Report' : 'Comprehensive_Audit_Report';
     res.setHeader('Content-Disposition', `attachment; filename="${prefix}_${project}_${new Date().toISOString().slice(0, 10)}.pdf"`);
+    res.flushHeaders(); // Flush headers immediately so client knows response started
     
     // The service will stream directly to the response object
     const isSummaryBool = isSummary === 'true';
@@ -57,11 +59,13 @@ const generatePdfReport = asyncHandler(async (req, res, next) => {
 });
 
 const generateComparisonPdfReport = asyncHandler(async (req, res) => {
-  req.setTimeout(0); // Prevent timeout for long-running report generation
+  req.setTimeout(600000); // 10 minutes
+  res.setTimeout(600000); // 10 minutes
   const { project, previousCycle, currentCycle, chainageType, chainageFrom, chainageTo, assetType, parameter, roadType, direction } = req.query;
   
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="Issue_Comparison_Report_${project}_${new Date().toISOString().slice(0, 10)}.pdf"`);
+  res.flushHeaders(); // Flush immediately
   
   await reportService.generateComparisonPdfReport(project, previousCycle, currentCycle, res, chainageType, chainageFrom, chainageTo, assetType, parameter, roadType, direction);
 });

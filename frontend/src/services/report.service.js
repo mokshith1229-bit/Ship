@@ -55,7 +55,8 @@ export const reportService = {
   async generateExcelReport(project, cycleId, mode = 'download', chainageType, chainageFrom, chainageTo, assetType, parameter, roadType, direction) {
     const response = await api.get('/reports/generate', {
       params: { project, cycleId, chainageType, chainageFrom, chainageTo, assetType, parameter, roadType, direction },
-      responseType: 'blob'
+      responseType: 'blob',
+      timeout: 600000
     });
 
     const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -81,7 +82,8 @@ export const reportService = {
   async generatePdfReport(project, cycleId, mode = 'download', chainageType, chainageFrom, chainageTo, assetType, parameter, roadType, direction, isSummary = false) {
     const response = await api.get('/reports/generate-pdf', {
       params: { project, cycleId, chainageType, chainageFrom, chainageTo, assetType, parameter, roadType, direction, isSummary },
-      responseType: 'blob'
+      responseType: 'blob',
+      timeout: 600000
     });
 
     const blob = new Blob([response.data], { type: 'application/pdf' });
@@ -108,7 +110,8 @@ export const reportService = {
   async generateComparisonPdfReport(project, previousCycle, currentCycle, mode = 'download', chainageType, chainageFrom, chainageTo, assetType, parameter, roadType, direction) {
     const response = await api.get('/reports/generate-comparison-pdf', {
       params: { project, previousCycle, currentCycle, chainageType, chainageFrom, chainageTo, assetType, parameter, roadType, direction },
-      responseType: 'blob'
+      responseType: 'blob',
+      timeout: 600000
     });
 
     const blob = new Blob([response.data], { type: 'application/pdf' });
