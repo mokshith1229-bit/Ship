@@ -351,9 +351,9 @@ const UserManagementPage = ({ defaultTab = 'all-users' }) => {
                     handleReset();
                     setActivePageTab('add-user');
                   }}
-                  className="group flex items-center gap-2 h-[46px] px-[26px] bg-white border border-[#2563EB] text-[#2563EB] rounded-xl text-sm font-medium shadow-sm hover:shadow hover:-translate-y-0.5 hover:bg-[#2563EB] hover:text-white transition-all duration-200 cursor-pointer"
+                  className="flex items-center gap-2 h-[46px] px-[26px] bg-white border border-green-600 text-green-700 hover:bg-green-50 font-medium rounded-xl shadow-sm transition-colors duration-200 cursor-pointer"
                 >
-                  <LuUserPlus className="text-[20px] text-[#2563EB] group-hover:text-white transition-colors duration-200" />
+                  <LuUserPlus className="text-[20px]" />
                   <span>Add User</span>
                 </button>
               )}
