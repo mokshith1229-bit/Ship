@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MdOutlineArrowBack, MdEdit } from 'react-icons/md';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const InspectionHeader = ({ task }) => {
+const InspectionHeader = ({ task, currentPage }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isEditMode, setIsEditMode] = useState(false);
   const [expandedCard, setExpandedCard] = useState(null);
   
@@ -30,14 +31,29 @@ const InspectionHeader = ({ task }) => {
     { key: 'asset', label: 'Asset', value: task.assetSubType ? `${task.assetType} (${task.assetSubType})` : task.assetType },
     { key: 'direction', label: 'Direction', value: task.direction },
     { key: 'roadType', label: 'Road', value: task.roadType },
-    { key: 'chainage', label: 'Chainage', value: `${task.chainage} km`, highlight: true }
+    { 
+      key: 'chainage', 
+      label: 'Chainage', 
+      value: task.chainage ? `${task.chainage} km` : '-', 
+      highlight: true,
+      subLabel: 'Current Page',
+      subValue: currentPage
+    }
   ];
 
   return (
-    <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shrink-0 shadow-sm relative z-50">
+    <div className="bg-white border-b border-gray-200 px-6 py-2.5 flex items-center justify-between shrink-0 shadow-sm relative z-50">
       <div className="flex items-center gap-4">
         <button 
-          onClick={() => navigate(-1)}
+          onClick={() => {
+            const road = location.state?.roadId || task.project?.name || task.project;
+            if (road) {
+              const basePath = location.pathname.startsWith('/rating-v2') ? '/rating-v2' : '/rating';
+              navigate(`${basePath}/${road}?page=${currentPage}`, { state: { returnPage: currentPage, currentPage } });
+            } else {
+              navigate(-1);
+            }
+          }}
           className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors"
           title="Go Back"
         >
@@ -57,6 +73,8 @@ const InspectionHeader = ({ task }) => {
             label={header.label} 
             value={header.value} 
             highlight={header.highlight}
+            subLabel={header.subLabel}
+            subValue={header.subValue}
             isEditMode={isEditMode}
             isExpanded={expandedCard === header.key}
             hasRemark={headerRemarks[header.key] && headerRemarks[header.key].trim() !== ''}
@@ -87,7 +105,7 @@ const InspectionHeader = ({ task }) => {
   );
 };
 
-const HeaderItem = ({ headerKey, label, value, highlight, isEditMode, isExpanded, hasRemark, remarkValue, onClick, onClose, onRemarkChange }) => {
+const HeaderItem = ({ headerKey, label, value, highlight, subLabel, subValue, isEditMode, isExpanded, hasRemark, remarkValue, onClick, onClose, onRemarkChange }) => {
   const itemRef = useRef(null);
 
   useEffect(() => {
@@ -119,6 +137,14 @@ const HeaderItem = ({ headerKey, label, value, highlight, isEditMode, isExpanded
       <span className={`text-base font-bold ${highlight ? 'text-green-600' : 'text-gray-900'} block whitespace-nowrap`}>
         {value || '-'}
       </span>
+      {subLabel && subValue !== undefined && subValue !== null && (
+        <div className="mt-1 pt-0.5">
+          <span className="text-xs text-gray-500 uppercase tracking-wider font-bold block mb-1">{subLabel}</span>
+          <span className="text-base font-bold text-green-600 block whitespace-nowrap">
+            {subValue}
+          </span>
+        </div>
+      )}
     </div>
 
     <AnimatePresence>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import HiRateRoadLoader from '../components/common/HiRateRoadLoader';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { MdClear, MdOutlineFileDownload } from 'react-icons/md';
 import { useAuth } from '../context/AuthContext';
 import Pagination from '../components/Pagination';
@@ -25,10 +25,21 @@ const RoadSummaryPage = () => {
   const { roadId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { hasPermission } = useAuth();
   const canExport = hasPermission('Rating', 'export');
 
-  const [currentPage, setCurrentPage] = useState(1);
+  const pageQuery = parseInt(searchParams.get('page'), 10);
+  const initialPage = React.useMemo(() => {
+    if (!isNaN(pageQuery) && pageQuery > 0) return pageQuery;
+    const fromState = location.state?.returnPage || location.state?.currentPage;
+    if (fromState && !isNaN(Number(fromState)) && Number(fromState) > 0) return Number(fromState);
+    const fromSession = sessionStorage.getItem('rating_current_page');
+    if (fromSession && !isNaN(Number(fromSession)) && Number(fromSession) > 0) return Number(fromSession);
+    return 1;
+  }, [pageQuery, location.state]);
+
+  const [currentPage, setCurrentPage] = useState(initialPage);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [direction, setDirection] = useState('Choose Direction');
   const [roadType, setRoadType] = useState('Choose Road Type');
@@ -63,6 +74,75 @@ const RoadSummaryPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [activeBatchId, setActiveBatchId] = useState(null);
+  const [gotoPageInput, setGotoPageInput] = useState('');
+  const [pageValidationError, setPageValidationError] = useState('');
+
+  useEffect(() => {
+    if (pageValidationError) {
+      const timer = setTimeout(() => {
+        setPageValidationError('');
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [pageValidationError]);
+
+  const handleGoToPage = (e) => {
+    if (e) e.preventDefault();
+    
+    const trimmed = String(gotoPageInput).trim();
+    if (!trimmed) {
+      setPageValidationError('Please enter a page number');
+      return;
+    }
+
+    // Check for non-integers, decimals, or invalid characters
+    if (!/^\d+$/.test(trimmed)) {
+      setPageValidationError('Please enter a valid whole number');
+      return;
+    }
+
+    const targetPage = parseInt(trimmed, 10);
+
+    if (isNaN(targetPage) || targetPage <= 0) {
+      setPageValidationError('Page number must be at least 1');
+      return;
+    }
+
+    if (targetPage > totalPages) {
+      setPageValidationError(`Page cannot exceed total pages (${totalPages})`);
+      return;
+    }
+
+    setPageValidationError('');
+    setCurrentPage(targetPage);
+    sessionStorage.setItem('rating_current_page', String(targetPage));
+    if (activeBatchId) {
+      loadBatchTasks(activeBatchId, targetPage, appliedFilters);
+    }
+  };
+
+  // Synchronize URL query parameter with currentPage
+  useEffect(() => {
+    const currentParam = parseInt(searchParams.get('page'), 10);
+    if (currentParam !== currentPage && currentPage > 0) {
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.set('page', currentPage);
+        return next;
+      }, { replace: true });
+    }
+  }, [currentPage, searchParams, setSearchParams]);
+
+  // Synchronize state if URL page param changes externally
+  useEffect(() => {
+    if (!isNaN(pageQuery) && pageQuery > 0 && pageQuery !== currentPage) {
+      setCurrentPage(pageQuery);
+      sessionStorage.setItem('rating_current_page', String(pageQuery));
+      if (activeBatchId) {
+        loadBatchTasks(activeBatchId, pageQuery, appliedFilters);
+      }
+    }
+  }, [pageQuery, activeBatchId]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -158,7 +238,7 @@ const RoadSummaryPage = () => {
           const bId = (latestBatch._id || latestBatch.id || latestBatch).toString();
           setActiveBatchId(bId);
           setVersion(formatVersionLabel(latestBatch));
-          await loadBatchTasks(bId, 1, appliedFilters);
+          await loadBatchTasks(bId, initialPage, appliedFilters);
         } else {
           setQuestions([]);
           setTotalPages(1);
@@ -185,6 +265,7 @@ const RoadSummaryPage = () => {
         if (selectedId !== activeBatchId) {
           setActiveBatchId(selectedId);
           setCurrentPage(1);
+          sessionStorage.setItem('rating_current_page', '1');
           loadBatchTasks(selectedId, 1, appliedFilters);
         }
       }
@@ -205,6 +286,9 @@ const RoadSummaryPage = () => {
     };
     setAppliedFilters(newFilters);
     setCurrentPage(1);
+    sessionStorage.setItem('rating_current_page', '1');
+    setGotoPageInput('');
+    setPageValidationError('');
     if (activeBatchId) {
       loadBatchTasks(activeBatchId, 1, newFilters);
     }
@@ -248,7 +332,7 @@ const RoadSummaryPage = () => {
 
       <div className="p-6 flex flex-col flex-1 overflow-hidden">
         {/* Filters */}
-        <div className="grid grid-cols-6 gap-4 mb-6 shrink-0">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6 shrink-0 items-start">
           <div>
             <label htmlFor="filter-category" className="block text-xs font-medium text-gray-700 mb-1">Category :</label>
             <CustomDropdown
@@ -267,6 +351,9 @@ const RoadSummaryPage = () => {
               onChange={(val) => {
                 setSelectedCategory(val);
                 setCurrentPage(1);
+                sessionStorage.setItem('rating_current_page', '1');
+                setGotoPageInput('');
+                setPageValidationError('');
                 const updated = { ...appliedFilters, category: val };
                 setAppliedFilters(updated);
                 if (activeBatchId) {
@@ -278,11 +365,11 @@ const RoadSummaryPage = () => {
           </div>
           <div>
             <label htmlFor="filter-min-chainage" className="block text-xs font-medium text-gray-700 mb-1">Min Chainage :</label>
-            <input id="filter-min-chainage" name="minChainage" type="text" value={minChainage} onChange={(e) => setMinChainage(e.target.value)} placeholder="Enter Chainage" className="w-full border border-[#5cb85c] rounded px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-[#5cb85c] focus:ring-2 focus:ring-[#5cb85c]/20 transition-all" />
+            <input id="filter-min-chainage" name="minChainage" type="text" value={minChainage} onChange={(e) => setMinChainage(e.target.value)} placeholder="Enter Chainage" className="w-full border border-[#5cb85c] rounded px-3 py-1.5 min-h-[34px] md:min-h-[38px] text-sm bg-white focus:outline-none focus:border-[#5cb85c] focus:ring-2 focus:ring-[#5cb85c]/20 transition-all" />
           </div>
           <div>
             <label htmlFor="filter-max-chainage" className="block text-xs font-medium text-gray-700 mb-1">Max Chainage :</label>
-            <input id="filter-max-chainage" name="maxChainage" type="text" value={maxChainage} onChange={(e) => setMaxChainage(e.target.value)} placeholder="Enter Chainage" className="w-full border border-[#5cb85c] rounded px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-[#5cb85c] focus:ring-2 focus:ring-[#5cb85c]/20 transition-all" />
+            <input id="filter-max-chainage" name="maxChainage" type="text" value={maxChainage} onChange={(e) => setMaxChainage(e.target.value)} placeholder="Enter Chainage" className="w-full border border-[#5cb85c] rounded px-3 py-1.5 min-h-[34px] md:min-h-[38px] text-sm bg-white focus:outline-none focus:border-[#5cb85c] focus:ring-2 focus:ring-[#5cb85c]/20 transition-all" />
           </div>
           <div>
             <label htmlFor="filter-direction" className="block text-xs font-medium text-gray-700 mb-1">Direction :</label>
@@ -313,6 +400,50 @@ const RoadSummaryPage = () => {
               onChange={setParamType}
               placeholder="Parameter Type"
             />
+          </div>
+          <div className="relative">
+            <label htmlFor="filter-goto-page" className="block text-xs font-medium text-gray-700 mb-1">Go to Page :</label>
+            <div className="flex items-center gap-1.5">
+              <input
+                id="filter-goto-page"
+                name="gotoPage"
+                type="number"
+                min="1"
+                max={totalPages}
+                value={gotoPageInput}
+                onChange={(e) => {
+                  setGotoPageInput(e.target.value);
+                  if (pageValidationError) setPageValidationError('');
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleGoToPage();
+                  } else if (e.key === '.' || e.key === 'e' || e.key === 'E' || e.key === '+' || e.key === '-') {
+                    e.preventDefault();
+                  }
+                }}
+                placeholder="Enter page number"
+                className={`w-full min-w-0 border ${
+                  pageValidationError
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-200'
+                    : 'border-[#5cb85c] focus:border-[#5cb85c] focus:ring-[#5cb85c]/20'
+                } rounded px-2.5 py-1.5 min-h-[34px] md:min-h-[38px] text-sm bg-white focus:outline-none focus:ring-2 transition-all placeholder:text-gray-400 placeholder:text-xs`}
+              />
+              <button
+                type="button"
+                onClick={handleGoToPage}
+                className="bg-[#5cb85c] hover:bg-green-600 active:bg-green-700 text-white font-medium px-3.5 py-1.5 min-h-[34px] md:min-h-[38px] rounded text-sm transition-colors shadow-sm shrink-0 flex items-center justify-center cursor-pointer"
+                title="Go to page"
+              >
+                Go
+              </button>
+            </div>
+            {pageValidationError && (
+              <div className="absolute top-full left-0 mt-1 z-30 flex items-center gap-1 bg-red-50 border border-red-200 text-red-600 text-[11px] font-medium px-2 py-0.5 rounded shadow-sm whitespace-nowrap">
+                <span>{pageValidationError}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -384,7 +515,10 @@ const RoadSummaryPage = () => {
                     const isCompleted = selectedBatchObj?.status === 'COMPLETED' || selectedBatchObj?.status === 'Completed' || q.status === 'COMPLETED' || q.status === 'SKIPPED' || q.status === 'FAILED';
                     const basePath = location.pathname.startsWith('/rating-v2') ? '/rating-v2/inspector' : '/rating/inspector';
                     const reviewQuery = isCompleted ? '&mode=review' : '';
-                    navigate(`${basePath}/${cleanBatchId}?startIndex=${q.taskGlobalIndex}${reviewQuery}`, { state: { roadId } });
+                    const recordGlobalIndex = (currentPage - 1) * 10 + index;
+                    navigate(`${basePath}/${cleanBatchId}?startIndex=${recordGlobalIndex}&page=${currentPage}${reviewQuery}`, { 
+                      state: { roadId, currentPage } 
+                    });
                   }}
                   className={`border-b border-[#5cb85c]/20 hover:bg-green-50/50 cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-[#5cb85c]/[0.02]'}`}
                 >
@@ -418,6 +552,8 @@ const RoadSummaryPage = () => {
               totalPages={totalPages} 
               onPageChange={(page) => {
                 setCurrentPage(page);
+                sessionStorage.setItem('rating_current_page', String(page));
+                setPageValidationError('');
                 if (activeBatchId) {
                   loadBatchTasks(activeBatchId, page, appliedFilters);
                 }

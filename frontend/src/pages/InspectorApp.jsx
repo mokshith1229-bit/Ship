@@ -56,23 +56,39 @@ const InspectorApp = () => {
   const assignmentId = searchParams.get('assignmentId');
   const categoryParam = searchParams.get('category');
   const pagesParam = searchParams.get('pages');
-  const startIndex = parseInt(searchParams.get('startIndex'), 10) || 0;
 
-  const handleGoBack = () => {
-    if (assignmentId || categoryParam || pagesParam) {
-      navigate('/dashboard');
-      return;
+  const PAGE_SIZE = 10;
+
+  // Resolve initial global index, reconciling any stale startIndex with active table pagination state
+  const initialGlobalIndex = React.useMemo(() => {
+    const rawStart = searchParams.get('startIndex');
+    const parsedStart = rawStart !== null ? parseInt(rawStart, 10) : NaN;
+    const urlPage = parseInt(searchParams.get('page'), 10);
+    const statePage = parseInt(location.state?.currentPage || location.state?.returnPage, 10);
+    const sessionPage = parseInt(sessionStorage.getItem('rating_current_page'), 10);
+
+    const explicitPage = (!isNaN(urlPage) && urlPage > 0)
+      ? urlPage
+      : ((!isNaN(statePage) && statePage > 0) ? statePage : ((!isNaN(sessionPage) && sessionPage > 0) ? sessionPage : null));
+
+    if (!isNaN(parsedStart) && parsedStart >= 0) {
+      const pageOfStart = Math.floor(parsedStart / PAGE_SIZE) + 1;
+      // If an explicit active page exists and does NOT match the page containing parsedStart,
+      // the startIndex parameter is stale. Synchronize to the active page.
+      if (explicitPage && explicitPage !== pageOfStart) {
+        return (explicitPage - 1) * PAGE_SIZE;
+      }
+      return parsedStart;
     }
-    const road = location.state?.roadId || currentTask?.project || tasks[0]?.project;
-    const basePath = location.pathname.startsWith('/rating-v2') ? '/rating-v2' : '/rating';
-    if (road) {
-      navigate(`${basePath}/${road}`);
-    } else {
-      navigate(-1);
+
+    if (explicitPage) {
+      return (explicitPage - 1) * PAGE_SIZE;
     }
-  };
-  
-  const [globalIndex, setGlobalIndex] = useState(startIndex);
+
+    return 0;
+  }, []);
+
+  const [globalIndex, setGlobalIndex] = useState(initialGlobalIndex);
   const [loadedPage, setLoadedPage] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [totalTasks, setTotalTasks] = useState(0);
@@ -100,9 +116,26 @@ const InspectorApp = () => {
     }
   });
 
-  const PAGE_SIZE = 10;
+  // Single reliable source of truth for the active page containing the current record
   const targetPage = Math.floor(globalIndex / PAGE_SIZE) + 1;
   const localIndex = globalIndex % PAGE_SIZE;
+  const activePageDisplay = targetPage;
+
+  const handleGoBack = () => {
+    if (assignmentId || categoryParam || pagesParam) {
+      navigate('/dashboard');
+      return;
+    }
+    const road = location.state?.roadId || currentTask?.project || tasks[0]?.project;
+    const basePath = location.pathname.startsWith('/rating-v2') ? '/rating-v2' : '/rating';
+    if (road) {
+      navigate(`${basePath}/${road}?page=${activePageDisplay}`, { 
+        state: { returnPage: activePageDisplay, currentPage: activePageDisplay } 
+      });
+    } else {
+      navigate(-1);
+    }
+  };
 
   useEffect(() => {
     const handleStorageChange = () => {
@@ -126,8 +159,14 @@ const InspectorApp = () => {
   }, []);
 
   useEffect(() => {
-    setGlobalIndex((prev) => prev !== startIndex ? startIndex : prev);
-  }, [startIndex]);
+    const rawStart = searchParams.get('startIndex');
+    if (rawStart !== null) {
+      const parsed = parseInt(rawStart, 10);
+      if (!isNaN(parsed)) {
+        setGlobalIndex((prev) => prev !== parsed ? parsed : prev);
+      }
+    }
+  }, [searchParams]);
 
   const prevParamsRef = React.useRef({ batchId, categoryParam, pagesParam, assignmentId });
   useEffect(() => {
@@ -148,16 +187,19 @@ const InspectorApp = () => {
     setCustomRemarkMode({});
     setValidationErrors({});
     
-    // Sync URL with globalIndex only if it changed
+    // Sync URL with globalIndex and page only if it changed
     const currentParam = parseInt(searchParams.get('startIndex'), 10);
-    if (currentParam !== globalIndex && !isNaN(globalIndex)) {
+    const currentPageParam = parseInt(searchParams.get('page'), 10);
+    if ((currentParam !== globalIndex || currentPageParam !== targetPage) && !isNaN(globalIndex)) {
       setSearchParams(prev => {
         const next = new URLSearchParams(prev);
         next.set('startIndex', globalIndex);
+        next.set('page', targetPage);
         return next;
       }, { replace: true });
+      sessionStorage.setItem('rating_current_page', String(targetPage));
     }
-  }, [globalIndex, searchParams, setSearchParams]);
+  }, [globalIndex, targetPage, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (loadedPage !== targetPage && batchId) {
@@ -785,8 +827,13 @@ const InspectorApp = () => {
             <p className="text-xs text-gray-500">Task {globalIndex + 1} of {totalTasks || '...'}</p>
           </div>
         </div>
-        <div className="text-sm font-medium text-gray-500">
-          Chainage: <span className="text-[#5cb85c] font-bold ml-1">{currentTask.chainage}</span>
+        <div className="text-sm font-medium text-gray-500 text-right flex flex-col items-end gap-0.5">
+          <div>
+            Chainage: <span className="text-[#5cb85c] font-bold ml-1">{currentTask?.chainage || '-'}</span>
+          </div>
+          <div>
+            Current Page: <span className="text-[#5cb85c] font-bold ml-1">{activePageDisplay}</span>
+          </div>
         </div>
       </div>
 

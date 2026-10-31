@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ratingService } from '../../services/rating.service';
 import InspectionHeader from '../../components/RatingV2/InspectionHeader';
@@ -12,22 +12,56 @@ import HiRateRoadLoader from '../../components/common/HiRateRoadLoader';
 const RatingV2Page = () => {
   const { batchId } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const startIndex = parseInt(searchParams.get('startIndex'), 10) || 0;
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const TABLE_PAGE_SIZE = 10;
+  const FETCH_CHUNK_SIZE = 50;
+
+  // Resolve initial global index, reconciling any stale startIndex with active table pagination state
+  const initialGlobalIndex = React.useMemo(() => {
+    const rawStart = searchParams.get('startIndex');
+    const parsedStart = rawStart !== null ? parseInt(rawStart, 10) : NaN;
+    const urlPage = parseInt(searchParams.get('page'), 10);
+    const statePage = parseInt(location.state?.currentPage || location.state?.returnPage, 10);
+    const sessionPage = parseInt(sessionStorage.getItem('rating_current_page'), 10);
+
+    const explicitPage = (!isNaN(urlPage) && urlPage > 0)
+      ? urlPage
+      : ((!isNaN(statePage) && statePage > 0) ? statePage : ((!isNaN(sessionPage) && sessionPage > 0) ? sessionPage : null));
+
+    if (!isNaN(parsedStart) && parsedStart >= 0) {
+      const pageOfStart = Math.floor(parsedStart / TABLE_PAGE_SIZE) + 1;
+      // If an explicit active page exists and does not match parsedStart's page, synchronize
+      if (explicitPage && explicitPage !== pageOfStart) {
+        return (explicitPage - 1) * TABLE_PAGE_SIZE;
+      }
+      return parsedStart;
+    }
+
+    if (explicitPage) {
+      return (explicitPage - 1) * TABLE_PAGE_SIZE;
+    }
+
+    return 0;
+  }, []);
 
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState([]);
   const [totalTasks, setTotalTasks] = useState(0);
-  const [globalIndex, setGlobalIndex] = useState(startIndex);
+  const [globalIndex, setGlobalIndex] = useState(initialGlobalIndex);
   const [loadedPage, setLoadedPage] = useState(null);
   const [ratingsState, setRatingsState] = useState({});
   const [saving, setSaving] = useState(false);
   const [isMissingModalOpen, setIsMissingModalOpen] = useState(false);
   const [activeImageView, setActiveImageView] = useState('current'); // 'prev', 'current', 'next'
 
-  const PAGE_SIZE = 50;
-  const targetPage = Math.floor(globalIndex / PAGE_SIZE) + 1;
-  const localIndex = globalIndex % PAGE_SIZE;
+  // Single reliable source of truth for the active page containing the current task
+  const activeCurrentPage = Math.floor(globalIndex / TABLE_PAGE_SIZE) + 1;
+
+  // Fetching chunk page & local index within chunk
+  const targetFetchPage = Math.floor(globalIndex / FETCH_CHUNK_SIZE) + 1;
+  const localIndex = globalIndex % FETCH_CHUNK_SIZE;
 
   // Helper to normalize parameters exactly like V1 without duplicates
   const getParamsList = (task) => {
@@ -88,17 +122,38 @@ const RatingV2Page = () => {
   };
 
   useEffect(() => {
-    setGlobalIndex((prev) => prev !== startIndex ? startIndex : prev);
-  }, [startIndex]);
+    const rawStart = searchParams.get('startIndex');
+    if (rawStart !== null) {
+      const parsed = parseInt(rawStart, 10);
+      if (!isNaN(parsed)) {
+        setGlobalIndex((prev) => prev !== parsed ? parsed : prev);
+      }
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     setLoadedPage(null); // Force reload ONLY if batchId changes
   }, [batchId]);
 
+  // Synchronize URL and sessionStorage with globalIndex and activeCurrentPage
+  useEffect(() => {
+    const currentStartParam = parseInt(searchParams.get('startIndex'), 10);
+    const currentPageParam = parseInt(searchParams.get('page'), 10);
+    if ((currentStartParam !== globalIndex || currentPageParam !== activeCurrentPage) && !isNaN(globalIndex)) {
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.set('startIndex', globalIndex);
+        next.set('page', activeCurrentPage);
+        return next;
+      }, { replace: true });
+      sessionStorage.setItem('rating_current_page', String(activeCurrentPage));
+    }
+  }, [globalIndex, activeCurrentPage, searchParams, setSearchParams]);
+
   const fetchTasksForPage = async (page, signal) => {
     try {
       setLoading(true);
-      const res = await ratingService.getBatchTasks(batchId, { page, limit: PAGE_SIZE });
+      const res = await ratingService.getBatchTasks(batchId, { page, limit: FETCH_CHUNK_SIZE });
       if (signal && signal.aborted) return;
       
       const paginatedData = res?.data || res;
@@ -123,12 +178,12 @@ const RatingV2Page = () => {
   };
 
   useEffect(() => {
-    if (loadedPage !== targetPage && batchId) {
+    if (loadedPage !== targetFetchPage && batchId) {
       const controller = new AbortController();
-      fetchTasksForPage(targetPage, controller.signal);
+      fetchTasksForPage(targetFetchPage, controller.signal);
       return () => controller.abort();
     }
-  }, [targetPage, loadedPage, batchId]);
+  }, [targetFetchPage, loadedPage, batchId]);
 
   const currentTask = tasks[localIndex] || null;
 
@@ -245,13 +300,9 @@ const RatingV2Page = () => {
       await ratingService.saveTaskRatings(currentTask._id, finalRatingsData);
       
       if (direction === 'next' && globalIndex < totalTasks - 1) {
-        const nextIndex = globalIndex + 1;
-        setGlobalIndex(nextIndex);
-        setSearchParams({ startIndex: nextIndex.toString() });
+        setGlobalIndex(prev => prev + 1);
       } else if (direction === 'prev' && globalIndex > 0) {
-        const prevIndex = globalIndex - 1;
-        setGlobalIndex(prevIndex);
-        setSearchParams({ startIndex: prevIndex.toString() });
+        setGlobalIndex(prev => prev - 1);
       }
     } catch (err) {
       console.error('Failed to save task', err);
@@ -269,9 +320,7 @@ const RatingV2Page = () => {
         remarks: 'Inspector skipped task via command center'
       });
       if (globalIndex < totalTasks - 1) {
-        const nextIndex = globalIndex + 1;
-        setGlobalIndex(nextIndex);
-        setSearchParams({ startIndex: nextIndex.toString() });
+        setGlobalIndex(prev => prev + 1);
       }
     } catch (err) {
       console.error('Failed to skip task', err);
@@ -334,7 +383,7 @@ const RatingV2Page = () => {
 
   return (
     <div className="flex flex-col h-screen bg-white text-gray-900 font-sans overflow-hidden selection:bg-green-100 selection:text-green-900">
-      <InspectionHeader task={currentTask} />
+      <InspectionHeader task={currentTask} currentPage={activeCurrentPage} />
       
       <div className="flex flex-1 overflow-hidden p-4 gap-4">
         {/* LEFT / MAIN - Image & Map */}
