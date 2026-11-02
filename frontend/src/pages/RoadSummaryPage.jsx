@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import HiRateRoadLoader from '../components/common/HiRateRoadLoader';
 import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { MdClear, MdOutlineFileDownload } from 'react-icons/md';
+import { MdClear, MdOutlineFileDownload, MdArrowBack } from 'react-icons/md';
 import { useAuth } from '../context/AuthContext';
 import Pagination from '../components/Pagination';
 import Navbar from '../components/Navbar';
@@ -27,7 +27,7 @@ const RoadSummaryPage = () => {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { hasPermission } = useAuth();
-  const canExport = hasPermission('Rating', 'export');
+  const canExport = typeof hasPermission === 'function' ? hasPermission('Rating', 'export') : true;
 
   const pageQuery = parseInt(searchParams.get('page'), 10);
   const initialPage = React.useMemo(() => {
@@ -76,6 +76,16 @@ const RoadSummaryPage = () => {
   const [activeBatchId, setActiveBatchId] = useState(null);
   const [gotoPageInput, setGotoPageInput] = useState('');
   const [pageValidationError, setPageValidationError] = useState('');
+  const [highlightedChainage, setHighlightedChainage] = useState(null);
+  const [noMatchingChainage, setNoMatchingChainage] = useState(false);
+  const matchedRowRef = React.useRef(null);
+  const searchRequestIdRef = React.useRef(0);
+
+  useEffect(() => {
+    if (highlightedChainage && matchedRowRef.current) {
+      matchedRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [questions, highlightedChainage]);
 
   useEffect(() => {
     if (pageValidationError) {
@@ -117,7 +127,7 @@ const RoadSummaryPage = () => {
     setCurrentPage(targetPage);
     sessionStorage.setItem('rating_current_page', String(targetPage));
     if (activeBatchId) {
-      loadBatchTasks(activeBatchId, targetPage, appliedFilters);
+      loadBatchTasks(activeBatchId, targetPage, appliedFilters, { jumpToMinChainage: false });
     }
   };
 
@@ -154,9 +164,11 @@ const RoadSummaryPage = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [navigate]);
 
-  const loadBatchTasks = async (batchId, page = 1, filters = appliedFilters) => {
+  const loadBatchTasks = async (batchId, page = 1, filters = appliedFilters, options = {}) => {
+    const requestId = ++searchRequestIdRef.current;
     try {
       setLoading(true);
+      setNoMatchingChainage(false);
       const cleanBatchId = (batchId?._id || batchId?.id || batchId || '').toString();
       if (!cleanBatchId) {
         setQuestions([]);
@@ -173,13 +185,23 @@ const RoadSummaryPage = () => {
       if (filters?.roadType && filters.roadType !== 'Choose Road Type' && filters.roadType !== 'All') queryParams.roadType = filters.roadType;
       if (filters?.minChainage) queryParams.minChainage = filters.minChainage;
       if (filters?.maxChainage) queryParams.maxChainage = filters.maxChainage;
+      if (options?.jumpToMinChainage) queryParams.jumpToMinChainage = true;
 
       const data = await ratingService.getBatchTasks(cleanBatchId, queryParams);
+      if (requestId !== searchRequestIdRef.current) return;
+
       let fetchedTasks = Array.isArray(data) ? data : (data?.data || []);
       let calculatedTotalPages = 1;
+      let effectivePage = page;
+      let matchedCh = null;
 
       if (!Array.isArray(fetchedTasks) && fetchedTasks?.tasks) {
         calculatedTotalPages = fetchedTasks.totalPages || Math.ceil((fetchedTasks.total || 0) / 10) || 1;
+        effectivePage = fetchedTasks.page || page;
+        matchedCh = fetchedTasks.matchedChainage || null;
+        if (fetchedTasks.noMatch) {
+          setNoMatchingChainage(true);
+        }
         fetchedTasks = fetchedTasks.tasks;
       } else if (Array.isArray(fetchedTasks)) {
         calculatedTotalPages = Math.ceil(fetchedTasks.length / 10) || 1;
@@ -188,6 +210,18 @@ const RoadSummaryPage = () => {
       if (!Array.isArray(fetchedTasks)) {
         fetchedTasks = [];
       }
+
+      if (options?.jumpToMinChainage && effectivePage) {
+        setCurrentPage(effectivePage);
+        sessionStorage.setItem('rating_current_page', String(effectivePage));
+        setSearchParams(prev => {
+          const next = new URLSearchParams(prev);
+          next.set('page', effectivePage);
+          return next;
+        }, { replace: true });
+      }
+
+      setHighlightedChainage(filters?.minChainage ? (matchedCh || filters.minChainage) : null);
       
       const tasksAsAssets = fetchedTasks.map((task, localIndex) => {
         const firstParam = task.parameters?.[0] || {};
@@ -195,7 +229,7 @@ const RoadSummaryPage = () => {
           ? task.parameters.length
           : (Array.isArray(task.ratings) && task.ratings.length > 0 ? task.ratings.length : 8);
 
-        const globalIndex = (page - 1) * 10 + localIndex;
+        const globalIndex = (effectivePage - 1) * 10 + localIndex;
 
         return {
           _id: (task._id || '').toString(),
@@ -215,11 +249,14 @@ const RoadSummaryPage = () => {
       setQuestions(tasksAsAssets);
       setTotalPages(calculatedTotalPages);
     } catch (err) {
+      if (requestId !== searchRequestIdRef.current) return;
       console.error('Error loading batch tasks:', err);
       setQuestions([]);
       setTotalPages(1);
     } finally {
-      setLoading(false);
+      if (requestId === searchRequestIdRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -275,22 +312,23 @@ const RoadSummaryPage = () => {
   const currentItems = questions;
   
   const handleGetRatings = () => {
+    const trimmedMin = (minChainage || '').trim();
+    const trimmedMax = (maxChainage || '').trim();
     const newFilters = {
       category: selectedCategory,
-      minChainage,
-      maxChainage,
+      minChainage: trimmedMin,
+      maxChainage: trimmedMax,
       direction,
       roadType,
       paramType,
       concernedItems,
     };
     setAppliedFilters(newFilters);
-    setCurrentPage(1);
-    sessionStorage.setItem('rating_current_page', '1');
     setGotoPageInput('');
     setPageValidationError('');
+    setNoMatchingChainage(false);
     if (activeBatchId) {
-      loadBatchTasks(activeBatchId, 1, newFilters);
+      loadBatchTasks(activeBatchId, 1, newFilters, { jumpToMinChainage: Boolean(trimmedMin) });
     }
   };
   
@@ -321,8 +359,27 @@ const RoadSummaryPage = () => {
         <div className="flex-1 p-6 overflow-y-auto">
           <div className="bg-white rounded shadow-sm border border-borderColor flex flex-col min-h-full overflow-hidden">
             
-            {/* Top Tabs */}
-            <div className="flex p-4 border-b border-borderColor overflow-x-auto shrink-0">
+            {/* Top Header & Tabs */}
+            <div className="flex items-center justify-between p-4 border-b border-borderColor overflow-x-auto shrink-0 gap-4">
+              <div className="flex items-center gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const basePath = location.pathname.startsWith('/rating-v2') ? '/rating-v2' : '/rating';
+                    navigate(basePath);
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-gray-700 bg-white hover:bg-green-50 hover:text-[#5cb85c] border border-gray-300 hover:border-[#5cb85c] rounded-md transition-all shadow-sm shrink-0 cursor-pointer"
+                  title="Back to Rating Projects"
+                >
+                  <MdArrowBack className="text-base" />
+                  <span>Back</span>
+                </button>
+                {roadId && (
+                  <span className="text-xs font-bold text-[#5cb85c] bg-green-50 border border-[#5cb85c]/30 px-2.5 py-1 rounded tracking-wide">
+                    {roadId}
+                  </span>
+                )}
+              </div>
               <SegmentedFilters 
                 filters={tabsFilters} 
                 activeFilter={activeTab} 
@@ -495,12 +552,27 @@ const RoadSummaryPage = () => {
             <tbody>
               {loading ? (
                 <tr><td colSpan="8" className="text-center py-8">Loading...</td></tr>
+              ) : noMatchingChainage ? (
+                <tr>
+                  <td colSpan="8" className="text-center py-12">
+                    <div className="flex flex-col items-center justify-center gap-1">
+                      <p className="text-amber-600 font-semibold text-base">No matching chainage found</p>
+                      <p className="text-gray-500 text-xs">No records found matching chainage &ge; {appliedFilters.minChainage || minChainage} with the selected filters.</p>
+                    </div>
+                  </td>
+                </tr>
               ) : currentItems.length === 0 ? (
                 <tr><td colSpan="8" className="text-center py-8 text-gray-500">No rating records found for this version/filter.</td></tr>
               ) : currentItems.map((q, index) => {
+                const prevTask = index > 0 ? currentItems[index - 1] : null;
+                const isMatch = highlightedChainage && (
+                  parseFloat(q.chainage) === parseFloat(highlightedChainage) ||
+                  (parseFloat(q.chainage) >= parseFloat(highlightedChainage) && (!prevTask || parseFloat(prevTask.chainage) < parseFloat(highlightedChainage)))
+                );
                 return (
                 <tr 
                   key={index} 
+                  ref={isMatch ? matchedRowRef : null}
                   onClick={() => {
                     if (!activeBatchId) {
                       alert('No active inspection batch found for this project.');
@@ -520,13 +592,26 @@ const RoadSummaryPage = () => {
                       state: { roadId, currentPage } 
                     });
                   }}
-                  className={`border-b border-[#5cb85c]/20 hover:bg-green-50/50 cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-[#5cb85c]/[0.02]'}`}
+                  className={`border-b border-[#5cb85c]/20 hover:bg-green-50/50 cursor-pointer ${
+                    isMatch 
+                      ? 'bg-green-100/70 border-l-4 border-l-[#5cb85c]' 
+                      : index % 2 === 0 
+                        ? 'bg-white' 
+                        : 'bg-[#5cb85c]/[0.02]'
+                  }`}
                 >
                   <td className="px-4 py-3 text-gray-900 font-medium">{q.assetId}</td>
                   <td className="px-4 py-3 text-gray-600">{q.project}</td>
                   <td className="px-4 py-3 text-gray-600">{q.category}</td>
                   <td className="px-4 py-3 text-gray-600">{q.assetType}</td>
-                  <td className="px-4 py-3 text-gray-600">{q.chainage}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    <span className={isMatch ? 'font-bold text-[#2e7d32]' : ''}>{q.chainage}</span>
+                    {isMatch && (
+                      <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#5cb85c] text-white">
+                        MATCH
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-gray-600">{q.parameterCount} Params</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`px-2.5 py-1 text-xs font-medium rounded ${
@@ -555,7 +640,7 @@ const RoadSummaryPage = () => {
                 sessionStorage.setItem('rating_current_page', String(page));
                 setPageValidationError('');
                 if (activeBatchId) {
-                  loadBatchTasks(activeBatchId, page, appliedFilters);
+                  loadBatchTasks(activeBatchId, page, appliedFilters, { jumpToMinChainage: false });
                 }
               }} 
             />

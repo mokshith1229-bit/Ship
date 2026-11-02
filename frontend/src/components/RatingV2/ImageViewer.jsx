@@ -20,22 +20,31 @@ const ImageViewer = ({ task, activeView = 'current', onNext, onPrevious, hasNext
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isFullScreen]);
 
-  if (!task || !task.image || !task.image.cloudinaryUrl) {
+  if (!task) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
-        Inspection image unavailable
+      <div className="w-full h-full flex items-center justify-center bg-gray-50 text-gray-400 text-sm">
+        Loading inspection data...
       </div>
     );
   }
 
   const getDisplayData = () => {
-    if (activeView === 'prev' && task.previousImage) {
-      return { url: task.previousImage.url, chainage: task.previousImage.chainage };
+    if (activeView === 'prev') {
+      if (task.previousImage && task.previousImage.url) {
+        return { url: task.previousImage.url, chainage: task.previousImage.chainage, label: 'Previous' };
+      }
+      return { url: null, chainage: (parseFloat(task.chainage) - 0.010).toFixed(3), label: 'Previous' };
     }
-    if (activeView === 'next' && task.nextImage) {
-      return { url: task.nextImage.url, chainage: task.nextImage.chainage };
+    if (activeView === 'next') {
+      if (task.nextImage && task.nextImage.url) {
+        return { url: task.nextImage.url, chainage: task.nextImage.chainage, label: 'Next' };
+      }
+      return { url: null, chainage: (parseFloat(task.chainage) + 0.010).toFixed(3), label: 'Next' };
     }
-    return { url: task.image.cloudinaryUrl, chainage: task.chainage };
+    if (task.image && task.image.cloudinaryUrl) {
+      return { url: task.image.cloudinaryUrl, chainage: task.chainage, label: 'Centre' };
+    }
+    return { url: null, chainage: task.chainage, label: 'Centre' };
   };
 
   const displayData = getDisplayData();
@@ -46,9 +55,10 @@ const ImageViewer = ({ task, activeView = 'current', onNext, onPrevious, hasNext
       <div className="w-full h-full relative bg-transparent overflow-hidden group">
         <div 
           className="w-full h-full flex items-center justify-center relative cursor-crosshair"
-          onMouseEnter={() => setZoomState(prev => ({ ...prev, show: true }))}
+          onMouseEnter={() => { if (displayData.url) setZoomState(prev => ({ ...prev, show: true })); }}
           onMouseLeave={() => setZoomState(prev => ({ ...prev, show: false }))}
           onMouseMove={(e) => {
+            if (!displayData.url) return;
             const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
             const x = (e.clientX - left) / width;
             const y = (e.clientY - top) / height;
@@ -59,34 +69,58 @@ const ImageViewer = ({ task, activeView = 'current', onNext, onPrevious, hasNext
             });
           }}
           onClick={() => {
-            setIsFullScreen(true);
-            setRotation(0);
+            if (displayData.url) {
+              setIsFullScreen(true);
+              setRotation(0);
+            }
           }}
         >
           <AnimatePresence mode="wait">
-            <motion.img
-              key={`${task._id}-${activeView}`}
-              src={displayData.url}
-              alt={`Chainage ${displayData.chainage}`}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="max-w-full max-h-full object-contain rounded-xl"
-              style={
-                zoomState.show
-                  ? {
-                      transform: 'scale(3.5)',
-                      transformOrigin: `${zoomState.x * 100}% ${zoomState.y * 100}%`,
-                      transition: 'transform 0.1s ease-out'
-                    }
-                  : {
-                      transform: 'scale(1)',
-                      transformOrigin: 'center center',
-                      transition: 'transform 0.3s ease-out'
-                    }
-              }
-            />
+            {displayData.url ? (
+              <motion.img
+                key={`${task._id}-${activeView}`}
+                src={displayData.url}
+                alt={`Chainage ${displayData.chainage}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="max-w-full max-h-full object-contain rounded-xl"
+                style={
+                  zoomState.show
+                    ? {
+                        transform: 'scale(3.5)',
+                        transformOrigin: `${zoomState.x * 100}% ${zoomState.y * 100}%`,
+                        transition: 'transform 0.1s ease-out'
+                      }
+                    : {
+                        transform: 'scale(1)',
+                        transformOrigin: 'center center',
+                        transition: 'transform 0.3s ease-out'
+                      }
+                }
+              />
+            ) : (
+              <motion.div
+                key={`${task._id}-${activeView}-empty`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col items-center justify-center p-8 text-center text-gray-400 select-none"
+              >
+                <div className="w-16 h-16 mb-3 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <p className="text-sm font-semibold text-gray-600 mb-1">
+                  {displayData.label} Image Unavailable
+                </p>
+                <p className="text-xs text-gray-400 font-mono">
+                  CH {displayData.chainage} KM &bull; {task.direction || 'LHS'} &bull; {task.roadType || 'Main Carriageway'}
+                </p>
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
         

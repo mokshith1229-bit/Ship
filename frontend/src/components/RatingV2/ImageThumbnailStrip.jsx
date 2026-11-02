@@ -15,7 +15,7 @@ const ImageThumbnailStrip = ({ task, activeView, onViewChange }) => {
       <div className="relative w-full max-w-[600px] flex items-center justify-center gap-6 py-2">
         
         {/* Previous Image */}
-        {task.previousImage ? (
+        {task.previousImage && task.previousImage.url ? (
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -27,10 +27,15 @@ const ImageThumbnailStrip = ({ task, activeView, onViewChange }) => {
               CH {task.previousImage.chainage}
             </div>
           </motion.div>
-        ) : <div className="w-[25%] shrink-0" />}
+        ) : (
+          <div className="w-[25%] aspect-video bg-gray-50 border border-dashed border-gray-200 rounded-lg flex flex-col items-center justify-center text-gray-400 text-[10px] shrink-0 select-none">
+            <span>No previous</span>
+            <span className="text-[9px] text-gray-400 font-mono">CH {(parseFloat(task.chainage) - 0.010).toFixed(3)}</span>
+          </div>
+        )}
         
         {/* Current Image */}
-        {task.image.cloudinaryUrl && (
+        {task.image && task.image.cloudinaryUrl ? (
           <div 
             className={`w-[35%] aspect-video rounded-lg shadow-md flex flex-col items-center justify-center bg-white cursor-pointer relative overflow-hidden shrink-0 mx-2 transition-all ${getBorderClass('current')}`}
             onClick={() => onViewChange('current')}
@@ -40,10 +45,18 @@ const ImageThumbnailStrip = ({ task, activeView, onViewChange }) => {
               CH {task.chainage}
             </div>
           </div>
+        ) : (
+          <div 
+            className={`w-[35%] aspect-video rounded-lg shadow-sm flex flex-col items-center justify-center bg-gray-50 border border-dashed border-amber-300 text-amber-700 text-xs shrink-0 mx-2 cursor-pointer transition-all ${getBorderClass('current')}`}
+            onClick={() => onViewChange('current')}
+          >
+            <span className="font-semibold text-xs">Image Unavailable</span>
+            <span className="text-[10px] text-gray-500 font-mono mt-0.5">CH {task.chainage} &bull; {task.direction}</span>
+          </div>
         )}
         
         {/* Next Image */}
-        {task.nextImage ? (
+        {task.nextImage && task.nextImage.url ? (
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -55,7 +68,12 @@ const ImageThumbnailStrip = ({ task, activeView, onViewChange }) => {
               CH {task.nextImage.chainage}
             </div>
           </motion.div>
-        ) : <div className="w-[25%] shrink-0" />}
+        ) : (
+          <div className="w-[25%] aspect-video bg-gray-50 border border-dashed border-gray-200 rounded-lg flex flex-col items-center justify-center text-gray-400 text-[10px] shrink-0 select-none">
+            <span>No next</span>
+            <span className="text-[9px] text-gray-400 font-mono">CH {(parseFloat(task.chainage) + 0.010).toFixed(3)}</span>
+          </div>
+        )}
         
       </div>
     </div>

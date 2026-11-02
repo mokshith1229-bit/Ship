@@ -107,6 +107,7 @@ const getBatchTasks = asyncHandler(async (req, res) => {
     roadType: req.query.roadType,
     minChainage: req.query.minChainage,
     maxChainage: req.query.maxChainage,
+    jumpToMinChainage: req.query.jumpToMinChainage === 'true' || req.query.jumpToMinChainage === true,
     assignmentId: req.query.assignmentId,
     pages: req.query.pages
   };

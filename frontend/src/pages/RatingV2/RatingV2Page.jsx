@@ -185,14 +185,15 @@ const RatingV2Page = () => {
     }
   }, [targetFetchPage, loadedPage, batchId]);
 
-  const currentTask = tasks[localIndex] || null;
+  const isChunkLoading = loadedPage !== targetFetchPage;
+  const currentTask = isChunkLoading ? null : (tasks[localIndex] || null);
 
   useEffect(() => {
     if (currentTask) {
       initializeRatings(currentTask);
       setActiveImageView('current');
     }
-  }, [localIndex, currentTask]);
+  }, [currentTask?._id]);
 
   const handleRatingChange = (paramKey, score, remark, isSkipped = false) => {
     if (!currentTask) return;
@@ -331,12 +332,12 @@ const RatingV2Page = () => {
 
   const handleShiftImageRight = () => {
     if (activeImageView === 'prev') setActiveImageView('current');
-    else if (activeImageView === 'current' && currentTask?.nextImage) setActiveImageView('next');
+    else if (activeImageView === 'current' && currentTask?.nextImage?.url) setActiveImageView('next');
   };
 
   const handleShiftImageLeft = () => {
     if (activeImageView === 'next') setActiveImageView('current');
-    else if (activeImageView === 'current' && currentTask?.previousImage) setActiveImageView('prev');
+    else if (activeImageView === 'current' && currentTask?.previousImage?.url) setActiveImageView('prev');
   };
 
   // Keyboard Shortcuts - ONLY Image Shifting (No Save)

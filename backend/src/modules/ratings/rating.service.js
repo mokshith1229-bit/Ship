@@ -4,6 +4,7 @@ const Inspection = require('../../models/Inspection.model');
 const InspectionBatch = require('../../models/InspectionBatch.model');
 const InspectionTask = require('../../models/InspectionTask.model');
 const MasterList = require('../../models/MasterList.model');
+const SurveyAsset = require('../../models/SurveyAsset.model');
 const User = require('../../models/User.model');
 const WorkAssignment = require('../../models/WorkAssignment.model');
 const mongoose = require('mongoose');
@@ -229,22 +230,66 @@ const getBatchTasks = async (batchId, user, options = {}) => {
       queryFilter.roadType = options.roadType;
     }
   }
-  if (options.minChainage || options.maxChainage) {
-    queryFilter.chainage = {};
-    if (options.minChainage) queryFilter.chainage.$gte = parseFloat(options.minChainage);
-    if (options.maxChainage) queryFilter.chainage.$lte = parseFloat(options.maxChainage);
+  if (options.maxChainage) {
+    const maxVal = parseFloat(options.maxChainage);
+    if (!isNaN(maxVal)) {
+      queryFilter.$expr = { $lte: [{ $toDouble: '$chainage' }, maxVal] };
+    }
   }
 
   // Pagination support — default: all tasks (limit=0 means no limit)
-  const page = Math.max(1, parseInt(options.page) || 1);
   const limit = parseInt(options.limit) || 0; // 0 = no pagination (backward compat)
-  const skip = limit > 0 ? (page - 1) * limit : 0;
   let total = 0;
   if (limit > 0) {
     total = await InspectionTask.countDocuments(queryFilter);
   }
+  const totalPages = limit > 0 ? (Math.ceil(total / limit) || 1) : 1;
+
+  let targetPage = null;
+  let matchedChainage = null;
+  let noMatch = false;
+
+  // Resolve target page when minChainage is provided
+  if (options.minChainage) {
+    const minVal = parseFloat(options.minChainage);
+    if (!isNaN(minVal)) {
+      const matchExpr = queryFilter.$expr
+        ? { $and: [queryFilter.$expr, { $gte: [{ $toDouble: '$chainage' }, minVal] }] }
+        : { $gte: [{ $toDouble: '$chainage' }, minVal] };
+
+      const matchTask = await InspectionTask.findOne({
+        ...queryFilter,
+        $expr: matchExpr
+      }).sort({ chainage: 1 }).lean();
+
+      if (!matchTask) {
+        noMatch = true;
+        return limit > 0
+          ? { tasks: [], total, page: 1, totalPages, targetPage: 1, noMatch: true }
+          : [];
+      } else {
+        matchedChainage = matchTask.chainage;
+        const matchVal = parseFloat(matchTask.chainage);
+        const countBeforeExpr = queryFilter.$expr
+          ? { $and: [queryFilter.$expr, { $lt: [{ $toDouble: '$chainage' }, matchVal] }] }
+          : { $lt: [{ $toDouble: '$chainage' }, matchVal] };
+
+        const countBefore = await InspectionTask.countDocuments({
+          ...queryFilter,
+          $expr: countBeforeExpr
+        });
+        targetPage = limit > 0 ? Math.floor(countBefore / limit) + 1 : 1;
+      }
+    }
+  }
+
+  let page = Math.max(1, parseInt(options.page) || 1);
+  if (options.jumpToMinChainage && targetPage) {
+    page = targetPage;
+  }
+  const skip = limit > 0 ? (page - 1) * limit : 0;
+
   let query = InspectionTask.find(queryFilter)
-    .select('-metadata -extractionDiagnostics')
     .populate('parameters')
     .sort({ chainage: 1 });
   if (limit > 0) {
@@ -254,37 +299,193 @@ const getBatchTasks = async (batchId, user, options = {}) => {
   const tasks = await query.lean();
   if (!tasks.length) {
     return limit > 0
-      ? { tasks: [], total, page, totalPages: Math.ceil(total / limit) }
+      ? { tasks: [], total, page, totalPages, targetPage: targetPage || page, matchedChainage, noMatch }
       : tasks;
   }
 
-  // ── Attach prev/next images using the already-fetched sorted tasks ──────────
-  // PERF FIX: Previously this re-queried ALL project tasks (another ~29 MB download).
-  // Now we compute prev/next from the sorted tasks we already have in memory.
-  // Tasks are already sorted by chainage ascending from the query above.
-  const tasksWithContext = tasks.map((task, idx) => {
-    // Walk backwards to find the nearest previous task that has an image
-    let prevTask = null;
-    for (let i = idx - 1; i >= 0; i--) {
-      if (tasks[i].image && tasks[i].image.cloudinaryUrl) {
-        prevTask = tasks[i];
-        break;
+  // ── Preload SurveyAssets to verify direction integrity ────────────────────────
+  const surveyAssetIds = [...new Set(tasks.map(t => t.extractionDiagnostics?.surveyAssetId?.toString()).filter(Boolean))];
+  const surveyAssets = surveyAssetIds.length > 0
+    ? await SurveyAsset.find({ _id: { $in: surveyAssetIds } }).select('roadDirection roadType assetName').lean()
+    : [];
+  const saMap = new Map(surveyAssets.map(sa => [sa._id.toString(), sa]));
+
+  // Direction and Road Type Normalizers
+  const normalizeDirection = (dir) => {
+    if (!dir) return null;
+    const d = String(dir).trim().toUpperCase();
+    if (d.includes('LHS')) return 'LHS';
+    if (d.includes('RHS')) return 'RHS';
+    if (d === 'BHS') return 'BHS';
+    return d;
+  };
+
+  const normalizeRoadType = (roadType) => {
+    if (!roadType) return 'MCW';
+    const r = String(roadType).trim().toUpperCase();
+    if (r === 'SR' || r.includes('SERVICE')) return 'SR';
+    if (r === 'MCW' || r.includes('MAIN')) return 'MCW';
+    return r;
+  };
+
+  const resolveTaskIdentity = (task, sa = null) => {
+    let taskDir = normalizeDirection(task.direction);
+    let taskRoad = normalizeRoadType(task.roadType);
+
+    if (!taskDir || taskDir === 'N/A') {
+      if (sa?.roadDirection) {
+        taskDir = normalizeDirection(sa.roadDirection);
+      } else if (task.parameters && task.parameters[0]?.direction) {
+        taskDir = normalizeDirection(task.parameters[0].direction);
       }
     }
 
-    // Walk forward to find the nearest next task that has an image
-    let nextTask = null;
-    for (let i = idx + 1; i < tasks.length; i++) {
-      if (tasks[i].image && tasks[i].image.cloudinaryUrl) {
-        nextTask = tasks[i];
-        break;
+    if (!taskRoad || taskRoad === 'N/A') {
+      if (sa?.roadType) {
+        taskRoad = normalizeRoadType(sa.roadType);
+      } else if (task.parameters && task.parameters[0]?.roadType) {
+        taskRoad = normalizeRoadType(task.parameters[0].roadType);
       }
+    }
+
+    const rawDir = String(task.direction || '').trim().toUpperCase();
+    if (rawDir.startsWith('SR ') || rawDir.startsWith('SR_') || rawDir.includes('SERVICE')) {
+      taskRoad = 'SR';
+    }
+
+    return { taskDir, taskRoad };
+  };
+
+  const validateCentreImage = (task, taskDir, sa = null) => {
+    const centerUrl = task.image?.cloudinaryUrl;
+    if (!centerUrl || typeof centerUrl !== 'string' || !centerUrl.trim()) {
+      return false;
+    }
+    // Strict direction verification: If SurveyAsset is known, its roadDirection must strictly match task direction
+    if (sa?.roadDirection) {
+      const saDir = normalizeDirection(sa.roadDirection);
+      if (saDir !== taskDir) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // ── Strict Direction-Synchronized Three-Image Selection ───────────────────────
+  const tasksWithContext = tasks.map((task) => {
+    const saId = task.extractionDiagnostics?.surveyAssetId?.toString();
+    const sa = saId ? saMap.get(saId) : null;
+
+    const { taskDir, taskRoad } = resolveTaskIdentity(task, sa);
+    const isCenterValid = validateCentreImage(task, taskDir, sa);
+
+    const validImage = isCenterValid
+      ? task.image
+      : { ...(task.image || {}), cloudinaryUrl: null, previousUrl: null, nextUrl: null };
+
+    let previousImage = null;
+    let nextImage = null;
+    const taskC = parseFloat(task.chainage);
+
+    if (isCenterValid) {
+      // Primary: Use task's own verified previousUrl / nextUrl extracted from the exact same SurveyAsset video
+      if (task.image?.previousUrl && typeof task.image.previousUrl === 'string' && task.image.previousUrl.trim()) {
+        const prevC = !isNaN(taskC) && taskC > 0.010 ? (taskC - 0.010).toFixed(3) : '0.000';
+        previousImage = {
+          url: task.image.previousUrl,
+          chainage: prevC,
+          direction: taskDir,
+          roadType: taskRoad,
+          surveyAssetId: saId || null
+        };
+      }
+
+      if (task.image?.nextUrl && typeof task.image.nextUrl === 'string' && task.image.nextUrl.trim()) {
+        const nextC = !isNaN(taskC) ? (taskC + 0.010).toFixed(3) : '0.000';
+        nextImage = {
+          url: task.image.nextUrl,
+          chainage: nextC,
+          direction: taskDir,
+          roadType: taskRoad,
+          surveyAssetId: saId || null
+        };
+      }
+    }
+
+    // Secondary fallback: Look for nearest lower / higher chainage task with matching direction and roadType
+    if (!previousImage && !isNaN(taskC)) {
+      let bestPrev = null;
+      for (let i = 0; i < tasks.length; i++) {
+        const t = tasks[i];
+        if (t._id?.toString() === task._id?.toString()) continue;
+        const tSaId = t.extractionDiagnostics?.surveyAssetId?.toString();
+        const tSa = tSaId ? saMap.get(tSaId) : null;
+        const { taskDir: tDir, taskRoad: tRoad } = resolveTaskIdentity(t, tSa);
+        if (tDir !== taskDir || tRoad !== taskRoad) continue;
+        if (!validateCentreImage(t, tDir, tSa)) continue;
+
+        const c = parseFloat(t.chainage);
+        if (c < taskC) {
+          if (!bestPrev || c > parseFloat(bestPrev.chainage)) {
+            bestPrev = t;
+          }
+        }
+      }
+      if (bestPrev) {
+        previousImage = {
+          url: bestPrev.image.cloudinaryUrl,
+          chainage: bestPrev.chainage,
+          direction: taskDir,
+          roadType: taskRoad,
+          surveyAssetId: bestPrev.extractionDiagnostics?.surveyAssetId?.toString() || null
+        };
+      }
+    }
+
+    if (!nextImage && !isNaN(taskC)) {
+      let bestNext = null;
+      for (let i = 0; i < tasks.length; i++) {
+        const t = tasks[i];
+        if (t._id?.toString() === task._id?.toString()) continue;
+        const tSaId = t.extractionDiagnostics?.surveyAssetId?.toString();
+        const tSa = tSaId ? saMap.get(tSaId) : null;
+        const { taskDir: tDir, taskRoad: tRoad } = resolveTaskIdentity(t, tSa);
+        if (tDir !== taskDir || tRoad !== taskRoad) continue;
+        if (!validateCentreImage(t, tDir, tSa)) continue;
+
+        const c = parseFloat(t.chainage);
+        if (c > taskC) {
+          if (!bestNext || c < parseFloat(bestNext.chainage)) {
+            bestNext = t;
+          }
+        }
+      }
+      if (bestNext) {
+        nextImage = {
+          url: bestNext.image.cloudinaryUrl,
+          chainage: bestNext.chainage,
+          direction: taskDir,
+          roadType: taskRoad,
+          surveyAssetId: bestNext.extractionDiagnostics?.surveyAssetId?.toString() || null
+        };
+      }
+    }
+
+    // Absolute enforcement: Never allow cross-direction or cross-road-type image
+    if (previousImage && (previousImage.direction !== taskDir || previousImage.roadType !== taskRoad)) {
+      previousImage = null;
+    }
+    if (nextImage && (nextImage.direction !== taskDir || nextImage.roadType !== taskRoad)) {
+      nextImage = null;
     }
 
     return {
       ...task,
-      previousImage: prevTask ? { url: prevTask.image.cloudinaryUrl, chainage: prevTask.chainage } : null,
-      nextImage: nextTask ? { url: nextTask.image.cloudinaryUrl, chainage: nextTask.chainage } : null
+      direction: taskDir || task.direction,
+      roadType: (taskRoad === 'SR' ? 'Service Road' : (task.roadType || 'Main Carriageway')),
+      image: validImage,
+      previousImage,
+      nextImage
     };
   });
   
@@ -294,7 +495,10 @@ const getBatchTasks = async (batchId, user, options = {}) => {
       tasks: tasksWithContext,
       total,
       page,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / limit) || 1,
+      targetPage: targetPage || page,
+      matchedChainage,
+      noMatch
     };
   }
   return tasksWithContext;

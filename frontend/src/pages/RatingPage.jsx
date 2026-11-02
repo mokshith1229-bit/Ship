@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MdOutlineMap, MdOutlineCheckCircle, MdOutlineHourglassEmpty, MdOutlineTrendingUp, MdStarRate } from 'react-icons/md';
+import { MdOutlineMap, MdOutlineCheckCircle, MdOutlineHourglassEmpty, MdOutlineTrendingUp, MdStarRate, MdArrowBack } from 'react-icons/md';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
 import StatCard from '../components/Rating/StatCard';
@@ -234,7 +234,18 @@ const RatingPage = () => {
 
             {/* Controls Bar */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-6 sticky top-0 bg-[#F8FAFC]/90 backdrop-blur-md py-4 z-40 border-b border-transparent">
-              <SegmentedFilters filters={filters} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate('/dashboard')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white hover:bg-green-50 hover:text-[#5cb85c] border border-gray-300 hover:border-[#5cb85c] rounded-md transition-all shadow-sm shrink-0 cursor-pointer"
+                  title="Back to Dashboard"
+                >
+                  <MdArrowBack className="text-base" />
+                  <span>Back</span>
+                </button>
+                <SegmentedFilters filters={filters} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
+              </div>
               <SearchBar value={searchQuery} onChange={setSearchQuery} />
             </div>
 
