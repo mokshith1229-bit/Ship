@@ -29,6 +29,9 @@ export const resolveRemarkRating = (category, remark) => {
     'no numbering': '1',
     'improper fixing plates': '5',
     'missing': '1',
+    'rusted': '1',
+    'chipped': '1',
+    'chipped concrete': '1',
     'due to pruning': '5',
     'unhealthy': '5',
     'due to grass': '5'

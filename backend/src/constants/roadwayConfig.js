@@ -12,7 +12,11 @@ const ROADWAY_PARAMETER_CONFIG = [
   { group: 'Pavement Markings', parameterKey: 'shyLineMarking', parameterName: 'Shy Line Marking' },
   { group: 'ROW', parameterKey: 'cleanlinessOfRow', parameterName: 'Cleanliness of ROW' },
   { group: 'Median Plantation', parameterKey: 'physicalConditionOfMedianPlants', parameterName: 'Physical condition of median plants' },
-  { group: 'Median Plantation', parameterKey: 'cleanlinessOfMedianGrass', parameterName: 'Cleanliness of median grass' }
+  { group: 'Median Plantation', parameterKey: 'cleanlinessOfMedianGrass', parameterName: 'Cleanliness of median grass' },
+  { group: 'Rigid Crash Barriers', parameterKey: 'RCB_HAND_RAIL', parameterName: 'Hand rail pipe – missing / rusted / damaged' },
+  { group: 'Rigid Crash Barriers', parameterKey: 'RCB_PAINTING', parameterName: 'Painting of RC crash barrier inner face – faded / not faded' },
+  { group: 'Rigid Crash Barriers', parameterKey: 'RCB_CRACKS', parameterName: 'Cracks' },
+  { group: 'Rigid Crash Barriers', parameterKey: 'RCB_CHIPPED', parameterName: 'Chipped concrete due to accidents' }
 ];
 
 module.exports = { ROADWAY_PARAMETER_CONFIG };

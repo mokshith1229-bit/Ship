@@ -7,6 +7,7 @@ const MasterList = require('../../models/MasterList.model');
 const SurveyAsset = require('../../models/SurveyAsset.model');
 const User = require('../../models/User.model');
 const WorkAssignment = require('../../models/WorkAssignment.model');
+const { ROADWAY_PARAMETER_CONFIG } = require('../../constants/roadwayConfig');
 const mongoose = require('mongoose');
 
 const toObjectId = (id) => {
@@ -479,8 +480,22 @@ const getBatchTasks = async (batchId, user, options = {}) => {
       nextImage = null;
     }
 
+    let taskRatings = task.ratings || [];
+    if (task.category === 'Roadway') {
+      const existingKeys = new Set(taskRatings.map(r => r.parameterKey));
+      const missingParams = ROADWAY_PARAMETER_CONFIG.filter(cfg => !existingKeys.has(cfg.parameterKey)).map(cfg => ({
+        ...cfg,
+        score: 10,
+        remark: ''
+      }));
+      if (missingParams.length > 0) {
+        taskRatings = [...taskRatings, ...missingParams];
+      }
+    }
+
     return {
       ...task,
+      ratings: taskRatings,
       direction: taskDir || task.direction,
       roadType: (taskRoad === 'SR' ? 'Service Road' : (task.roadType || 'Main Carriageway')),
       image: validImage,
@@ -534,7 +549,7 @@ const saveTaskRatings = async (taskId, ratingsData, selectedImageUrl, user) => {
   if (task.category === 'Roadway') {
     const ratedRoadwayGroups = new Set((task.ratings || []).filter(r => r.group).map(r => r.group));
     const skippedGroups = new Set((task.skippedAssetTypes || []).map(s => s.assetType));
-    const requiredRoadwayGroups = ['Pavement', 'Shoulder', 'Kerb', 'Pavement Markings', 'ROW', 'Median Plantation'];
+    const requiredRoadwayGroups = ['Pavement', 'Shoulder', 'Kerb', 'Pavement Markings', 'ROW', 'Median Plantation', 'Rigid Crash Barriers'];
     const isRoadwayCompleted = requiredRoadwayGroups.every(g => ratedRoadwayGroups.has(g) || skippedGroups.has(g));
     
     if (isRoadwayCompleted) {
@@ -717,34 +732,42 @@ const skipTask = async (taskId, skipData, user) => {
     }
   }
 
-  const reason = skipData.skipReason || skipData.reason;
+  // Handle case where payload was wrapped in { reason: { ... } }
+  let data = { ...(skipData || {}) };
+  if (data.reason && typeof data.reason === 'object') {
+    data = { ...data.reason, ...data, reason: data.reason.skipReason || data.reason.reason };
+  }
+
+  const reason = (typeof data.skipReason === 'string' && data.skipReason.trim()) || 
+                 (typeof data.reason === 'string' && data.reason.trim()) || 
+                 '';
   if (!reason) {
     throw Object.assign(new Error('Skip reason is required'), { statusCode: 400 });
   }
 
-  if (reason === 'Other' && !skipData.remarks) {
+  if (reason === 'Other' && !data.remarks?.trim()) {
     throw Object.assign(new Error('Remarks are required when skip reason is "Other"'), { statusCode: 400 });
   }
 
-  if (skipData.assetType) {
+  if (data.assetType) {
     // Asset-level skip
     if (!task.skippedAssetTypes) task.skippedAssetTypes = [];
     
     // Remove if already exists to update
-    task.skippedAssetTypes = task.skippedAssetTypes.filter(s => s.assetType !== skipData.assetType);
+    task.skippedAssetTypes = task.skippedAssetTypes.filter(s => s.assetType !== data.assetType);
     
     task.skippedAssetTypes.push({
-      assetType: skipData.assetType,
+      assetType: data.assetType,
       reason: reason,
-      remarks: skipData.remarks || '',
-      skippedBy: user._id,
+      remarks: data.remarks || '',
+      skippedBy: user?._id,
       skippedAt: new Date()
     });
 
     if (task.category === 'Roadway') {
       const ratedRoadwayGroups = new Set((task.ratings || []).filter(r => r.group).map(r => r.group));
       const skippedGroups = new Set(task.skippedAssetTypes.map(s => s.assetType));
-      const requiredRoadwayGroups = ['Pavement', 'Shoulder', 'Kerb', 'Pavement Markings', 'ROW', 'Median Plantation'];
+      const requiredRoadwayGroups = ['Pavement', 'Shoulder', 'Kerb', 'Pavement Markings', 'ROW', 'Median Plantation', 'Rigid Crash Barriers'];
       const isRoadwayCompleted = requiredRoadwayGroups.every(g => ratedRoadwayGroups.has(g) || skippedGroups.has(g));
       
       if (isRoadwayCompleted) {
@@ -765,8 +788,8 @@ const skipTask = async (taskId, skipData, user) => {
     task.status = 'SKIPPED';
     task.skipMetadata = {
       reason: reason,
-      remarks: skipData.remarks || '',
-      skippedBy: user._id,
+      remarks: data.remarks || '',
+      skippedBy: user?._id,
       skippedAt: new Date()
     };
   }
@@ -834,7 +857,7 @@ const unskipTask = async (taskId, payload, user) => {
     if (task.category === 'Roadway') {
       const ratedRoadwayGroups = new Set((task.ratings || []).filter(r => r.group).map(r => r.group));
       const skippedGroups = new Set((task.skippedAssetTypes || []).map(s => s.assetType));
-      const requiredRoadwayGroups = ['Pavement', 'Shoulder', 'Kerb', 'Pavement Markings', 'ROW', 'Median Plantation'];
+      const requiredRoadwayGroups = ['Pavement', 'Shoulder', 'Kerb', 'Pavement Markings', 'ROW', 'Median Plantation', 'Rigid Crash Barriers'];
       const isRoadwayCompleted = requiredRoadwayGroups.every(g => ratedRoadwayGroups.has(g) || skippedGroups.has(g));
       
       task.status = isRoadwayCompleted ? 'COMPLETED' : 'IN_PROGRESS';

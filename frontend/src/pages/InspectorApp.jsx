@@ -507,7 +507,7 @@ const InspectorApp = () => {
       setSkipping(true);
       const payload = {
         category: currentTask.category,
-        assetType: skipGroup ? skipGroup : currentTask.assetType,
+        assetType: skipGroup ? skipGroup : null,
         skipReason: skipReason,
         remarks: skipRemarks
       };
@@ -517,7 +517,12 @@ const InspectorApp = () => {
       
       setTasks(prev => {
         const updated = [...prev];
-        updated[localIndex] = { ...updated[localIndex], status: returnedTask.status, skippedAssetTypes: returnedTask.skippedAssetTypes };
+        updated[localIndex] = { 
+          ...updated[localIndex], 
+          status: returnedTask.status, 
+          skippedAssetTypes: returnedTask.skippedAssetTypes,
+          skipMetadata: returnedTask.skipMetadata
+        };
         return updated;
       });
       
@@ -616,7 +621,7 @@ const InspectorApp = () => {
     
     // Determine category for this parameter (useful for RSF embedded in Roadway)
     // For RSF parameters, param.assetType might be 'Road Signage and Furniture' or 'Landscaping'
-    const paramCategory = param.category || param.assetType || currentCategory;
+    const paramCategory = param.group || param.category || param.assetType || currentCategory;
     const paramMasterRemarks = remarkMasterConfig[paramCategory] || [];
     
     // Combine master remarks for the main task category AND the specific parameter category
@@ -949,7 +954,7 @@ const InspectorApp = () => {
           <div className="flex flex-col gap-6 w-full mb-0">
             {currentTask.category === 'Roadway' ? (
               <>
-                {['Pavement', 'Shoulder', 'Kerb', 'Pavement Markings', 'ROW', 'Median Plantation'].map(group => {
+                {['Pavement', 'Shoulder', 'Kerb', 'Pavement Markings', 'ROW', 'Median Plantation', 'Rigid Crash Barriers'].map(group => {
                   const groupParams = (currentTask.ratings || []).filter(p => p.group === group && p.parameterKey !== 'rutting');
                   if (groupParams.length === 0) return null;
                   const isSkipped = (currentTask.skippedAssetTypes || []).some(s => s.assetType === group);

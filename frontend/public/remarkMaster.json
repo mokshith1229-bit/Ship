@@ -43,5 +43,13 @@
     "Unhealthy",
     "Due to Grass",
     "Due to Soil"
+  ],
+  "Rigid Crash Barriers": [
+    "Cracks",
+    "Damaged",
+    "Faded",
+    "Missing",
+    "Rusted",
+    "Chipped"
   ]
 }

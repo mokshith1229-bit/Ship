@@ -50,10 +50,13 @@ export const ratingService = {
   },
 
   /**
-   * Skip a task
+   * Skip a task or asset
    */
-  async skipTask(taskId, reason, remarks = '') {
-    const response = await api.post(`/ratings/tasks/${taskId}/skip`, { reason, remarks });
+  async skipTask(taskId, reasonOrPayload, remarks = '') {
+    const payload = (typeof reasonOrPayload === 'object' && reasonOrPayload !== null)
+      ? reasonOrPayload
+      : { reason: reasonOrPayload, remarks };
+    const response = await api.post(`/ratings/tasks/${taskId}/skip`, payload);
     return response.data;
   },
 

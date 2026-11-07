@@ -15,6 +15,16 @@ const inspectionTaskSchema = new mongoose.Schema(
       required: true,
       index: true
     },
+    category: {
+      type: String,
+      trim: true,
+      index: true
+    },
+    direction: {
+      type: String,
+      trim: true,
+      index: true
+    },
     assetType: {
       type: String,
       index: true
@@ -78,6 +88,12 @@ const inspectionTaskSchema = new mongoose.Schema(
       required: true,
       index: true
     },
+    imageRequirement: {
+      type: String,
+      enum: ['DAY', 'NIGHT'],
+      default: 'DAY',
+      index: true
+    },
     status: {
       type: String,
       enum: ['PENDING_IMAGE', 'READY_FOR_REVIEW', 'READY_FOR_RATING', 'IN_PROGRESS', 'COMPLETED', 'EXTRACTION_FAILED', 'FAILED', 'REJECTED', 'SKIPPED'],
@@ -129,7 +145,14 @@ const inspectionTaskSchema = new mongoose.Schema(
       remarks: String,
       skippedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
       skippedAt: Date
-    }
+    },
+    skippedAssetTypes: [{
+      assetType: { type: String, required: true },
+      reason: String,
+      remarks: String,
+      skippedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      skippedAt: { type: Date, default: Date.now }
+    }]
   },
   {
     timestamps: true,
@@ -137,6 +160,8 @@ const inspectionTaskSchema = new mongoose.Schema(
     toObject: { virtuals: true }
   }
 );
+
+inspectionTaskSchema.index({ batchId: 1, chainage: 1 });
 
 const InspectionTask = mongoose.model('InspectionTask', inspectionTaskSchema);
 
